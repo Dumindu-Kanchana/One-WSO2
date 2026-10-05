@@ -60,12 +60,14 @@ import type {
 } from "../../api/riskApi";
 import { deleteRiskEvidence, fetchRiskEvidence, uploadRiskEvidence } from "../../api/riskApi";
 import RiskHistoryTimeline from "./RiskHistoryTimeline";
+import { ENVIRONMENTS, hasComplianceReferences } from "../add-risk/templates";
 import { RiskPrivilege } from "../../privileges";
 import { dialogPaperSx } from "../cardStyles";
 import {
   STATUS_CONFIG,
   calcAge,
   calcDue,
+  canCancelRisk,
   canViewInline,
   changedValue,
   downloadBlob,
@@ -272,6 +274,57 @@ function InfoTile({ label, children }: { label: string; children: ReactNode }): 
 
 function InfoGrid({ children }: { children: ReactNode }): JSX.Element {
   return <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>{children}</Box>;
+}
+
+const ENVIRONMENT_LABELS = Object.fromEntries(ENVIRONMENTS.map((e) => [e.value, e.label]));
+
+// The fields a register's template adds to a risk (RISK_MODULE_DESIGN.md §14):
+// Platform on an Aggregated register; Customer, Deployment Type, Product and
+// Environment on a Managed Services one. Renders nothing for Standard. A value
+// that has since been deactivated still shows — the risk keeps what it had.
+export function RegisterDetails({ detail }: { detail: RiskDetail }): JSX.Element | null {
+  const chips = (labels: string[]): JSX.Element => (
+    <Stack direction="row" flexWrap="wrap" gap={0.75}>
+      {labels.map((label) => (
+        <Chip key={label} label={label} size="small" variant="outlined" />
+      ))}
+    </Stack>
+  );
+
+  if (detail.register_template === "AGGREGATED") {
+    return (
+      <SectionCard icon={<Briefcase size={16} />} iconBg="#ecfeff" iconColor="#0e7490" title="Platform">
+        {detail.platforms.length > 0 ? (
+          chips(detail.platforms.map((p) => p.name))
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            No platform recorded.
+          </Typography>
+        )}
+      </SectionCard>
+    );
+  }
+
+  if (detail.register_template === "MANAGED_SERVICES") {
+    return (
+      <SectionCard icon={<Briefcase size={16} />} iconBg="#ecfeff" iconColor="#0e7490" title="Managed Services Details">
+        <Stack gap={1.5}>
+          <InfoGrid>
+            <InfoTile label="Customer">
+              {detail.customer ? `${detail.customer.name} (${detail.customer.code ?? ""})` : ""}
+            </InfoTile>
+            <InfoTile label="Deployment Type">{detail.deployment_type?.name ?? ""}</InfoTile>
+          </InfoGrid>
+          <InfoTile label="Product">{detail.products.length > 0 ? chips(detail.products.map((p) => p.name)) : ""}</InfoTile>
+          <InfoTile label="Environment">
+            {detail.environments.length > 0 ? chips(detail.environments.map((e) => ENVIRONMENT_LABELS[e] ?? e)) : ""}
+          </InfoTile>
+        </Stack>
+      </SectionCard>
+    );
+  }
+
+  return null;
 }
 
 function ScoreChip({ label, score }: { label: string; score: RiskScoreInfo }): JSX.Element {
@@ -716,8 +769,9 @@ function ActionPlanCard({
   );
 }
 
-function ActionFooter({
+export function ActionFooter({
   status,
+  ownerFirstApprovedAt,
   actions,
   disabled,
   can,
@@ -729,6 +783,9 @@ function ActionFooter({
   hasOpenEscalation,
 }: {
   status: string;
+  // When a Risk Owner first approved the risk; null if never. Decides whether
+  // a rejected risk may still be cancelled.
+  ownerFirstApprovedAt: string | null;
   actions: DrawerActions;
   disabled: boolean;
   can: (privilege: string) => boolean;
@@ -900,13 +957,22 @@ function ActionFooter({
     case "PENDING_REVISION": {
       const showEdit = can(RiskPrivilege.UpdateRisk) && isRiskAssigner;
       const showResubmit = can(RiskPrivilege.SubmitRisk) && isRiskAssigner;
-      if (!showEdit && !showResubmit) return null;
+      // Cancelling is only open while no Risk Owner has ever approved the risk,
+      // so a wrong customer — locked, being part of the risk code — can be
+      // fixed by cancelling and raising it again.
+      const showCancel = can(RiskPrivilege.CancelRisk) && isRiskAssigner && canCancelRisk(status, ownerFirstApprovedAt);
+      if (!showEdit && !showResubmit && !showCancel) return null;
       return (
         <Box sx={{ pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
           <Stack direction="row" gap={1}>
             {showEdit && (
               <Button variant="outlined" fullWidth disabled={disabled} onClick={actions.onEdit}>
                 Edit Risk
+              </Button>
+            )}
+            {showCancel && (
+              <Button variant="outlined" color="error" fullWidth disabled={disabled} onClick={actions.onCancel}>
+                Cancel Risk
               </Button>
             )}
             {showResubmit && (
@@ -1224,6 +1290,8 @@ export default function RiskDetailDrawer({
                 </Stack>
               </SectionCard>
 
+              <RegisterDetails detail={detail} />
+
               <SectionCard icon={<Users size={16} />} iconBg="#eff6ff" iconColor="#2563eb" title="Ownership">
                 <InfoGrid>
                   <InfoTile label="Assigned To">{detail.assigner_name}</InfoTile>
@@ -1246,19 +1314,22 @@ export default function RiskDetailDrawer({
                 )}
               </SectionCard>
 
-              <SectionCard icon={<LinkIcon size={16} />} iconBg="#f5f3ff" iconColor="#7c3aed" title="Compliance References">
-                {detail.compliance_references.length > 0 ? (
-                  <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                    {detail.compliance_references.map((ref) => (
-                      <Chip key={ref.id} label={ref.name} size="small" variant="outlined" />
-                    ))}
-                  </Stack>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    No compliance references linked.
-                  </Typography>
-                )}
-              </SectionCard>
+              {/* Managed Services risks have no compliance references */}
+              {hasComplianceReferences(detail.register_template) && (
+                <SectionCard icon={<LinkIcon size={16} />} iconBg="#f5f3ff" iconColor="#7c3aed" title="Compliance References">
+                  {detail.compliance_references.length > 0 ? (
+                    <Stack direction="row" flexWrap="wrap" gap={0.75}>
+                      {detail.compliance_references.map((ref) => (
+                        <Chip key={ref.id} label={ref.name} size="small" variant="outlined" />
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      No compliance references linked.
+                    </Typography>
+                  )}
+                </SectionCard>
+              )}
             </TabPanel>
 
             <TabPanel value={tab} index={1}>
@@ -1377,6 +1448,7 @@ export default function RiskDetailDrawer({
           )}
           <ActionFooter
             status={status}
+            ownerFirstApprovedAt={detail.owner_first_approved_at}
             actions={actions}
             disabled={actionsDisabled}
             can={can}

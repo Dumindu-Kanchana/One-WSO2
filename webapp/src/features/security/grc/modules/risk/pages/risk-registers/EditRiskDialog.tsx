@@ -43,17 +43,27 @@ import { Plus, Trash2 } from "@wso2/oxygen-ui-icons-react";
 import { parseDateOnly, toDateOnlyString } from "@features/security/grc/utils/dateTime";
 import type { JSX } from "react";
 import type * as React from "react";
-import { resolveUserByEmail, searchEmployees } from "../../api/riskApi";
+import { fetchLookupOptions, resolveUserByEmail, searchEmployees } from "../../api/riskApi";
 import type {
   ComplianceReference,
   EmployeeOption,
+  LookupOption,
   RiskDetail,
+  RiskEnvironment,
   RiskScore,
   RiskTeam,
   UpdateRiskPayload,
   UserOption,
 } from "../../api/riskApi";
 import { TREATMENT_STRATEGIES } from "../add-risk/constants";
+import PillMultiSelect from "../add-risk/PillMultiSelect";
+import {
+  ENVIRONMENTS,
+  hasComplianceReferences,
+  missingTemplateFields,
+  optionsForEdit,
+  sameValues,
+} from "../add-risk/templates";
 import { LEVEL_FALLBACK_COLORS } from "../dashboard/constants";
 import { dialogPaperSx } from "../cardStyles";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
@@ -149,6 +159,23 @@ export default function EditRiskDialog({
   const [progress, setProgress] = useState(detail.progress ?? "");
   const [gitIssueUrl, setGitIssueUrl] = useState(detail.git_issue_url ?? "");
   const [remarks, setRemarks] = useState(detail.remarks ?? "");
+
+  // ── Register-template fields (full mode only; RISK_MODULE_DESIGN.md §14) ───
+  // Which of these the risk has depends on its register's template. The
+  // customer is not here: it is part of the risk code and never changes.
+  const template = detail.register_template;
+  const currentPlatformIds = (detail.platforms ?? []).map((p) => p.id);
+  const currentProductIds = (detail.products ?? []).map((p) => p.id);
+  const currentEnvironments: RiskEnvironment[] = detail.environments ?? [];
+  const [platformIds, setPlatformIds] = useState<number[]>(currentPlatformIds);
+  const [deploymentTypeId, setDeploymentTypeId] = useState<number | "">(detail.deployment_type?.id ?? "");
+  const [productIds, setProductIds] = useState<number[]>(currentProductIds);
+  const [environments, setEnvironments] = useState<RiskEnvironment[]>(currentEnvironments);
+  // Every value, inactive included: a value the risk already carries stays
+  // selectable after being deactivated (see optionsForEdit).
+  const [platformOptions, setPlatformOptions] = useState<LookupOption[]>([]);
+  const [productOptions, setProductOptions] = useState<LookupOption[]>([]);
+  const [deploymentTypeOptions, setDeploymentTypeOptions] = useState<LookupOption[]>([]);
 
   // ── Fields available in both modes ────────────────────────────────────────
   const [implementationDate, setImplementationDate] = useState<Date | null>(
@@ -254,8 +281,42 @@ export default function EditRiskDialog({
     actionOwnerDebounce.current = setTimeout(() => runActionOwnerSearch(value), EMPLOYEE_SEARCH_DEBOUNCE_MS);
   };
 
+  // Load the lookup values the register's template needs, once, when the
+  // dialog opens in full mode.
+  useEffect(() => {
+    if (!open || mode !== "full" || template === "STANDARD") return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (template === "AGGREGATED") {
+          const platforms = await fetchLookupOptions(authFetch, "platforms", "ALL");
+          if (!cancelled) setPlatformOptions(platforms);
+        } else if (template === "MANAGED_SERVICES") {
+          const [products, deploymentTypes] = await Promise.all([
+            fetchLookupOptions(authFetch, "products", "ALL"),
+            fetchLookupOptions(authFetch, "deployment-types", "ALL"),
+          ]);
+          if (!cancelled) {
+            setProductOptions(products);
+            setDeploymentTypeOptions(deploymentTypes);
+          }
+        }
+      } catch {
+        if (!cancelled) setApiError("Couldn't load the options for this register's fields. Please close and try again.");
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, template, authFetch]);
+
   useEffect(() => {
     if (!open) return;
+    setPlatformIds((detail.platforms ?? []).map((p) => p.id));
+    setDeploymentTypeId(detail.deployment_type?.id ?? "");
+    setProductIds((detail.products ?? []).map((p) => p.id));
+    setEnvironments(detail.environments ?? []);
     setRiskTitle(detail.risk_title);
     setRiskDescription(detail.risk_description);
     setImpactDescription(detail.impact_description ?? "");
@@ -305,6 +366,18 @@ export default function EditRiskDialog({
       if (reassessmentDate && reassessmentDate < today) {
         e.reassessmentDate = "Reassessment date cannot be in the past.";
       }
+      // The customer is locked and never validated here: it cannot be edited,
+      // so a risk missing one could not be repaired from this form.
+      Object.assign(
+        e,
+        missingTemplateFields(template, {
+          platforms: platformIds,
+          customer: detail.customer?.id ?? 0,
+          deploymentType: deploymentTypeId,
+          products: productIds,
+          environments,
+        }),
+      );
     }
     if (implementationDate && implementationDate < today) {
       e.implementationDate = "Implementation date cannot be in the past.";
@@ -355,7 +428,21 @@ export default function EditRiskDialog({
 
         payload.assigner_id = assignerId !== "" ? Number(assignerId) : undefined;
         payload.owner_id = ownerId !== "" ? Number(ownerId) : undefined;
-        payload.compliance_reference_ids = selectedRefIds;
+        // Managed Services risks have no compliance references.
+        if (hasComplianceReferences(template)) payload.compliance_reference_ids = selectedRefIds;
+        // Register-template fields go only when they changed. Each is the
+        // complete new set; the server checks they belong to this register's
+        // template and that anything newly added is still active.
+        if (template === "AGGREGATED" && !sameValues(platformIds, currentPlatformIds)) {
+          payload.platform_ids = platformIds;
+        }
+        if (template === "MANAGED_SERVICES") {
+          if (deploymentTypeId !== "" && deploymentTypeId !== detail.deployment_type?.id) {
+            payload.deployment_type_id = deploymentTypeId;
+          }
+          if (!sameValues(productIds, currentProductIds)) payload.product_ids = productIds;
+          if (!sameValues(environments, currentEnvironments)) payload.environments = environments;
+        }
         payload.gross_score_id = grossScoreId ?? undefined;
         payload.reassessment_date = toDateOnlyString(reassessmentDate);
         payload.treatment_strategy = treatmentStrategy || undefined;
@@ -622,7 +709,76 @@ export default function EditRiskDialog({
                       </FormHelperText>
                     )}
                   </FormControl>
-                  {/* Compliance References */}
+                  {/* Register-template fields. The customer is shown, not editable:
+                      it is part of the risk code, so a wrong one is fixed by
+                      cancelling this risk and raising it again. */}
+                  {template === "AGGREGATED" && (
+                    <PillMultiSelect
+                      label="Platform"
+                      required
+                      ariaLabel="Platforms"
+                      options={optionsForEdit(platformOptions, currentPlatformIds)}
+                      value={platformIds}
+                      onChange={(next) => {
+                        setPlatformIds(next);
+                        if (errors.platforms) setErrors((p) => ({ ...p, platforms: "" }));
+                      }}
+                      error={errors.platforms}
+                    />
+                  )}
+                  {template === "MANAGED_SERVICES" && (
+                    <>
+                      <TextField
+                        label="Customer Name"
+                        fullWidth
+                        disabled
+                        value={detail.customer ? `${detail.customer.name} (${detail.customer.code ?? ""})` : ""}
+                        helperText="Can't be changed: the customer is part of the risk code. To correct it, cancel this risk and raise it again."
+                      />
+                      <FormControl fullWidth disabled={submitting} error={!!errors.deploymentType}>
+                        <InputLabel>Deployment Type</InputLabel>
+                        <Select
+                          label="Deployment Type"
+                          value={deploymentTypeId}
+                          onChange={(e) => {
+                            setDeploymentTypeId(Number(e.target.value));
+                            if (errors.deploymentType) setErrors((p) => ({ ...p, deploymentType: "" }));
+                          }}
+                        >
+                          {optionsForEdit(deploymentTypeOptions, detail.deployment_type ? [detail.deployment_type.id] : []).map((o) => (
+                            <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
+                          ))}
+                        </Select>
+                        {errors.deploymentType && <FormHelperText error>{errors.deploymentType}</FormHelperText>}
+                      </FormControl>
+                      <PillMultiSelect
+                        label="Product"
+                        required
+                        ariaLabel="Products"
+                        options={optionsForEdit(productOptions, currentProductIds)}
+                        value={productIds}
+                        onChange={(next) => {
+                          setProductIds(next);
+                          if (errors.products) setErrors((p) => ({ ...p, products: "" }));
+                        }}
+                        error={errors.products}
+                      />
+                      <PillMultiSelect
+                        label="Environment"
+                        required
+                        ariaLabel="Environments"
+                        options={ENVIRONMENTS}
+                        value={environments}
+                        onChange={(next) => {
+                          setEnvironments(next);
+                          if (errors.environments) setErrors((p) => ({ ...p, environments: "" }));
+                        }}
+                        error={errors.environments}
+                      />
+                    </>
+                  )}
+                  {/* Compliance References — Managed Services risks have none */}
+                  {hasComplianceReferences(template) && (
                   <FormControl fullWidth disabled={submitting}>
                     <InputLabel>Compliance References</InputLabel>
                     <Select
@@ -641,6 +797,7 @@ export default function EditRiskDialog({
                       ))}
                     </Select>
                   </FormControl>
+                  )}
                 </Stack>
               </Box>
 
