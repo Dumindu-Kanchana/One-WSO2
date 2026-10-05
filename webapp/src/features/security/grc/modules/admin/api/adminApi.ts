@@ -209,8 +209,14 @@ export interface AdminTeam {
   code: string | null;
   description: string | null;
   team_type: "SOURCE_REGISTER" | "ASSIGNMENT" | "BOTH";
+  register_template: RegisterTemplate;
   status: "ACTIVE" | "INACTIVE" | "REMOVED";
 }
+
+// On a register, which fields its risks carry; on an assignment team, which
+// registers' pickers offer it (RISK_MODULE_DESIGN.md §14). Fixed once the
+// register has risks — the backend answers 409 after that.
+export type RegisterTemplate = "STANDARD" | "AGGREGATED" | "MANAGED_SERVICES";
 
 export interface TeamPayload {
   name: string;
@@ -222,6 +228,7 @@ export interface TeamPayload {
   // the update endpoint doesn't support partial updates and would otherwise
   // silently upgrade it to a full register.
   team_type: "BOTH" | "ASSIGNMENT" | "SOURCE_REGISTER";
+  register_template: RegisterTemplate;
   status: "ACTIVE" | "INACTIVE";
 }
 
@@ -249,6 +256,66 @@ export async function updateTeam(authFetch: AuthFetch, id: number, payload: Team
     method: "PUT",
     body: JSON.stringify(payload),
   });
+  await handleResponse(res);
+}
+
+// ── Manage Risk Hub — Register-template lookups ────────────────────────────────
+// Platforms, Customers, Products and Deployment Types: admin-managed dropdown
+// values for the Aggregated and Managed Services register templates. All four
+// share one shape and one set of endpoints (RISK_MODULE_DESIGN.md §14).
+
+export type LookupPath = "platforms" | "customers" | "products" | "deployment-types";
+
+export interface Lookup {
+  id: number;
+  name: string;
+  // Customers only: A-Z/0-9, embedded in Managed Services risk codes.
+  code?: string;
+  status: "ACTIVE" | "INACTIVE";
+  // True once any risk uses the value. It can then be deactivated but not
+  // deleted, and a customer's code can no longer change.
+  in_use: boolean;
+}
+
+export interface LookupPayload {
+  name: string;
+  code?: string;
+  status?: "ACTIVE" | "INACTIVE";
+}
+
+// Lists every value, inactive ones included — the admin table needs them to
+// reactivate. Pickers elsewhere ask for status=ACTIVE (see riskApi).
+export async function fetchLookups(authFetch: AuthFetch, path: LookupPath): Promise<Lookup[]> {
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/${path}`);
+  return handleResponse<Lookup[]>(res);
+}
+
+export async function createLookup(authFetch: AuthFetch, path: LookupPath, payload: LookupPayload): Promise<Lookup> {
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/${path}`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Lookup>(res);
+}
+
+// Fields left out of the payload are unchanged server-side.
+export async function updateLookup(
+  authFetch: AuthFetch,
+  path: LookupPath,
+  id: number,
+  payload: LookupPayload,
+): Promise<Lookup> {
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/${path}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Lookup>(res);
+}
+
+// Only a value no risk has ever used can be deleted; otherwise the backend
+// answers 409 and the admin should deactivate it instead.
+export async function deleteLookup(authFetch: AuthFetch, path: LookupPath, id: number): Promise<void> {
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/${path}/${id}`, { method: "DELETE" });
   await handleResponse(res);
 }
 

@@ -43,7 +43,14 @@ import {
 import { Pencil, Plus } from "@wso2/oxygen-ui-icons-react";
 import { type JSX, useEffect, useState } from "react";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
-import { createTeam, fetchAllTeams, updateTeam, type AdminTeam, type TeamPayload } from "../api/adminApi";
+import {
+  createTeam,
+  fetchAllTeams,
+  updateTeam,
+  type AdminTeam,
+  type RegisterTemplate,
+  type TeamPayload,
+} from "../api/adminApi";
 import { dialogPaperSx } from "../cardStyles";
 
 // The DB's team_type enum still has three values (SOURCE_REGISTER, ASSIGNMENT,
@@ -61,6 +68,40 @@ const teamTypeOptions: { value: "BOTH" | "ASSIGNMENT"; label: string; hint: stri
   { value: "ASSIGNMENT", label: "Assignment", hint: "Assignment target only — cannot be a risk's source register." },
 ];
 
+// What a Register Template means depends on the kind of team (RISK_MODULE_DESIGN.md
+// §14): on a register it picks the fields its risks carry; on an assignment-only
+// team it picks which registers' assignment pickers offer it. Aggregated only
+// means something on a register — an assignment team is either a Managed
+// Services (SRE) team or not.
+const templateLabel: Record<RegisterTemplate, string> = {
+  STANDARD: "Standard",
+  AGGREGATED: "Aggregated",
+  MANAGED_SERVICES: "Managed Services",
+};
+
+const registerTemplateOptions: { value: RegisterTemplate; label: string; hint: string }[] = [
+  { value: "STANDARD", label: "Standard", hint: "The original risk fields, including Security Compliance Reference." },
+  { value: "AGGREGATED", label: "Aggregated", hint: "The standard fields plus Platform." },
+  {
+    value: "MANAGED_SERVICES",
+    label: "Managed Services",
+    hint: "No Security Compliance Reference; adds Customer Name, Product, Deployment Type and Environment.",
+  },
+];
+
+const assignmentTemplateOptions: { value: RegisterTemplate; label: string; hint: string }[] = [
+  {
+    value: "STANDARD",
+    label: "Any register except Managed Services",
+    hint: "Offered as an assignment team on every register that isn't Managed Services.",
+  },
+  {
+    value: "MANAGED_SERVICES",
+    label: "Managed Services (SRE team)",
+    hint: "Offered only on Managed Services registers.",
+  },
+];
+
 const teamTypeLabel = (t: AdminTeam["team_type"]): string =>
   t === "BOTH" ? "Register" : t === "ASSIGNMENT" ? "Assignment" : "Source Register";
 
@@ -75,6 +116,7 @@ export default function RiskTeamsPage(): JSX.Element {
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [teamType, setTeamType] = useState<"BOTH" | "ASSIGNMENT">("BOTH");
+  const [registerTemplate, setRegisterTemplate] = useState<RegisterTemplate>("STANDARD");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [saving, setSaving] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -99,6 +141,7 @@ export default function RiskTeamsPage(): JSX.Element {
     setCode("");
     setDescription("");
     setTeamType("BOTH");
+    setRegisterTemplate("STANDARD");
     setStatus("ACTIVE");
     setDialogError(null);
     setDialogOpen(true);
@@ -116,6 +159,7 @@ export default function RiskTeamsPage(): JSX.Element {
     // below) and handleSave sends the real team_type unchanged, so this
     // display-only substitution never reaches the save payload.
     setTeamType(team.team_type === "ASSIGNMENT" ? "ASSIGNMENT" : "BOTH");
+    setRegisterTemplate(team.register_template);
     setStatus(team.status === "INACTIVE" ? "INACTIVE" : "ACTIVE");
     setDialogError(null);
     setDialogOpen(true);
@@ -127,6 +171,13 @@ export default function RiskTeamsPage(): JSX.Element {
   // SOURCE_REGISTER-only on save.
   const isSourceRegister = editing?.team_type === "SOURCE_REGISTER";
   const codeRequired = teamType === "BOTH" || isSourceRegister;
+  const templateOptions =
+    teamType === "ASSIGNMENT" && !isSourceRegister ? assignmentTemplateOptions : registerTemplateOptions;
+  // An assignment-only team can't be Aggregated; treat it as Standard rather
+  // than save a value its picker rule would ignore.
+  const effectiveTemplate: RegisterTemplate = templateOptions.some((o) => o.value === registerTemplate)
+    ? registerTemplate
+    : "STANDARD";
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -153,6 +204,7 @@ export default function RiskTeamsPage(): JSX.Element {
         code: code.trim() ? code.trim().toUpperCase() : null,
         description: description.trim(),
         team_type: isSourceRegister ? "SOURCE_REGISTER" : teamType,
+        register_template: effectiveTemplate,
         status,
       };
       if (editing) {
@@ -190,6 +242,7 @@ export default function RiskTeamsPage(): JSX.Element {
               <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Template</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
               <TableCell sx={{ fontWeight: 700 }} align="right">
                 Actions
@@ -199,14 +252,14 @@ export default function RiskTeamsPage(): JSX.Element {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <CircularProgress size={22} />
                 </TableCell>
               </TableRow>
             )}
             {!loading && teams.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     No teams found.
                   </Typography>
@@ -227,6 +280,7 @@ export default function RiskTeamsPage(): JSX.Element {
                     )}
                   </TableCell>
                   <TableCell>{teamTypeLabel(team.team_type)}</TableCell>
+                  <TableCell>{templateLabel[team.register_template] ?? team.register_template}</TableCell>
                   <TableCell>
                     <Chip
                       size="small"
@@ -256,7 +310,7 @@ export default function RiskTeamsPage(): JSX.Element {
         {/* pt bumped above DialogContent's default — otherwise the first
             field's floating label (autoFocus Name) renders partly clipped
             against the content box's top edge. */}
-        <DialogContent sx={{ minHeight: 380, pt: 3 }}>
+        <DialogContent sx={{ minHeight: 470, pt: 3 }}>
           {dialogError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError(null)}>
               {dialogError}
@@ -306,6 +360,24 @@ export default function RiskTeamsPage(): JSX.Element {
             {isSourceRegister
               ? "Source Register-only — this type isn't editable from this console; saving keeps it unchanged."
               : teamTypeOptions.find((o) => o.value === teamType)?.hint}
+          </Typography>
+          <FormControl fullWidth size="small">
+            <InputLabel id="team-template-label">Register Template</InputLabel>
+            <Select
+              labelId="team-template-label"
+              label="Register Template"
+              value={effectiveTemplate}
+              onChange={(e) => setRegisterTemplate(e.target.value as RegisterTemplate)}
+            >
+              {templateOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, mb: 2.5 }}>
+            {templateOptions.find((o) => o.value === effectiveTemplate)?.hint} Fixed once the register has risks.
           </Typography>
           <TextField
             fullWidth
