@@ -202,7 +202,7 @@ export default function ManageAuditHubPage(): JSX.Element {
         PaperProps={{ sx: dialogPaperSx }}
       >
         <DialogTitle>{editing ? "Edit Audit Team" : "Add Audit Team"}</DialogTitle>
-        <DialogContent sx={{ minHeight: 180, pt: 3 }}>
+        <DialogContent sx={{ minHeight: 180, pt: "24px !important" }}>
           {dialogError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError(null)}>
               {dialogError}

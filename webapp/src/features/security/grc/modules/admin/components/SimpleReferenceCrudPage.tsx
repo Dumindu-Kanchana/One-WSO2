@@ -241,10 +241,10 @@ export default function SimpleReferenceCrudPage({
         PaperProps={{ sx: dialogPaperSx }}
       >
         <DialogTitle>{editing ? "Edit" : addLabel}</DialogTitle>
-        {/* minHeight for breathing room, pt bumped above the default —
-            otherwise the first field's floating label (autoFocus Name)
-            renders partly clipped against the content box's top edge. */}
-        <DialogContent sx={{ minHeight: 300, pt: 3 }}>
+        {/* pt needs !important: MUI zeroes the top padding of a DialogContent that
+            directly follows the DialogTitle, and that rule outranks a plain pt, so
+            the first field's floating label was cut off at the top edge. */}
+        <DialogContent sx={{ minHeight: 300, pt: "24px !important" }}>
           {dialogError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError(null)}>
               {dialogError}

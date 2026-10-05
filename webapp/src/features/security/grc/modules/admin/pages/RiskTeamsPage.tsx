@@ -307,10 +307,10 @@ export default function RiskTeamsPage(): JSX.Element {
         PaperProps={{ sx: dialogPaperSx }}
       >
         <DialogTitle>{editing ? "Edit Risk Team" : "Add Risk Team"}</DialogTitle>
-        {/* pt bumped above DialogContent's default — otherwise the first
-            field's floating label (autoFocus Name) renders partly clipped
-            against the content box's top edge. */}
-        <DialogContent sx={{ minHeight: 470, pt: 3 }}>
+        {/* pt needs !important: MUI zeroes the top padding of a DialogContent that
+            directly follows the DialogTitle, and that rule outranks a plain pt, so
+            the first field's floating label was cut off at the top edge. */}
+        <DialogContent sx={{ minHeight: 470, pt: "24px !important" }}>
           {dialogError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError(null)}>
               {dialogError}

@@ -91,7 +91,7 @@ export default function RequestCustomerDialog({ open, onClose }: RequestCustomer
   return (
     <Dialog open={open} onClose={close} maxWidth="sm" fullWidth PaperProps={{ sx: dialogPaperSx }}>
       <DialogTitle>Request a customer</DialogTitle>
-      <DialogContent sx={{ pt: 3 }}>
+      <DialogContent sx={{ pt: "24px !important" }}>
         {sent ? (
           <Alert severity="success">
             Your request has been sent to the platform admins, and you are copied on the email. You can raise this risk
