@@ -210,6 +210,9 @@ export interface AdminTeam {
   description: string | null;
   team_type: "SOURCE_REGISTER" | "ASSIGNMENT" | "BOTH";
   register_template: RegisterTemplate;
+  // True once any risk uses the team, as its source register or its assignment
+  // team. Its template can then no longer change (the backend answers 409).
+  has_risks: boolean;
   status: "ACTIVE" | "INACTIVE" | "REMOVED";
 }
 

@@ -18,6 +18,10 @@
 // in Managed Services risk codes, so it can't contain the "-" separator.
 export const CUSTOMER_CODE_MAX = 12;
 
+// The name column of every lookup table is VARCHAR(255); the backend rejects a
+// longer name, and the input stops at the limit so it never gets that far.
+export const LOOKUP_NAME_MAX = 255;
+
 // Returns a message for an invalid code, or null when it is fine.
 export function customerCodeError(code: string): string | null {
   if (code === "") return "Code is required.";

@@ -116,6 +116,7 @@ export default function RequestCustomerDialog({ open, onClose }: RequestCustomer
               label="Customer name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              slotProps={{ htmlInput: { maxLength: 255 } }}
               disabled={sending}
             />
             <TextField
@@ -136,6 +137,7 @@ export default function RequestCustomerDialog({ open, onClose }: RequestCustomer
               label="Note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
+              slotProps={{ htmlInput: { maxLength: 1000 } }}
               helperText="Optional. Anything that helps the admin, e.g. which contract it is for."
               disabled={sending}
             />

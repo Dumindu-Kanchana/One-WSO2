@@ -175,8 +175,16 @@ export default function RiskTeamsPage(): JSX.Element {
   // risks — so an assignment-only team isn't asked for one. A team that already
   // has a code keeps showing it (and can't lose it: see handleSave).
   const showCode = codeRequired || !!editing?.code;
+  // Once a risk uses the team its template is fixed: the risks were checked
+  // against it. The select is disabled, and offers every option while locked so
+  // the saved value is never coerced by a Team Type change (an Aggregated
+  // register switched to Assignment would otherwise fall back to Standard, a
+  // change the backend refuses).
+  const templateLocked = !!editing?.has_risks;
   const templateOptions =
-    teamType === "ASSIGNMENT" && !isSourceRegister ? assignmentTemplateOptions : registerTemplateOptions;
+    templateLocked || !(teamType === "ASSIGNMENT" && !isSourceRegister)
+      ? registerTemplateOptions
+      : assignmentTemplateOptions;
   // An assignment-only team can't be Aggregated; treat it as Standard rather
   // than save a value its picker rule would ignore.
   const effectiveTemplate: RegisterTemplate = templateOptions.some((o) => o.value === registerTemplate)
@@ -365,7 +373,7 @@ export default function RiskTeamsPage(): JSX.Element {
               sx={{ mb: 2.5 }}
             />
           )}
-          <FormControl fullWidth size="small">
+          <FormControl fullWidth size="small" disabled={templateLocked}>
             <InputLabel id="team-template-label">Register Template</InputLabel>
             <Select
               labelId="team-template-label"
@@ -381,7 +389,9 @@ export default function RiskTeamsPage(): JSX.Element {
             </Select>
           </FormControl>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, mb: 2.5 }}>
-            {templateOptions.find((o) => o.value === effectiveTemplate)?.hint} Fixed once the register has risks.
+            {templateLocked
+              ? "Locked: risks already use this team, so its template can no longer be changed."
+              : `${templateOptions.find((o) => o.value === effectiveTemplate)?.hint} Fixed once a risk uses the team.`}
           </Typography>
           <TextField
             fullWidth

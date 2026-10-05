@@ -181,6 +181,24 @@ describe("LookupCrudPage (customers)", () => {
   });
 });
 
+describe("LookupCrudPage name length", () => {
+  it("stops the name input at the column's 255 characters", async () => {
+    rows = [];
+    const user = userEvent.setup();
+    render(
+      <LookupCrudPage
+        path="products"
+        addLabel="Add Product"
+        itemLabel="product"
+        emptyLabel="No products found."
+        nameHint="hint"
+      />,
+    );
+    await user.click(await screen.findByRole("button", { name: /Add Product/ }));
+    expect(screen.getByLabelText("Name")).toHaveAttribute("maxlength", "255");
+  });
+});
+
 describe("LookupCrudPage (a lookup without a code)", () => {
   it("has no code column or field, and creates with the name alone", async () => {
     rows = [{ id: 1, name: "API Manager", status: "ACTIVE", in_use: false }];

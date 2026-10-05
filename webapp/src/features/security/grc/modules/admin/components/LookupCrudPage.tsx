@@ -45,7 +45,7 @@ import { type JSX, useEffect, useState } from "react";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
 import { createLookup, deleteLookup, fetchLookups, type Lookup, type LookupPath, updateLookup } from "../api/adminApi";
 import { dialogPaperSx } from "../cardStyles";
-import { CUSTOMER_CODE_MAX, customerCodeError } from "./lookupValidation";
+import { CUSTOMER_CODE_MAX, LOOKUP_NAME_MAX, customerCodeError } from "./lookupValidation";
 
 interface LookupCrudPageProps {
   path: LookupPath;
@@ -284,6 +284,7 @@ export default function LookupCrudPage({
             label="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            slotProps={{ htmlInput: { maxLength: LOOKUP_NAME_MAX } }}
             helperText={nameHint}
             sx={{ mb: 2.5 }}
           />

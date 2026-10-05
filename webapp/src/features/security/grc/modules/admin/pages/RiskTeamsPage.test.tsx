@@ -108,6 +108,7 @@ describe("RiskTeamsPage dialog — Team Type and Code", () => {
         description: null,
         team_type: "ASSIGNMENT",
         register_template: "STANDARD",
+        has_risks: false,
         status: "ACTIVE",
       },
     ];
@@ -115,5 +116,53 @@ describe("RiskTeamsPage dialog — Team Type and Code", () => {
     render(<RiskTeamsPage />);
     await user.click(await screen.findByRole("button", { name: "Edit" }));
     expect(await screen.findByLabelText("Code")).toHaveValue("LEG");
+  });
+});
+
+describe("RiskTeamsPage dialog — Register Template lock", () => {
+  const team = (over: Partial<AdminTeam>): AdminTeam => ({
+    id: 7,
+    name: "Managed Services",
+    code: "MS",
+    description: null,
+    team_type: "BOTH",
+    register_template: "MANAGED_SERVICES",
+    has_risks: false,
+    status: "ACTIVE",
+    ...over,
+  });
+  const templateSelect = () => screen.getByRole("combobox", { name: "Register Template" });
+
+  it("leaves the template editable while nothing uses the team", async () => {
+    teams = [team({})];
+    const user = userEvent.setup();
+    render(<RiskTeamsPage />);
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await screen.findByLabelText("Name");
+    expect(templateSelect()).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("disables the template, and says why, once a risk uses the team", async () => {
+    teams = [team({ has_risks: true })];
+    const user = userEvent.setup();
+    render(<RiskTeamsPage />);
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await screen.findByLabelText("Name");
+    expect(templateSelect()).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText(/risks already use this team/i)).toBeInTheDocument();
+  });
+
+  it("keeps sending the saved template for a locked team, even if its Team Type is switched", async () => {
+    // An Aggregated register with risks, switched to Assignment, would be coerced
+    // to Standard — a change the backend refuses. The locked value is sent as is.
+    teams = [team({ id: 8, name: "WSO2 Cloud", code: "CLO", register_template: "AGGREGATED", has_risks: true })];
+    const user = userEvent.setup();
+    render(<RiskTeamsPage />);
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await screen.findByLabelText("Name");
+    await chooseType(user, /Assignment/);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes("PUT")).toHaveLength(1));
+    expect(writes("PUT")[0].body).toMatchObject({ register_template: "AGGREGATED" });
   });
 });
