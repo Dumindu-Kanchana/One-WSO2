@@ -85,17 +85,29 @@ export default function LookupCrudPage({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const load = () => {
+  // `isStale` lets the effect discard a response that arrives after `path`
+  // changed or the component unmounted; save/delete reloads never go stale.
+  const load = (isStale: () => boolean = () => false) => {
     setLoading(true);
     setError(null);
     fetchLookups(authFetch, path)
-      .then(setRows)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false));
+      .then((r) => {
+        if (!isStale()) setRows(r);
+      })
+      .catch((e) => {
+        if (!isStale()) setError(e instanceof Error ? e.message : "Failed to load");
+      })
+      .finally(() => {
+        if (!isStale()) setLoading(false);
+      });
   };
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    load(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
