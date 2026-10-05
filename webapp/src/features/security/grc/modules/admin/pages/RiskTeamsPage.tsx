@@ -171,6 +171,10 @@ export default function RiskTeamsPage(): JSX.Element {
   // SOURCE_REGISTER-only on save.
   const isSourceRegister = editing?.team_type === "SOURCE_REGISTER";
   const codeRequired = teamType === "BOTH" || isSourceRegister;
+  // The code only goes into generated risk codes, and only a register raises
+  // risks — so an assignment-only team isn't asked for one. A team that already
+  // has a code keeps showing it (and can't lose it: see handleSave).
+  const showCode = codeRequired || !!editing?.code;
   const templateOptions =
     teamType === "ASSIGNMENT" && !isSourceRegister ? assignmentTemplateOptions : registerTemplateOptions;
   // An assignment-only team can't be Aggregated; treat it as Standard rather
@@ -201,7 +205,9 @@ export default function RiskTeamsPage(): JSX.Element {
     try {
       const payload: TeamPayload = {
         name: name.trim(),
-        code: code.trim() ? code.trim().toUpperCase() : null,
+        // Not sent when the field is hidden, so a code typed before switching
+        // the team to Assignment can't ride along unseen.
+        code: showCode && code.trim() ? code.trim().toUpperCase() : null,
         description: description.trim(),
         team_type: isSourceRegister ? "SOURCE_REGISTER" : teamType,
         register_template: effectiveTemplate,
@@ -326,7 +332,28 @@ export default function RiskTeamsPage(): JSX.Element {
             helperText="The team or product name shown throughout the Risk Hub."
             sx={{ mb: 2.5 }}
           />
-          <Stack direction="row" spacing={2} sx={{ mb: 2.5 }}>
+          {/* Team Type first: it decides whether a Code is asked for at all. */}
+          <FormControl fullWidth size="small" disabled={isSourceRegister}>
+            <InputLabel id="team-type-label">Team Type</InputLabel>
+            <Select
+              labelId="team-type-label"
+              label="Team Type"
+              value={teamType}
+              onChange={(e) => setTeamType(e.target.value as "BOTH" | "ASSIGNMENT")}
+            >
+              {teamTypeOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, mb: 2.5 }}>
+            {isSourceRegister
+              ? "Source Register-only — this type isn't editable from this console; saving keeps it unchanged."
+              : teamTypeOptions.find((o) => o.value === teamType)?.hint}
+          </Typography>
+          {showCode && (
             <TextField
               fullWidth
               size="small"
@@ -334,33 +361,10 @@ export default function RiskTeamsPage(): JSX.Element {
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               slotProps={{ htmlInput: { maxLength: 10, style: { textTransform: "uppercase" } } }}
-              helperText={
-                codeRequired
-                  ? "Short abbreviation used to build generated risk codes, e.g. CHO."
-                  : "Only needed for a Register team — this one doesn't require it."
-              }
+              helperText="Short abbreviation used to build generated risk codes, e.g. CHO."
+              sx={{ mb: 2.5 }}
             />
-            <FormControl fullWidth size="small" disabled={isSourceRegister}>
-              <InputLabel id="team-type-label">Team Type</InputLabel>
-              <Select
-                labelId="team-type-label"
-                label="Team Type"
-                value={teamType}
-                onChange={(e) => setTeamType(e.target.value as "BOTH" | "ASSIGNMENT")}
-              >
-                {teamTypeOptions.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: -1.5, mb: 2.5 }}>
-            {isSourceRegister
-              ? "Source Register-only — this type isn't editable from this console; saving keeps it unchanged."
-              : teamTypeOptions.find((o) => o.value === teamType)?.hint}
-          </Typography>
+          )}
           <FormControl fullWidth size="small">
             <InputLabel id="team-template-label">Register Template</InputLabel>
             <Select
