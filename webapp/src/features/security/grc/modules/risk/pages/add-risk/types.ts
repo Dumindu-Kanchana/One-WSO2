@@ -30,6 +30,9 @@ export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 // Matches risk.treatment_strategy ENUM in risk_schema.sql.
 export type TreatmentStrategy = "REMEDIATE" | "ACCEPT" | "TRANSFER" | "AVOID";
 
+import type { RiskEnvironment } from "../../api/riskApi";
+export type { RiskEnvironment };
+
 export interface ActionStep {
   description: string;
 }
@@ -94,4 +97,19 @@ export interface AddRiskFormValues {
   remarks: string;
   // TODO: POST attachments to /api/v1/risks/{id}/evidence after risk creation (backend endpoint not yet implemented)
   evidenceAttachments: EvidenceAttachment[];
+
+  // ── Register-template fields (Step 1) ─────────────────────────────────────
+  // Which of these a risk carries depends on its source register's template
+  // (RISK_MODULE_DESIGN.md §14); the others stay empty and are cleared when the
+  // register changes.
+  //   AGGREGATED       → platforms
+  //   MANAGED_SERVICES → customer, deploymentType, products, environments
+  // Ids of risk_platform / risk_product rows.
+  platforms: number[];
+  // Id of the risk_customer row. Its code goes into the generated risk code.
+  customer: number | "";
+  // Id of the risk_deployment_type row.
+  deploymentType: number | "";
+  products: number[];
+  environments: RiskEnvironment[];
 }

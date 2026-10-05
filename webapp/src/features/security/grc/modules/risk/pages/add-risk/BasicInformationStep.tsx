@@ -35,9 +35,13 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@wso2/oxygen-ui";
-import type { JSX, ReactNode } from "react";
+import type { JSX } from "react";
 import type { AddRiskFormValues } from "./types";
 import { QUARTERS, YEAR_OPTIONS } from "./constants";
+import FieldLabel from "./FieldLabel";
+import TemplateFields from "./TemplateFields";
+import type { TemplateLookups } from "./TemplateFields";
+import { hasComplianceReferences, riskCodePreview, templateOf } from "./templates";
 import { fetchRiskAssignerCandidates, searchEmployees } from "../../api/riskApi";
 import type { ComplianceReference, EmployeeOption, RiskCategory, RiskTeam, UserOption } from "../../api/riskApi";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
@@ -50,31 +54,6 @@ const MIN_EMPLOYEE_SEARCH_LEN = 2;
 const EMPLOYEE_SEARCH_DEBOUNCE_MS = 300;
 
 const { DatePicker, LocalizationProvider } = DatePickers;
-
-// `required` renders the asterisk convention users expect on a form: the field
-// must be filled before the step will submit. It mirrors the `rules.required`
-// on the same Controller — keep the two in step, or the form will either
-// promise something it doesn't enforce or enforce something it didn't warn about.
-function FieldLabel({ children, required }: { children: ReactNode; required?: boolean }): JSX.Element {
-  return (
-    <Typography
-      variant="body2"
-      fontWeight={500}
-      color="text.primary"
-      sx={{ display: "block", mb: 1 }}
-    >
-      {children}
-      {required && (
-        // Inherits the label's colour rather than fixing one: the form sits on a
-        // dark card in dark mode and a light one otherwise, so a hard-coded
-        // colour would be invisible in one of them.
-        <Box component="span" aria-hidden="true" sx={{ color: "inherit", ml: 0.4 }}>
-          *
-        </Box>
-      )}
-    </Typography>
-  );
-}
 
 function SectionHeader({ title }: { title: string }): JSX.Element {
   return (
@@ -92,6 +71,9 @@ interface BasicInformationStepProps {
   sourceRegisterTeams: RiskTeam[];
   complianceRefs: ComplianceReference[];
   riskCategories: RiskCategory[];
+  // Values for the register-template fields (Platform, Customer, Product,
+  // Deployment Type), fetched once by the page.
+  lookups: TemplateLookups;
 }
 
 export default function BasicInformationStep({
@@ -99,6 +81,7 @@ export default function BasicInformationStep({
   sourceRegisterTeams,
   complianceRefs,
   riskCategories,
+  lookups,
 }: BasicInformationStepProps): JSX.Element {
   const { control, clearErrors, setValue } = useFormContext<AddRiskFormValues>();
   const authFetch = useAuthApiClient();
@@ -223,15 +206,18 @@ export default function BasicInformationStep({
     ? sourceRegisterTeams.find(t => t.id === sourceRegister) ?? null
     : null;
   const teamCode = selectedTeam?.code ?? null;
+  const template = templateOf(selectedTeam);
+  const customer = useWatch({ control, name: "customer" });
+  const customerCode = lookups.customers.find((c) => c.id === customer)?.code ?? null;
 
-  const seqSuffix = riskSequenceId !== null
-    ? String(riskSequenceId).padStart(4, "0")
-    : "####";
-
-  const riskCodePreview =
-    year && quarter && teamCode
-      ? `${year}-${teamCode}-${quarter}-${seqSuffix}`
-      : "YEAR-REGISTER-QUARTER-####";
+  const codePreview = riskCodePreview({
+    year,
+    quarter,
+    teamCode,
+    template,
+    customerCode,
+    sequenceId: riskSequenceId,
+  });
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -365,9 +351,17 @@ export default function BasicInformationStep({
               fontWeight={600}
               color={year && quarter && teamCode ? "text.primary" : "text.disabled"}
             >
-              {riskCodePreview}
+              {codePreview}
             </Typography>
+            {template === "MANAGED_SERVICES" && !customerCode && (
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                Choose a customer below — its code is part of the risk code.
+              </Typography>
+            )}
           </Box>
+
+          {/* Fields the register's template adds — nothing for Standard */}
+          <TemplateFields template={template} lookups={lookups} />
         </Stack>
 
         {/* ── Risk Details ───────────────────────────────────── */}
@@ -422,7 +416,9 @@ export default function BasicInformationStep({
             )}
           />
 
-          {/* Security Compliance Reference (multi-select toggle buttons) */}
+          {/* Security Compliance Reference (multi-select toggle buttons).
+              Managed Services risks have no such field — see templates.ts. */}
+          {hasComplianceReferences(template) && (
           <Controller
             name="complianceReferences"
             control={control}
@@ -468,6 +464,7 @@ export default function BasicInformationStep({
               </FormControl>
             )}
           />
+          )}
 
           {/* Risk Category (single-select) */}
           <Controller

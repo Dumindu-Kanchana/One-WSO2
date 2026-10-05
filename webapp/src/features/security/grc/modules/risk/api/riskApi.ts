@@ -20,14 +20,32 @@ import type { AddRiskFormValues } from "../pages/add-risk/types";
 
 // ── Response types (mirror Go models) ─────────────────────────────────────────
 
+// On a register, which fields its risks carry; on an assignment team, which
+// registers' pickers offer it (RISK_MODULE_DESIGN.md §14).
+export type RegisterTemplate = "STANDARD" | "AGGREGATED" | "MANAGED_SERVICES";
+
 export interface RiskTeam {
   id: number;
   name: string;
   code: string | null;
   description: string | null;
   team_type: string;
+  register_template: RegisterTemplate;
   status: string;
 }
+
+// A register-template dropdown value: a platform, customer, product or
+// deployment type. code is set for customers only.
+export interface LookupOption {
+  id: number;
+  name: string;
+  code?: string;
+  status: "ACTIVE" | "INACTIVE";
+}
+
+export type LookupKind = "platforms" | "customers" | "products" | "deployment-types";
+
+export type RiskEnvironment = "PRODUCTION" | "NON_PRODUCTION" | "DR";
 
 export interface RiskScore {
   id: number;
@@ -91,6 +109,12 @@ export interface RiskListItem {
   rejection_comment: string | null;
   rejection_stage: string | null;
   created_at: string;
+  // Register-template summary for the table's template columns; empty when the
+  // risk's template lacks the field (RISK_MODULE_DESIGN.md §14).
+  register_template: RegisterTemplate;
+  customer_name: string | null;
+  environments: RiskEnvironment[];
+  platform_names: string[];
 }
 
 export interface RiskScoreInfo {
@@ -259,6 +283,14 @@ export interface RiskDetail {
   // single-select, so this can come back with zero, one, or several entries —
   // render it as a list, not a scalar.
   risk_categories: RiskCategory[];
+  // Register-template values, each with its status so an edit form can mark an
+  // INACTIVE one. Null/empty when the risk's template lacks the field.
+  register_template: RegisterTemplate;
+  customer: LookupOption | null;
+  deployment_type: LookupOption | null;
+  products: LookupOption[];
+  platforms: LookupOption[];
+  environments: RiskEnvironment[];
   action_plan: ActionPlanDetail | null;
   assessments: RiskAssessmentRecord[];
   // What the caller may do ON THIS RISK: their privileges resolved in its
@@ -283,6 +315,11 @@ export interface ListRisksParams {
   risk_type?: string[];
   treatment_strategy?: string[];
   owner_id?: number[];
+  // Register-template filters: a risk whose template lacks the field never
+  // matches.
+  customer_id?: number[];
+  environment?: RiskEnvironment[];
+  platform_id?: number[];
   submitted_from?: string;
   submitted_to?: string;
   due_from?: string;
@@ -329,6 +366,12 @@ export interface UpdateRiskPayload {
   action_plan_description?: string;
   action_owner_id?: number;
   action_steps?: { id?: number; description: string }[];
+  // Register-template fields: full-edit only, each the complete new set. Left
+  // out when unchanged. There is no customer — it never changes.
+  platform_ids?: number[];
+  deployment_type_id?: number;
+  product_ids?: number[];
+  environments?: RiskEnvironment[];
 }
 
 export interface CreateAssessmentPayload {
@@ -572,9 +615,43 @@ export async function fetchSourceRegisterTeams(
   return handleResponse<RiskTeam[]>(res);
 }
 
-export async function fetchAssignmentTeams(authFetch: AuthFetch): Promise<RiskTeam[]> {
-  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/teams?type=ASSIGNMENT`);
+// forRegister narrows the list to teams that may be the assignment team for a
+// risk in that source register: Managed Services teams (the SRE teams) for a
+// Managed Services register, every other team otherwise.
+export async function fetchAssignmentTeams(authFetch: AuthFetch, forRegister?: number): Promise<RiskTeam[]> {
+  const query = forRegister ? `&for_register=${forRegister}` : "";
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/teams?type=ASSIGNMENT${query}`);
   return handleResponse<RiskTeam[]>(res);
+}
+
+// The values a picker offers: ACTIVE only. Existing risks keep showing a value
+// that has since been deactivated, which is why edit forms ask for
+// status "ALL" and mark those "(inactive)".
+export async function fetchLookupOptions(
+  authFetch: AuthFetch,
+  kind: LookupKind,
+  status: "ACTIVE" | "ALL" = "ACTIVE",
+): Promise<LookupOption[]> {
+  const query = status === "ACTIVE" ? "?status=ACTIVE" : "";
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/${kind}${query}`);
+  return handleResponse<LookupOption[]>(res);
+}
+
+export interface CustomerRequest {
+  customer_name: string;
+  suggested_code?: string;
+  note?: string;
+}
+
+// Asks the platform admins to add a customer that is missing from the Customer
+// Name list. Nothing is stored: it is an email to the admins, with the caller
+// copied. The risk cannot be saved until the customer exists.
+export async function requestCustomer(authFetch: AuthFetch, payload: CustomerRequest): Promise<void> {
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/customer-requests`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  await handleResponse(res);
 }
 
 export async function fetchRiskScores(authFetch: AuthFetch): Promise<RiskScore[]> {
@@ -661,12 +738,16 @@ export async function fetchNextSequenceID(
   sourceRegisterID: number,
   year: number,
   quarter: string,
+  // Required for a Managed Services register, whose risk codes count per
+  // customer; rejected for any other.
+  customerID?: number,
 ): Promise<number> {
   const params = new URLSearchParams({
     source_register_id: String(sourceRegisterID),
     year: String(year),
     quarter,
   });
+  if (customerID !== undefined) params.set("customer_id", String(customerID));
   const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/next-sequence-id?${params}`);
   const data = await handleResponse<NextSequenceIDResponse>(res);
   return data.next_sequence_id;
@@ -710,6 +791,13 @@ export function buildCreateRiskPayload(data: AddRiskFormValues): Record<string, 
     git_issue_url: data.gitIssueUrl || undefined,
     email_subject: data.emailSubject,
     remarks: data.remarks || undefined,
+    // Register-template fields. Empty ones are left out; the server checks the
+    // rest against the register's template.
+    platform_ids: data.platforms.length > 0 ? data.platforms : undefined,
+    customer_id: data.customer !== "" ? data.customer : undefined,
+    deployment_type_id: data.deploymentType !== "" ? data.deploymentType : undefined,
+    product_ids: data.products.length > 0 ? data.products : undefined,
+    environments: data.environments.length > 0 ? data.environments : undefined,
   };
 }
 
@@ -794,6 +882,9 @@ export async function fetchRisks(
   if (params.risk_type?.length) q.set("risk_type", params.risk_type.join(","));
   if (params.treatment_strategy?.length) q.set("treatment_strategy", params.treatment_strategy.join(","));
   if (params.owner_id?.length) q.set("owner_id", params.owner_id.join(","));
+  if (params.customer_id?.length) q.set("customer_id", params.customer_id.join(","));
+  if (params.environment?.length) q.set("environment", params.environment.join(","));
+  if (params.platform_id?.length) q.set("platform_id", params.platform_id.join(","));
   if (params.submitted_from) q.set("submitted_from", params.submitted_from);
   if (params.submitted_to) q.set("submitted_to", params.submitted_to);
   if (params.due_from) q.set("due_from", params.due_from);

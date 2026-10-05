@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import type { FieldPath } from "react-hook-form";
 import { useAsgardeo } from "@asgardeo/react";
@@ -36,19 +36,22 @@ import BasicInformationStep from "./add-risk/BasicInformationStep";
 import RiskAssessmentStep from "./add-risk/RiskAssessmentStep";
 import ActionPlanStep from "./add-risk/ActionPlanStep";
 import { buildRiskCode, getCurrentQuarter, getCurrentYear } from "./add-risk/constants";
+import { missingTemplateFields, resetForRegisterChange, templateOf } from "./add-risk/templates";
+import type { TemplateField } from "./add-risk/templates";
 import type { AddRiskFormValues } from "./add-risk/types";
 import { darkCardSx } from "./cardStyles";
 import {
   createRisk,
   fetchAssignmentTeams,
   fetchComplianceReferences,
+  fetchLookupOptions,
   fetchNextSequenceID,
   fetchRiskCategories,
   fetchRiskScores,
   fetchSourceRegisterTeams,
   uploadRiskEvidence,
 } from "../api/riskApi";
-import type { ComplianceReference, CreateRiskResponse, RiskCategory, RiskScore, RiskTeam } from "../api/riskApi";
+import type { ComplianceReference, CreateRiskResponse, LookupOption, RiskCategory, RiskScore, RiskTeam } from "../api/riskApi";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
 import { RiskPrivilege } from "../privileges";
 
@@ -121,6 +124,12 @@ export default function AddRisk(): JSX.Element {
   const [riskScores, setRiskScores]                   = useState<RiskScore[]>([]);
   const [complianceRefs, setComplianceRefs]           = useState<ComplianceReference[]>([]);
   const [riskCategories, setRiskCategories]           = useState<RiskCategory[]>([]);
+  // Register-template lookups: ACTIVE values only, since an inactive one must
+  // not be newly chosen.
+  const [platforms, setPlatforms]                     = useState<LookupOption[]>([]);
+  const [customers, setCustomers]                     = useState<LookupOption[]>([]);
+  const [products, setProducts]                       = useState<LookupOption[]>([]);
+  const [deploymentTypes, setDeploymentTypes]         = useState<LookupOption[]>([]);
   const [fetchError, setFetchError]                   = useState<string | null>(null);
   const [submitError, setSubmitError]                 = useState<string | null>(null);
   // Set only when the risk itself was created successfully but a staged
@@ -166,16 +175,29 @@ export default function AddRisk(): JSX.Element {
       emailSubject: "",
       remarks: "",
       evidenceAttachments: [],
+      // ── Register-template fields (Step 1) ─────────────────────────────────
+      platforms: [],
+      customer: "",
+      deploymentType: "",
+      products: [],
+      environments: [],
     },
     mode: "onSubmit",
   });
 
-  const { trigger, handleSubmit, setError } = methods;
+  const { trigger, handleSubmit, setError, setValue, getValues } = methods;
 
   // Watch the three fields that determine the risk code preview and next-sequence-id.
   const watchedYear            = methods.watch("year");
   const watchedQuarter         = methods.watch("quarter");
   const watchedSourceRegister  = methods.watch("sourceRegister");
+  const watchedCustomer        = methods.watch("customer");
+
+  // The chosen register decides which template fields the form carries.
+  const selectedRegister = typeof watchedSourceRegister === "number"
+    ? sourceRegisterTeams.find((t) => t.id === watchedSourceRegister)
+    : undefined;
+  const template = templateOf(selectedRegister);
 
   useEffect(() => {
     document.getElementById("main-scroll-container")?.scrollTo({ top: 0 });
@@ -190,19 +212,23 @@ export default function AddRisk(): JSX.Element {
       // checks RISK_CREATE *in the chosen register*, so anything broader would
       // offer choices that 403 on submit.
       fetchSourceRegisterTeams(authFetch, true, RiskPrivilege.CreateRisk),
-      // Assignment teams stay unrestricted — you routinely hand remediation to
-      // a team you don't belong to, and being assigned confers no authority.
-      fetchAssignmentTeams(authFetch),
       fetchRiskScores(authFetch),
       fetchComplianceReferences(authFetch),
       fetchRiskCategories(authFetch),
+      fetchLookupOptions(authFetch, "platforms"),
+      fetchLookupOptions(authFetch, "customers"),
+      fetchLookupOptions(authFetch, "products"),
+      fetchLookupOptions(authFetch, "deployment-types"),
     ])
-      .then(([srTeams, atTeams, scores, refs, categories]) => {
+      .then(([srTeams, scores, refs, categories, plats, custs, prods, deploys]) => {
         setSourceRegisterTeams(srTeams);
-        setAssignmentTeams(atTeams);
         setRiskScores(scores);
         setComplianceRefs(refs);
         setRiskCategories(categories);
+        setPlatforms(plats);
+        setCustomers(custs);
+        setProducts(prods);
+        setDeploymentTypes(deploys);
       })
       .catch(() => {
         setFetchError("Failed to load form data. Please refresh the page.");
@@ -217,17 +243,66 @@ export default function AddRisk(): JSX.Element {
   // since eligibility is now register-dependent rather than "any platform
   // user".
 
-  // Re-fetch the next sequence ID whenever year, quarter, or source register changes.
+  // Assignment teams depend on the register: a Managed Services register takes
+  // only Managed Services (SRE) teams, every other register takes the rest.
+  // Anyone may be assigned to — you routinely hand remediation to a team you
+  // don't belong to, and being assigned confers no authority — so this is not
+  // narrowed by the caller's own grants.
+  useEffect(() => {
+    if (typeof watchedSourceRegister !== "number") {
+      setAssignmentTeams([]);
+      return;
+    }
+    if (!isSignedIn) return;
+    let cancelled = false;
+    fetchAssignmentTeams(authFetch, watchedSourceRegister)
+      .then((teams) => {
+        if (cancelled) return;
+        setAssignmentTeams(teams);
+        // A team chosen for the previous register may no longer be offered.
+        const chosen = getValues("assignmentTeam");
+        if (chosen !== "" && !teams.some((t) => t.id === chosen)) setValue("assignmentTeam", "");
+      })
+      .catch(() => { if (!cancelled) setAssignmentTeams([]); });
+    return () => { cancelled = true; };
+  }, [watchedSourceRegister, isSignedIn, authFetch, getValues, setValue]);
+
+  // Changing the register clears the template fields: the previous register's
+  // Platform or Customer must not travel into a risk on a register that lacks
+  // them. (Compliance references are only cleared when the new register drops
+  // them — see resetForRegisterChange.)
+  const previousRegister = useRef<number | "">("");
+  useEffect(() => {
+    if (previousRegister.current === watchedSourceRegister) return;
+    previousRegister.current = watchedSourceRegister;
+    const reset = resetForRegisterChange(template);
+    (Object.keys(reset) as (keyof typeof reset)[]).forEach((key) => setValue(key, reset[key] as never));
+  }, [watchedSourceRegister, template, setValue]);
+
+  // Re-fetch the next sequence ID whenever year, quarter, source register — or,
+  // for a Managed Services register, which counts per customer — changes.
   useEffect(() => {
     if (typeof watchedSourceRegister !== "number") {
       setRiskSequenceId(null);
       return;
     }
+    const perCustomer = template === "MANAGED_SERVICES";
+    if (perCustomer && typeof watchedCustomer !== "number") {
+      // No number to preview until a customer is chosen.
+      setRiskSequenceId(null);
+      return;
+    }
     if (!isSignedIn) return;
-    fetchNextSequenceID(authFetch, watchedSourceRegister, watchedYear, watchedQuarter)
+    fetchNextSequenceID(
+      authFetch,
+      watchedSourceRegister,
+      watchedYear,
+      watchedQuarter,
+      perCustomer && typeof watchedCustomer === "number" ? watchedCustomer : undefined,
+    )
       .then(setRiskSequenceId)
       .catch(() => setRiskSequenceId(null));
-  }, [watchedYear, watchedQuarter, watchedSourceRegister, isSignedIn, authFetch]);
+  }, [watchedYear, watchedQuarter, watchedSourceRegister, watchedCustomer, template, isSignedIn, authFetch]);
 
   const isLastStep = activeStep === STEPS.length - 1;
   const isComplete = activeStep === STEPS.length;
@@ -237,6 +312,13 @@ export default function AddRisk(): JSX.Element {
 
     if (activeStep === 0) {
       valid = await trigger([...STEP_1_FIELDS, "identifiedByName"]);
+      // The template fields have no field-level rules (they only exist for some
+      // registers), so the register's template decides what is required here.
+      const missing = missingTemplateFields(template, getValues());
+      (Object.entries(missing) as [TemplateField, string][]).forEach(([field, message]) =>
+        setError(field, { type: "required", message }),
+      );
+      if (Object.keys(missing).length > 0) valid = false;
     } else if (activeStep === 1) {
       valid = await trigger(STEP_2_FIELDS);
     }
@@ -302,9 +384,10 @@ export default function AddRisk(): JSX.Element {
         const nextSeqId = apiErr.data?.next_sequence_id ?? riskSequenceId + 1;
         const teamCode = sourceRegisterTeams.find(t => t.id === data.sourceRegister)?.code
           ?? String(data.sourceRegister);
+        const customerCode = customers.find(c => c.id === data.customer)?.code ?? null;
         setRiskCodeConflict({
-          taken: buildRiskCode(data.year, teamCode, data.quarter, riskSequenceId),
-          next:  buildRiskCode(data.year, teamCode, data.quarter, nextSeqId),
+          taken: buildRiskCode(data.year, teamCode, data.quarter, riskSequenceId, customerCode),
+          next:  buildRiskCode(data.year, teamCode, data.quarter, nextSeqId, customerCode),
         });
         setRiskSequenceId(nextSeqId);
       } else {
@@ -350,6 +433,7 @@ export default function AddRisk(): JSX.Element {
       sourceRegisterTeams={sourceRegisterTeams}
       complianceRefs={complianceRefs}
       riskCategories={riskCategories}
+      lookups={{ platforms, customers, products, deploymentTypes }}
     />,
     <RiskAssessmentStep riskScores={riskScores} />,
     <ActionPlanStep
