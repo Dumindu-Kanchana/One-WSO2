@@ -139,6 +139,17 @@ describe("Add Risk — register templates", () => {
     await waitFor(() => expect(callsMatching("type=ASSIGNMENT&for_register=2")).toHaveLength(1));
   });
 
+  it("asks for the customer before it shows the risk code, since the code contains it", async () => {
+    const user = userEvent.setup();
+    render(<AddRisk />);
+    await screen.findByRole("button", { name: "ISO 27001" });
+    await chooseRegister(user, /Managed Services/);
+    const customer = await screen.findByText("Customer Name");
+    const code = screen.getByText(/-MS-CUSTOMER-Q\d-####/);
+    expect(customer.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText(/Choose a customer above/)).toBeInTheDocument();
+  });
+
   it("previews the risk code per customer, asking the backend only once a customer is chosen", async () => {
     const user = userEvent.setup();
     render(<AddRisk />);

@@ -39,7 +39,7 @@ import type { JSX } from "react";
 import type { AddRiskFormValues } from "./types";
 import { QUARTERS, YEAR_OPTIONS } from "./constants";
 import FieldLabel from "./FieldLabel";
-import TemplateFields from "./TemplateFields";
+import TemplateFields, { CustomerField } from "./TemplateFields";
 import type { TemplateLookups } from "./TemplateFields";
 import { hasComplianceReferences, riskCodePreview, templateOf } from "./templates";
 import { fetchRiskAssignerCandidates, searchEmployees } from "../../api/riskApi";
@@ -331,6 +331,10 @@ export default function BasicInformationStep({
             />
           </Box>
 
+          {/* Managed Services: the customer comes before the risk code, which
+              contains its code and counts per customer. */}
+          {template === "MANAGED_SERVICES" && <CustomerField lookups={lookups} />}
+
           {/* Risk Code (auto-generated preview — not a user-editable field) */}
           <Box
             sx={{
@@ -355,7 +359,7 @@ export default function BasicInformationStep({
             </Typography>
             {template === "MANAGED_SERVICES" && !customerCode && (
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                Choose a customer below — its code is part of the risk code.
+                Choose a customer above — its code is part of the risk code.
               </Typography>
             )}
           </Box>
