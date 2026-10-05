@@ -293,6 +293,7 @@ export default function AddRisk(): JSX.Element {
       return;
     }
     if (!isSignedIn) return;
+    let cancelled = false;
     fetchNextSequenceID(
       authFetch,
       watchedSourceRegister,
@@ -300,8 +301,15 @@ export default function AddRisk(): JSX.Element {
       watchedQuarter,
       perCustomer && typeof watchedCustomer === "number" ? watchedCustomer : undefined,
     )
-      .then(setRiskSequenceId)
-      .catch(() => setRiskSequenceId(null));
+      .then((id) => {
+        if (!cancelled) setRiskSequenceId(id);
+      })
+      .catch(() => {
+        if (!cancelled) setRiskSequenceId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [watchedYear, watchedQuarter, watchedSourceRegister, watchedCustomer, template, isSignedIn, authFetch]);
 
   const isLastStep = activeStep === STEPS.length - 1;
