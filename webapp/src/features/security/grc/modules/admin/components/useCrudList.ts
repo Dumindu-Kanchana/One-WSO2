@@ -14,18 +14,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { type DependencyList, useEffect, useState } from "react";
+import { type DependencyList, useEffect, useRef, useState } from "react";
 
 // Rows + loading + error for an admin CRUD list. The effect refetches when
-// `deps` change and discards a response that arrives after they changed (or
-// after unmount), so a slow earlier fetch can't overwrite a newer list.
-// `reload` (after a save or delete) is never stale.
+// `deps` change. Only the most recent request (effect or `reload`) may update
+// state, so a slow earlier fetch can't overwrite a newer list; unmounting or
+// changing `deps` invalidates whatever is still in flight.
 export function useCrudList<T>(fetchAll: () => Promise<T[]>, deps: DependencyList) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
 
-  const load = (isStale: () => boolean = () => false) => {
+  const load = () => {
+    const id = ++requestId.current;
+    const isStale = () => id !== requestId.current;
     setLoading(true);
     setError(null);
     fetchAll()
@@ -41,13 +44,14 @@ export function useCrudList<T>(fetchAll: () => Promise<T[]>, deps: DependencyLis
   };
 
   useEffect(() => {
-    let cancelled = false;
-    load(() => cancelled);
+    load();
     return () => {
-      cancelled = true;
+      // A counter, not a DOM ref: the cleanup must bump the live value.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      requestId.current++;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { rows, loading, error, setError, reload: () => load() };
+  return { rows, loading, error, setError, reload: load };
 }
