@@ -244,7 +244,7 @@ export default function AddRisk(): JSX.Element {
   // user".
 
   // Assignment teams depend on the register: a Managed Services register takes
-  // only Managed Services (SRE) teams, every other register takes the rest.
+  // only Managed Services teams, every other register takes the rest.
   // Anyone may be assigned to — you routinely hand remediation to a team you
   // don't belong to, and being assigned confers no authority — so this is not
   // narrowed by the caller's own grants.

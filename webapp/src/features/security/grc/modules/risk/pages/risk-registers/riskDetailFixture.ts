@@ -52,7 +52,7 @@ export function riskDetail(overrides: Partial<RiskDetail> = {}): RiskDetail {
     updated_at: "2026-05-02T00:00:00Z",
     assignees_editable_until: null,
     source_register_name: "Managed Services",
-    assignment_team_name: "SRE Team A",
+    assignment_team_name: "Managed Services Team A",
     owner_name: "Owner",
     assigner_name: "Assigner",
     management_approver_id: 12,

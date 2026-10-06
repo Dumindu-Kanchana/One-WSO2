@@ -36,7 +36,7 @@ const registers = [
 
 const sreTeam = {
   id: 20,
-  name: "SRE Team A",
+  name: "Managed Services Team A",
   code: null,
   description: null,
   team_type: "ASSIGNMENT",

@@ -68,13 +68,13 @@ describe("RiskTeamsPage dialog — Team Type and Code", () => {
     const user = userEvent.setup();
     render(<RiskTeamsPage />);
     await openAdd(user);
-    await user.type(screen.getByLabelText("Name"), "SRE Team A");
+    await user.type(screen.getByLabelText("Name"), "Managed Services Team A");
     await user.type(screen.getByLabelText("Code *"), "typed-before-switching");
     await chooseType(user, /Assignment/);
     expect(screen.queryByLabelText(/^Code/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(writes("POST")).toHaveLength(1));
-    expect(writes("POST")[0].body).toMatchObject({ name: "SRE Team A", team_type: "ASSIGNMENT", code: null });
+    expect(writes("POST")[0].body).toMatchObject({ name: "Managed Services Team A", team_type: "ASSIGNMENT", code: null });
   });
 
   it("still requires a code for a register", async () => {

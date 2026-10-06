@@ -99,7 +99,7 @@ export function riskCodePreview(args: {
 
 // Whether an assignment team on teamTemplate may be picked for a risk in a
 // register on registerTemplate: Managed Services registers take only Managed
-// Services teams (the SRE teams), every other register takes every team but
+// Services teams, every other register takes every team but
 // those. The backend enforces the same rule; this only keeps the picker honest.
 export const assignmentTeamFits = (registerTemplate: RegisterTemplate, teamTemplate: RegisterTemplate): boolean =>
   (registerTemplate === "MANAGED_SERVICES") === (teamTemplate === "MANAGED_SERVICES");

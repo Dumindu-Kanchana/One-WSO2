@@ -72,7 +72,7 @@ const teamTypeOptions: { value: "BOTH" | "ASSIGNMENT"; label: string; hint: stri
 // §14): on a register it picks the fields its risks carry; on an assignment-only
 // team it picks which registers' assignment pickers offer it. Aggregated only
 // means something on a register — an assignment team is either a Managed
-// Services (SRE) team or not.
+// Services team or not.
 const templateLabel: Record<RegisterTemplate, string> = {
   STANDARD: "Standard",
   AGGREGATED: "Aggregated",
@@ -97,7 +97,7 @@ const assignmentTemplateOptions: { value: RegisterTemplate; label: string; hint:
   },
   {
     value: "MANAGED_SERVICES",
-    label: "Managed Services (SRE team)",
+    label: "Managed Services",
     hint: "Offered only on Managed Services registers.",
   },
 ];
