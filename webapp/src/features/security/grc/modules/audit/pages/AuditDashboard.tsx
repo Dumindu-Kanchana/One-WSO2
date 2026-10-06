@@ -32,6 +32,7 @@ import PhaseInsightDialog from "@features/security/grc/modules/audit/components/
 import TeamProgress from "@features/security/grc/modules/audit/components/dashboard/TeamProgress";
 import TeamInsightDialog from "@features/security/grc/modules/audit/components/dashboard/TeamInsightDialog";
 import WorkQueue, {
+  QUEUE_TAB_ALL_PENDING,
   QUEUE_TAB_AWAITING,
   QUEUE_TAB_OVERDUE,
 } from "@features/security/grc/modules/audit/components/dashboard/WorkQueue";
@@ -192,6 +193,7 @@ export default function AuditDashboard(): JSX.Element {
         overdueControls={stats.overdueControls}
         awaitingCount={awaitingCount}
         awaitingLabel={queueTitle}
+        onTotalClick={() => jumpToQueue(QUEUE_TAB_ALL_PENDING)}
         onAwaitingClick={() => jumpToQueue(QUEUE_TAB_AWAITING)}
         onOverdueClick={() => jumpToQueue(QUEUE_TAB_OVERDUE)}
       />

@@ -82,7 +82,7 @@ import { isAssignedAuditor } from "@features/security/grc/modules/audit/utils/au
 import type { AuditControl, ControlStatus } from "@features/security/grc/modules/audit/types/audit";
 import { useAuditPrivileges } from "@features/security/grc/modules/audit/hooks/useAuditPrivileges";
 import { AuditPrivilege } from "@features/security/grc/modules/audit/privileges";
-import { CONTROL_STATUS_LABELS } from "@features/security/grc/modules/audit/utils/controlStatus";
+import { CONTROL_STATUS_LABELS, isPopulationOverdue } from "@features/security/grc/modules/audit/utils/controlStatus";
 
 interface ControlDrawerProps {
   control: AuditControl | null;
@@ -1821,7 +1821,7 @@ export default function ControlDrawer({ control, open, onClose }: ControlDrawerP
                 title="Population Details"
               >
                 <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
-                  <DueDateTile label="Population Due Date" date={control.populationDueDate ?? null} />
+                  <DueDateTile label="Population Due Date" date={control.populationDueDate ?? null} overdue={isPopulationOverdue(control)} />
 
                   <InfoTile label="Population Owner">
                     {control.populationOwnerName ? (
