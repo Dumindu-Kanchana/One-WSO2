@@ -68,11 +68,9 @@ const teamTypeOptions: { value: "BOTH" | "ASSIGNMENT"; label: string; hint: stri
   { value: "ASSIGNMENT", label: "Assignment", hint: "Assignment target only — cannot be a risk's source register." },
 ];
 
-// What a Register Template means depends on the kind of team (RISK_MODULE_DESIGN.md
-// §14): on a register it picks the fields its risks carry; on an assignment-only
-// team it picks which registers' assignment pickers offer it. Aggregated only
-// means something on a register — an assignment team is either a Managed
-// Services team or not.
+// A Register Template picks the fields a register's risks carry
+// (RISK_MODULE_DESIGN.md §14). An assignment-only team has no risks of its own,
+// so the form doesn't ask for one.
 const templateLabel: Record<RegisterTemplate, string> = {
   STANDARD: "Standard",
   AGGREGATED: "Aggregated",
@@ -86,19 +84,6 @@ const registerTemplateOptions: { value: RegisterTemplate; label: string; hint: s
     value: "MANAGED_SERVICES",
     label: "Managed Services",
     hint: "No Security Compliance Reference; adds Customer Name, Product, Deployment Type and Environment.",
-  },
-];
-
-const assignmentTemplateOptions: { value: RegisterTemplate; label: string; hint: string }[] = [
-  {
-    value: "STANDARD",
-    label: "Any register except Managed Services",
-    hint: "Offered as an assignment team on every register that isn't Managed Services.",
-  },
-  {
-    value: "MANAGED_SERVICES",
-    label: "Managed Services",
-    hint: "Offered only on Managed Services registers.",
   },
 ];
 
@@ -175,21 +160,16 @@ export default function RiskTeamsPage(): JSX.Element {
   // risks — so an assignment-only team isn't asked for one. A team that already
   // has a code keeps showing it (and can't lose it: see handleSave).
   const showCode = codeRequired || !!editing?.code;
-  // Once a risk uses the team its template is fixed: the risks were checked
-  // against it. The select is disabled, and offers every option while locked so
-  // the saved value is never coerced by a Team Type change (an Aggregated
-  // register switched to Assignment would otherwise fall back to Standard, a
-  // change the backend refuses).
+  // Once a risk uses the team as its source register its template is fixed:
+  // those risks carry its fields. The select is disabled while locked.
   const templateLocked = !!editing?.has_risks;
-  const templateOptions =
-    templateLocked || !(teamType === "ASSIGNMENT" && !isSourceRegister)
-      ? registerTemplateOptions
-      : assignmentTemplateOptions;
-  // An assignment-only team can't be Aggregated; treat it as Standard rather
-  // than save a value its picker rule would ignore.
-  const effectiveTemplate: RegisterTemplate = templateOptions.some((o) => o.value === registerTemplate)
+  // An assignment-only team isn't asked for a template. It sends what it
+  // already has (Standard for a new team), so a Team Type switch never changes
+  // a saved template, which the backend refuses once risks use it.
+  const showTemplate = !(teamType === "ASSIGNMENT" && !isSourceRegister);
+  const effectiveTemplate: RegisterTemplate = showTemplate
     ? registerTemplate
-    : "STANDARD";
+    : (editing?.register_template ?? "STANDARD");
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -373,26 +353,30 @@ export default function RiskTeamsPage(): JSX.Element {
               sx={{ mb: 2.5 }}
             />
           )}
-          <FormControl fullWidth size="small" disabled={templateLocked}>
-            <InputLabel id="team-template-label">Register Template</InputLabel>
-            <Select
-              labelId="team-template-label"
-              label="Register Template"
-              value={effectiveTemplate}
-              onChange={(e) => setRegisterTemplate(e.target.value as RegisterTemplate)}
-            >
-              {templateOptions.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, mb: 2.5 }}>
-            {templateLocked
-              ? "Locked: risks already use this team, so its template can no longer be changed."
-              : `${templateOptions.find((o) => o.value === effectiveTemplate)?.hint} Fixed once a risk uses the team.`}
-          </Typography>
+          {showTemplate && (
+            <>
+              <FormControl fullWidth size="small" disabled={templateLocked}>
+                <InputLabel id="team-template-label">Register Template</InputLabel>
+                <Select
+                  labelId="team-template-label"
+                  label="Register Template"
+                  value={effectiveTemplate}
+                  onChange={(e) => setRegisterTemplate(e.target.value as RegisterTemplate)}
+                >
+                  {registerTemplateOptions.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, mb: 2.5 }}>
+                {templateLocked
+                  ? "Locked: risks already use this team, so its template can no longer be changed."
+                  : `${registerTemplateOptions.find((o) => o.value === effectiveTemplate)?.hint} Fixed once a risk uses the team.`}
+              </Typography>
+            </>
+          )}
           <TextField
             fullWidth
             multiline

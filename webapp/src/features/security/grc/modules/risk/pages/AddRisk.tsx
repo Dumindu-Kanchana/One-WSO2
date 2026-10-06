@@ -243,29 +243,17 @@ export default function AddRisk(): JSX.Element {
   // since eligibility is now register-dependent rather than "any platform
   // user".
 
-  // Assignment teams depend on the register: a Managed Services register takes
-  // only Managed Services teams, every other register takes the rest.
-  // Anyone may be assigned to — you routinely hand remediation to a team you
+  // Every register offers the same assignment teams. Anyone may be assigned to — you routinely hand remediation to a team you
   // don't belong to, and being assigned confers no authority — so this is not
   // narrowed by the caller's own grants.
   useEffect(() => {
-    if (typeof watchedSourceRegister !== "number") {
-      setAssignmentTeams([]);
-      return;
-    }
     if (!isSignedIn) return;
     let cancelled = false;
-    fetchAssignmentTeams(authFetch, watchedSourceRegister)
-      .then((teams) => {
-        if (cancelled) return;
-        setAssignmentTeams(teams);
-        // A team chosen for the previous register may no longer be offered.
-        const chosen = getValues("assignmentTeam");
-        if (chosen !== "" && !teams.some((t) => t.id === chosen)) setValue("assignmentTeam", "");
-      })
+    fetchAssignmentTeams(authFetch)
+      .then((teams) => { if (!cancelled) setAssignmentTeams(teams); })
       .catch(() => { if (!cancelled) setAssignmentTeams([]); });
     return () => { cancelled = true; };
-  }, [watchedSourceRegister, isSignedIn, authFetch, getValues, setValue]);
+  }, [isSignedIn, authFetch]);
 
   // Changing the register clears the template fields: the previous register's
   // Platform or Customer must not travel into a risk on a register that lacks

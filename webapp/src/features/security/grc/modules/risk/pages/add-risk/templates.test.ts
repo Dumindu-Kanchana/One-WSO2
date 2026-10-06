@@ -15,11 +15,9 @@
 // under the License.
 
 import { describe, expect, it } from "vitest";
-import type { LookupOption, RiskTeam } from "../../api/riskApi";
+import type { LookupOption } from "../../api/riskApi";
 import { buildRiskCode } from "./constants";
 import {
-  assignmentTeamFits,
-  assignmentTeamsFor,
   hasComplianceReferences,
   missingTemplateFields,
   optionsForEdit,
@@ -141,39 +139,6 @@ describe("buildRiskCode", () => {
     expect(buildRiskCode(2026, "ASG", "Q2", 1)).toBe("2026-ASG-Q2-0001");
     expect(buildRiskCode(2026, "MS", "Q2", 3, "BANKONESUB")).toBe("2026-MS-BANKONESUB-Q2-0003");
     expect(buildRiskCode(2026, "MS", "Q2", 3, null)).toBe("2026-MS-Q2-0003");
-  });
-});
-
-describe("assignmentTeamFits / assignmentTeamsFor", () => {
-  const team = (id: number, register_template: RiskTeam["register_template"]): RiskTeam => ({
-    id,
-    name: `Team ${id}`,
-    code: null,
-    description: null,
-    team_type: "ASSIGNMENT",
-    register_template,
-    status: "ACTIVE",
-  });
-  const teams = [team(1, "STANDARD"), team(2, "AGGREGATED"), team(3, "MANAGED_SERVICES")];
-
-  it("pairs Managed Services registers with Managed Services teams only", () => {
-    expect(assignmentTeamFits("MANAGED_SERVICES", "MANAGED_SERVICES")).toBe(true);
-    expect(assignmentTeamFits("MANAGED_SERVICES", "STANDARD")).toBe(false);
-    expect(assignmentTeamFits("MANAGED_SERVICES", "AGGREGATED")).toBe(false);
-    expect(assignmentTeamFits("STANDARD", "MANAGED_SERVICES")).toBe(false);
-    expect(assignmentTeamFits("AGGREGATED", "MANAGED_SERVICES")).toBe(false);
-    expect(assignmentTeamFits("STANDARD", "AGGREGATED")).toBe(true);
-    expect(assignmentTeamFits("AGGREGATED", "STANDARD")).toBe(true);
-  });
-
-  it("filters the list per register", () => {
-    expect(assignmentTeamsFor("MANAGED_SERVICES", teams).map((t) => t.id)).toEqual([3]);
-    expect(assignmentTeamsFor("STANDARD", teams).map((t) => t.id)).toEqual([1, 2]);
-    expect(assignmentTeamsFor("AGGREGATED", teams).map((t) => t.id)).toEqual([1, 2]);
-  });
-
-  it("always keeps the risk's current team, so the picker is never blank", () => {
-    expect(assignmentTeamsFor("MANAGED_SERVICES", teams, 1).map((t) => t.id)).toEqual([1, 3]);
   });
 });
 

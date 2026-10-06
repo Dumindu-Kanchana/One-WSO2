@@ -77,6 +77,21 @@ describe("RiskTeamsPage dialog — Team Type and Code", () => {
     expect(writes("POST")[0].body).toMatchObject({ name: "Managed Services Team A", team_type: "ASSIGNMENT", code: null });
   });
 
+  it("does not ask an assignment team for a Register Template, and sends Standard", async () => {
+    teams = [];
+    const user = userEvent.setup();
+    render(<RiskTeamsPage />);
+    await openAdd(user);
+    await user.type(screen.getByLabelText("Name"), "Legal");
+    await user.click(screen.getByRole("combobox", { name: "Register Template" }));
+    await user.click(await screen.findByRole("option", { name: "Managed Services" }));
+    await chooseType(user, /Assignment/);
+    expect(screen.queryByRole("combobox", { name: "Register Template" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(writes("POST")).toHaveLength(1));
+    expect(writes("POST")[0].body).toMatchObject({ team_type: "ASSIGNMENT", register_template: "STANDARD" });
+  });
+
   it("still requires a code for a register", async () => {
     teams = [];
     const user = userEvent.setup();

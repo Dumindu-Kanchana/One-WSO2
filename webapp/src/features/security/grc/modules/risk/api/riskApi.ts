@@ -615,12 +615,10 @@ export async function fetchSourceRegisterTeams(
   return handleResponse<RiskTeam[]>(res);
 }
 
-// forRegister narrows the list to teams that may be the assignment team for a
-// risk in that source register: Managed Services teams for a
-// Managed Services register, every other team otherwise.
-export async function fetchAssignmentTeams(authFetch: AuthFetch, forRegister?: number): Promise<RiskTeam[]> {
-  const query = forRegister ? `&for_register=${forRegister}` : "";
-  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/teams?type=ASSIGNMENT${query}`);
+// Every team that can be an assignment team (ASSIGNMENT and BOTH). The list is
+// the same on every register.
+export async function fetchAssignmentTeams(authFetch: AuthFetch): Promise<RiskTeam[]> {
+  const res = await authFetch(`${BACKEND_BASE_URL}/api/v1/risks/teams?type=ASSIGNMENT`);
   return handleResponse<RiskTeam[]>(res);
 }
 

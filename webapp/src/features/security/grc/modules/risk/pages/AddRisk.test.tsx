@@ -78,7 +78,7 @@ beforeEach(() => {
     const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
     if (path.startsWith("/risks/teams?type=SOURCE_REGISTER")) return json(registers);
     if (path.startsWith("/risks/teams?type=ASSIGNMENT")) {
-      return json(path.includes("for_register=2") ? [sreTeam] : [legalTeam]);
+      return json([sreTeam, legalTeam]);
     }
     if (path.startsWith("/risks/next-sequence-id"))
       return json({ next_sequence_id: path.includes("customer_id=1") ? 4 : 2 });
@@ -130,13 +130,14 @@ describe("Add Risk — register templates", () => {
     expect(screen.queryByRole("button", { name: "ISO 27001" })).not.toBeInTheDocument();
   });
 
-  it("offers a register's own assignment teams, asking the backend per register", async () => {
+  it("fetches one assignment team list for every register, not one per register", async () => {
     const user = userEvent.setup();
     render(<AddRisk />);
     await screen.findByRole("button", { name: "ISO 27001" });
-    expect(callsMatching("type=ASSIGNMENT")).toHaveLength(0);
+    await waitFor(() => expect(callsMatching("type=ASSIGNMENT")).toHaveLength(1));
     await chooseRegister(user, /Managed Services/);
-    await waitFor(() => expect(callsMatching("type=ASSIGNMENT&for_register=2")).toHaveLength(1));
+    expect(callsMatching("type=ASSIGNMENT")).toHaveLength(1);
+    expect(callsMatching("for_register")).toHaveLength(0);
   });
 
   it("asks for the customer before it shows the risk code, since the code contains it", async () => {

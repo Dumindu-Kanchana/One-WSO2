@@ -108,7 +108,7 @@ import ActionPlanDialog from "./risk-registers/ActionPlanDialog";
 import type { ActionPlanPayload } from "./risk-registers/ActionPlanDialog";
 import EscalationCommentDialog from "./risk-registers/EscalationCommentDialog";
 import ColumnFilter from "./risk-registers/ColumnFilter";
-import { ENVIRONMENTS, assignmentTeamsFor, templateInView } from "./add-risk/templates";
+import { ENVIRONMENTS, templateInView } from "./add-risk/templates";
 import DateRangeFilter from "./risk-registers/DateRangeFilter";
 import {
   ALL_OPEN_STATUSES,
@@ -1384,7 +1384,7 @@ export default function RiskRegisters(): JSX.Element {
             open
             detail={editDetail}
             mode={isFullMode ? "full" : "restricted"}
-            assignmentTeams={assignmentTeamsFor(editDetail.register_template, assignmentTeams, editDetail.assignment_team_id)}
+            assignmentTeams={assignmentTeams}
             users={isFullMode ? users : undefined}
             riskScores={isFullMode ? riskScores : undefined}
             complianceRefs={isFullMode ? complianceRefs : undefined}
@@ -1398,7 +1398,7 @@ export default function RiskRegisters(): JSX.Element {
         <UpdateAssigneesDialog
           open
           detail={assigneesDetail}
-          assignmentTeams={assignmentTeamsFor(assigneesDetail.register_template, assignmentTeams, assigneesDetail.assignment_team_id)}
+          assignmentTeams={assignmentTeams}
           users={users}
           onClose={() => setAssigneesDetail(null)}
           onSave={handleAssigneesSave}

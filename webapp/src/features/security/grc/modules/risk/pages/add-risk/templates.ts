@@ -97,24 +97,6 @@ export function riskCodePreview(args: {
   return `${year}-${teamCode}-${quarter}-${seq}`;
 }
 
-// Whether an assignment team on teamTemplate may be picked for a risk in a
-// register on registerTemplate: Managed Services registers take only Managed
-// Services teams, every other register takes every team but
-// those. The backend enforces the same rule; this only keeps the picker honest.
-export const assignmentTeamFits = (registerTemplate: RegisterTemplate, teamTemplate: RegisterTemplate): boolean =>
-  (registerTemplate === "MANAGED_SERVICES") === (teamTemplate === "MANAGED_SERVICES");
-
-// The assignment teams to offer for a risk in a register on registerTemplate.
-// currentTeamId is always kept, so opening a risk never shows a blank picker
-// for a team it already has.
-export function assignmentTeamsFor(
-  registerTemplate: RegisterTemplate,
-  teams: RiskTeam[],
-  currentTeamId?: number,
-): RiskTeam[] {
-  return teams.filter((t) => t.id === currentTeamId || assignmentTeamFits(registerTemplate, t.register_template));
-}
-
 // Options for editing a risk's lookup field. Active values are offered; a value
 // the risk already carries stays even once deactivated, marked "(inactive)", so
 // editing something else never forces anyone to change historical data. An
