@@ -19,10 +19,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   IconButton,
   InputLabel,
@@ -41,10 +37,11 @@ import {
   Typography,
 } from "@wso2/oxygen-ui";
 import { Pencil, Plus, Trash2 } from "@wso2/oxygen-ui-icons-react";
-import { type JSX, useEffect, useState } from "react";
+import { type JSX, useState } from "react";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
 import { createLookup, deleteLookup, fetchLookups, type Lookup, type LookupPath, updateLookup } from "../api/adminApi";
-import { dialogPaperSx } from "../cardStyles";
+import { ConfirmDeleteDialog, CrudFormDialog } from "./CrudDialogs";
+import { useCrudList } from "./useCrudList";
 import { CUSTOMER_CODE_MAX, LOOKUP_NAME_MAX, customerCodeError } from "./lookupValidation";
 
 interface LookupCrudPageProps {
@@ -71,9 +68,7 @@ export default function LookupCrudPage({
   hasCode = false,
 }: LookupCrudPageProps): JSX.Element {
   const authFetch = useAuthApiClient();
-  const [rows, setRows] = useState<Lookup[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { rows, loading, error, setError, reload } = useCrudList(() => fetchLookups(authFetch, path), [path]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Lookup | null>(null);
   const [name, setName] = useState("");
@@ -84,32 +79,6 @@ export default function LookupCrudPage({
   const [deleteTarget, setDeleteTarget] = useState<Lookup | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // `isStale` lets the effect discard a response that arrives after `path`
-  // changed or the component unmounted; save/delete reloads never go stale.
-  const load = (isStale: () => boolean = () => false) => {
-    setLoading(true);
-    setError(null);
-    fetchLookups(authFetch, path)
-      .then((r) => {
-        if (!isStale()) setRows(r);
-      })
-      .catch((e) => {
-        if (!isStale()) setError(e instanceof Error ? e.message : "Failed to load");
-      })
-      .finally(() => {
-        if (!isStale()) setLoading(false);
-      });
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    load(() => cancelled);
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
 
   const openAdd = () => {
     setEditing(null);
@@ -159,7 +128,7 @@ export default function LookupCrudPage({
         await createLookup(authFetch, path, { name: name.trim(), ...(hasCode ? { code } : {}) });
       }
       setDialogOpen(false);
-      load();
+      reload();
     } catch (e) {
       setDialogError(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -174,7 +143,7 @@ export default function LookupCrudPage({
     try {
       await deleteLookup(authFetch, path, deleteTarget.id);
       setDeleteTarget(null);
-      load();
+      reload();
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "Failed to delete");
     } finally {
@@ -272,23 +241,16 @@ export default function LookupCrudPage({
         </Table>
       </TableContainer>
 
-      <Dialog
+      <CrudFormDialog
         open={dialogOpen}
+        title={editing ? `Edit ${itemLabel}` : addLabel}
+        error={dialogError}
+        saving={saving}
+        minHeight={hasCode ? 300 : 240}
         onClose={() => setDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: dialogPaperSx }}
+        onClearError={() => setDialogError(null)}
+        onSave={handleSave}
       >
-        <DialogTitle>{editing ? `Edit ${itemLabel}` : addLabel}</DialogTitle>
-        {/* pt needs !important: MUI zeroes the top padding of a DialogContent that
-            directly follows the DialogTitle, and that rule outranks a plain pt, so
-            the first field's floating label was cut off at the top edge. */}
-        <DialogContent sx={{ minHeight: hasCode ? 300 : 240, pt: "24px !important" }}>
-          {dialogError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError(null)}>
-              {dialogError}
-            </Alert>
-          )}
           <TextField
             autoFocus
             fullWidth
@@ -337,43 +299,20 @@ export default function LookupCrudPage({
               </Typography>
             </>
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={saving} onClick={handleSave}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </CrudFormDialog>
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={!!deleteTarget}
-        onClose={() => (deleting ? undefined : setDeleteTarget(null))}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ sx: dialogPaperSx }}
+        itemLabel={itemLabel}
+        error={deleteError}
+        deleting={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onClearError={() => setDeleteError(null)}
+        onConfirm={handleDelete}
       >
-        <DialogTitle>Delete {itemLabel}?</DialogTitle>
-        <DialogContent>
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDeleteError(null)}>
-              {deleteError}
-            </Alert>
-          )}
-          <Typography variant="body2">
-            This permanently removes <b>{deleteTarget?.name}</b>. It can't be undone. Only a {itemLabel} that no risk
-            has ever used can be deleted; otherwise deactivate it.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button variant="contained" color="error" disabled={deleting} onClick={handleDelete}>
-            {deleting ? "Deleting…" : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        This permanently removes <b>{deleteTarget?.name}</b>. It can't be undone. Only a {itemLabel} that no risk has
+        ever used can be deleted; otherwise deactivate it.
+      </ConfirmDeleteDialog>
     </Box>
   );
 }
