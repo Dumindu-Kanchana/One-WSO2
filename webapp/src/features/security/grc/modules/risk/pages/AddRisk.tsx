@@ -243,15 +243,20 @@ export default function AddRisk(): JSX.Element {
   // since eligibility is now register-dependent rather than "any platform
   // user".
 
-  // Every register offers the same assignment teams. Anyone may be assigned to — you routinely hand remediation to a team you
-  // don't belong to, and being assigned confers no authority — so this is not
-  // narrowed by the caller's own grants.
+  // Every register offers the same assignment teams. Anyone may be assigned
+  // to — you routinely hand remediation to a team you don't belong to, and
+  // being assigned confers no authority — so this is not narrowed by the
+  // caller's own grants.
   useEffect(() => {
     if (!isSignedIn) return;
     let cancelled = false;
     fetchAssignmentTeams(authFetch)
       .then((teams) => { if (!cancelled) setAssignmentTeams(teams); })
-      .catch(() => { if (!cancelled) setAssignmentTeams([]); });
+      .catch(() => {
+        if (cancelled) return;
+        setAssignmentTeams([]);
+        setFetchError("Failed to load assignment teams. Please refresh the page.");
+      });
     return () => { cancelled = true; };
   }, [isSignedIn, authFetch]);
 

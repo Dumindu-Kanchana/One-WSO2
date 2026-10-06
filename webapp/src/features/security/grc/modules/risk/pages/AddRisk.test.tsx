@@ -130,6 +130,15 @@ describe("Add Risk — register templates", () => {
     expect(screen.queryByRole("button", { name: "ISO 27001" })).not.toBeInTheDocument();
   });
 
+  it("says so when the assignment teams fail to load", async () => {
+    const ok = authFetch.getMockImplementation()!;
+    authFetch.mockImplementation(async (input: string) =>
+      String(input).includes("type=ASSIGNMENT") ? new Response("{}", { status: 500 }) : ok(input),
+    );
+    render(<AddRisk />);
+    expect(await screen.findByText("Failed to load assignment teams. Please refresh the page.")).toBeInTheDocument();
+  });
+
   it("fetches one assignment team list for every register, not one per register", async () => {
     const user = userEvent.setup();
     render(<AddRisk />);
