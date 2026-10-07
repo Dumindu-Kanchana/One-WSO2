@@ -32,24 +32,20 @@ import {
   Typography,
 } from "@wso2/oxygen-ui";
 import { useState, type JSX } from "react";
-import { HttpError } from "@api/http";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { isPreviewEnabled } from "@config/previewFeatures";
 import { useAccessToken } from "@hooks/useAccessToken";
-import { useEngineeringAdminGate } from "@features/engineering/api/engineeringAdminVisibility";
 import {
   createTrackedRepository,
   deactivateTrackedRepository,
   getAdminRepositories,
   getSyncLogs,
-  isCredentialedProductDownloadStatsUrl,
-  isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
   updateTrackedRepository,
   type AdminTrackedRepository,
   type NewTrackedRepository,
   type TrackedRepositoryUpdate,
 } from "@features/engineering/api/productDownloadStats";
+import DownloadStatsShell from "../components/DownloadStatsShell";
 import { formatJobTime, jobStatusLabel, productLabel } from "./display";
 
 function refreshTrackedLists(queryClient: QueryClient): void {
@@ -69,25 +65,51 @@ function parsePrefixes(raw: string): string[] {
 }
 
 export default function EngineeringAdminPage(): JSX.Element {
-  const preview = isPreviewEnabled("engineering");
-  const configured = isProductDownloadStatsConfigured();
-  const base = productDownloadStatsBackendUrl();
-  const allowed = isCredentialedProductDownloadStatsUrl(base);
-  const getToken = useAccessToken();
-  const gate = useEngineeringAdminGate(preview && configured && allowed);
-  const queryClient = useQueryClient();
+  // The add/edit form is opened from beside the title, which is the shell's
+  // to render, so the choice of what is open lives here rather than in the
+  // screen. The shell shows the button only once the API has said Admin.
   const [dialog, setDialog] = useState<"add" | AdminTrackedRepository | null>(null);
+
+  return (
+    <>
+      <DownloadStatsShell
+        screen="admin"
+        actions={
+          <Button variant="contained" onClick={() => setDialog("add")}>
+            Add tracked repository
+          </Button>
+        }
+      >
+        <AdminScreen onEdit={setDialog} />
+      </DownloadStatsShell>
+      {dialog != null && (
+        <RepositoryDialog
+          key={dialog === "add" ? "add" : dialog.id}
+          repository={dialog === "add" ? null : dialog}
+          onClose={() => setDialog(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Inside the shell, so it is mounted — and asks — only once the API has said the reader is an Admin. */
+function AdminScreen({
+  onEdit,
+}: {
+  onEdit: (repository: AdminTrackedRepository) => void;
+}): JSX.Element {
+  const base = productDownloadStatsBackendUrl();
+  const getToken = useAccessToken();
+  const queryClient = useQueryClient();
   const [confirm, setConfirm] = useState<AdminTrackedRepository | null>(null);
 
-  const listEnabled = preview && configured && allowed && gate.isAdmin;
   const repositories = useQuery({
     queryKey: ["product-download-stats", "admin-repositories", base],
-    enabled: listEnabled,
     queryFn: async () => getAdminRepositories(await getToken()),
   });
   const logs = useQuery({
     queryKey: ["product-download-stats", "sync-logs", base],
-    enabled: listEnabled,
     queryFn: async () => getSyncLogs(await getToken()),
   });
   const deactivate = useMutation({
@@ -99,55 +121,8 @@ export default function EngineeringAdminPage(): JSX.Element {
     },
   });
 
-  if (!preview) {
-    return <Typography>Engineering isn't available yet.</Typography>;
-  }
-  if (!configured) {
-    return (
-      <Typography>
-        Product Download Stats isn't connected yet. Set{" "}
-        <code>ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL</code> in config.js.
-      </Typography>
-    );
-  }
-  if (!allowed) {
-    return (
-      <Typography>
-        Product Download Stats needs an https address. An http address is only accepted for
-        localhost.
-      </Typography>
-    );
-  }
-  if (gate.isResolving) {
-    return <Loading label="Loading Admin…" />;
-  }
-  const forbidden = gate.error instanceof HttpError && gate.error.status === 403;
-  if (gate.isError && !forbidden) {
-    return (
-      <ErrorNotice onRetry={gate.retry} error={gate.error}>
-        Couldn't check Admin access.
-      </ErrorNotice>
-    );
-  }
-  if (!gate.isAdmin) {
-    return (
-      <Typography>
-        You don't have access to Admin. It is where tracked repositories are added and turned off.
-        Ask someone who already manages that list.
-      </Typography>
-    );
-  }
-
   return (
     <Box>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-        <Typography component="h1" variant="h5">
-          Admin
-        </Typography>
-        <Button variant="contained" onClick={() => setDialog("add")}>
-          Add tracked repository
-        </Button>
-      </Stack>
       <Stack spacing={2}>
           <Card sx={{ p: 2 }}>
             {repositories.isPending ? (
@@ -181,7 +156,7 @@ export default function EngineeringAdminPage(): JSX.Element {
                           <ListingTable.Cell>{repository.isActive ? "On" : "Off"}</ListingTable.Cell>
                           <ListingTable.Cell>{repository.trackPackages ? "On" : "Off"}</ListingTable.Cell>
                           <ListingTable.Cell>
-                            <Button size="small" onClick={() => setDialog(repository)}>
+                            <Button size="small" onClick={() => onEdit(repository)}>
                               Edit {label}
                             </Button>
                             {repository.isActive && (
@@ -247,13 +222,6 @@ export default function EngineeringAdminPage(): JSX.Element {
             )}
           </Card>
         </Stack>
-      {dialog != null && (
-        <RepositoryDialog
-          key={dialog === "add" ? "add" : dialog.id}
-          repository={dialog === "add" ? null : dialog}
-          onClose={() => setDialog(null)}
-        />
-      )}
       <Dialog
         open={confirm != null}
         onClose={() => {

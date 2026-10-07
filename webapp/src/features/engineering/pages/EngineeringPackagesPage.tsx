@@ -32,7 +32,6 @@ import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { isPreviewEnabled } from "@config/previewFeatures";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
   dailyRange,
@@ -40,13 +39,12 @@ import {
   getPackageProducts,
   getPackageSeries,
   getPackageVersions,
-  isCredentialedProductDownloadStatsUrl,
-  isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
   type PackageBreakdownItem,
   type PackageSeriesItem,
   type ReleaseDownloadGrain,
 } from "@features/engineering/api/productDownloadStats";
+import DownloadStatsShell from "../components/DownloadStatsShell";
 import { seriesStroke } from "./dailyChartModel";
 import { formatCount, productLabel } from "./display";
 
@@ -71,17 +69,22 @@ function byActivity(a: PackageBreakdownItem, b: PackageBreakdownItem): number {
 }
 
 export default function EngineeringPackagesPage(): JSX.Element {
-  const preview = isPreviewEnabled("engineering");
-  const configured = isProductDownloadStatsConfigured();
+  return (
+    <DownloadStatsShell screen="packages">
+      <PackagesScreen />
+    </DownloadStatsShell>
+  );
+}
+
+/** Inside the shell, so it is mounted — and asks — only once the shell has let the reader through. */
+function PackagesScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const allowed = isCredentialedProductDownloadStatsUrl(base);
   const defaults = dailyRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
   const interval = readGrain(params.get("interval"));
-  const enabled = preview && configured && allowed;
   const [selection, setSelection] = useState<{
     repoId: number;
     packageName: string | null;
@@ -90,7 +93,6 @@ export default function EngineeringPackagesPage(): JSX.Element {
 
   const products = useQuery({
     queryKey: ["product-download-stats", "package-products", base],
-    enabled,
     queryFn: async () => getPackageProducts(await getToken()),
   });
   const offered = products.data?.repos ?? [];
@@ -108,17 +110,17 @@ export default function EngineeringPackagesPage(): JSX.Element {
 
   const breakdown = useQuery({
     queryKey: ["product-download-stats", "packages", base, repoId, from, to],
-    enabled: enabled && repoId > 0 && !rangeInverted,
+    enabled: repoId > 0 && !rangeInverted,
     queryFn: async () => getPackageBreakdown(await getToken(), { repoId, from, to }),
   });
   const series = useQuery({
     queryKey: ["product-download-stats", "package-series", base, repoId, from, to, interval],
-    enabled: enabled && repoId > 0 && !rangeInverted,
+    enabled: repoId > 0 && !rangeInverted,
     queryFn: async () => getPackageSeries(await getToken(), { repoId, from, to, interval }),
   });
   const versions = useQuery({
     queryKey: ["product-download-stats", "package-versions", base, repoId, from, to, packageForRepo],
-    enabled: enabled && selectionReady && repoId > 0 && packageForRepo != null && !rangeInverted,
+    enabled: selectionReady && repoId > 0 && packageForRepo != null && !rangeInverted,
     queryFn: async () =>
       getPackageVersions(await getToken(), {
         repoId,
@@ -129,31 +131,11 @@ export default function EngineeringPackagesPage(): JSX.Element {
   });
 
   useEffect(() => {
-    if (!enabled || !products.isSuccess || firstId == null || requestedIsOffered) return;
+    if (!products.isSuccess || firstId == null || requestedIsOffered) return;
     const next = new URLSearchParams(params);
     next.set("repo", String(firstId));
     setParams(next, { replace: true });
-  }, [enabled, products.isSuccess, params, firstId, requestedIsOffered, setParams]);
-
-  if (!preview) {
-    return <Typography>Engineering isn't available yet.</Typography>;
-  }
-  if (!configured) {
-    return (
-      <Typography>
-        Product Download Stats isn't connected yet. Set{" "}
-        <code>ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL</code> in config.js.
-      </Typography>
-    );
-  }
-  if (!allowed) {
-    return (
-      <Typography>
-        Product Download Stats needs an https address. An http address is only accepted for
-        localhost.
-      </Typography>
-    );
-  }
+  }, [products.isSuccess, params, firstId, requestedIsOffered, setParams]);
 
   const replace = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -184,10 +166,7 @@ export default function EngineeringPackagesPage(): JSX.Element {
 
   return (
     <Box>
-      <Typography component="h1" variant="h5">
-        Packages
-      </Typography>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ my: 2, flexWrap: "wrap" }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
         <TextField
           label="From"
           type="date"

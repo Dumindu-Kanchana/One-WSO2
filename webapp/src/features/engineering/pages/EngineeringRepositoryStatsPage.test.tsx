@@ -20,6 +20,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import EngineeringRepositoryStatsPage from "./EngineeringRepositoryStatsPage";
 
 vi.mock("recharts", async () => {
@@ -49,14 +50,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function renderStats(path = "/engineering/repository-stats") {
+const STATS = downloadStatsPaths.repositoryStats;
+
+function renderStats(path: string = STATS) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <Where />
         <Routes>
-          <Route path="engineering/repository-stats" element={<EngineeringRepositoryStatsPage />} />
+          <Route path={STATS} element={<EngineeringRepositoryStatsPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -159,6 +162,9 @@ function statsFetch(url: string): Promise<Response> {
   return Promise.resolve(json({}, 404));
 }
 
+// The preview, not-connected and https rungs are the shell's —
+// DownloadStatsShell.test.tsx walks them, and the Overview suite keeps two on
+// a real screen.
 describe("Repository Stats", () => {
   it("keeps the measure in the address, explains unique cloners, and searches the table", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -226,7 +232,7 @@ describe("Repository Stats", () => {
         return json({ series: [] });
       }),
     );
-    renderStats("/engineering/repository-stats?stat=uniqueCloners");
+    renderStats(`${STATS}?stat=uniqueCloners`);
     expect(await screen.findByText(/clones unavailable/i)).toBeInTheDocument();
     expect(await screen.findByRole("cell", { name: "API Manager" })).toBeInTheDocument();
     expect(screen.getAllByRole("cell", { name: "—" }).length).toBeGreaterThan(0);
@@ -286,7 +292,7 @@ describe("Repository Stats", () => {
     window.config = configured();
     const fetchMock = vi.fn(statsFetch);
     vi.stubGlobal("fetch", fetchMock);
-    renderStats("/engineering/repository-stats?interval=month");
+    renderStats(`${STATS}?interval=month`);
 
     expect(await screen.findByRole("cell", { name: "120" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Chart type" })).not.toBeInTheDocument();
@@ -305,7 +311,7 @@ describe("Repository Stats", () => {
     window.config = configured();
     const fetchMock = vi.fn(statsFetch);
     vi.stubGlobal("fetch", fetchMock);
-    renderStats("/engineering/repository-stats?repos=7");
+    renderStats(`${STATS}?repos=7`);
 
     expect(await screen.findByRole("cell", { name: "API Manager" })).toBeInTheDocument();
     expect(screen.queryByRole("cell", { name: "Identity Server" })).not.toBeInTheDocument();
@@ -317,7 +323,7 @@ describe("Repository Stats", () => {
     window.config = configured();
     const fetchMock = vi.fn(statsFetch);
     vi.stubGlobal("fetch", fetchMock);
-    renderStats("/engineering/repository-stats?stat=uniqueCloners&interval=cumulative");
+    renderStats(`${STATS}?stat=uniqueCloners&interval=cumulative`);
 
     expect(await screen.findByRole("cell", { name: "6" })).toBeInTheDocument();
     expect(
@@ -336,7 +342,7 @@ describe("Repository Stats", () => {
   it("plots only the dates the API returned", async () => {
     window.config = configured();
     vi.stubGlobal("fetch", vi.fn(statsFetch));
-    renderStats("/engineering/repository-stats?from=2026-08-31&to=2026-09-30");
+    renderStats(`${STATS}?from=2026-08-31&to=2026-09-30`);
     expect(await screen.findByText("2026-09-28")).toBeInTheDocument();
     expect(screen.queryByText("2026-08-31")).not.toBeInTheDocument();
   });
@@ -345,7 +351,7 @@ describe("Repository Stats", () => {
     window.config = configured();
     const fetchMock = vi.fn(statsFetch);
     vi.stubGlobal("fetch", fetchMock);
-    renderStats("/engineering/repository-stats?from=2026-09-10&to=2026-09-01");
+    renderStats(`${STATS}?from=2026-09-10&to=2026-09-01`);
     expect(await screen.findByText("From is after To.")).toBeInTheDocument();
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/stats/"))).toBe(false);
   });
@@ -373,7 +379,7 @@ describe("Repository Stats", () => {
         return json({ series: [] });
       }),
     );
-    renderStats("/engineering/repository-stats?interval=month");
+    renderStats(`${STATS}?interval=month`);
     await userEvent.click(await screen.findByRole("button", { name: "Monthly" }));
     expect(await screen.findByText(/forks unavailable/i)).toBeInTheDocument();
     expect(screen.getByText("No data for the selected range")).toBeInTheDocument();
@@ -390,42 +396,6 @@ describe("Repository Stats", () => {
     expect(await screen.findByText(/couldn't load repository stats/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /retry/i }));
     expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes("/stats/")).length).toBeGreaterThan(1);
-  });
-
-  it("says Engineering is not available when the preview is off", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { engineering: false },
-      ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "https://stats.example",
-    } as Window["config"];
-    renderStats();
-    expect(screen.getByText(/engineering isn't available yet/i)).toBeInTheDocument();
-  });
-
-  it("does not send the access token to an http address", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-      ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "http://stats.example",
-    } as Window["config"];
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    renderStats();
-    expect(screen.getByText(/needs an https address/i)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("says Repository Stats is not connected and makes no request", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-    } as Window["config"];
-    delete window.config?.ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL;
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    renderStats();
-    expect(screen.getByText(/isn't connected yet/i)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

@@ -21,6 +21,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import AuthGuard from "@layouts/AuthGuard";
+import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import EngineeringOverviewPage from "./EngineeringOverviewPage";
 
 const auth = vi.hoisted(() => {
@@ -74,10 +75,10 @@ function renderOverview({ signedIn = true }: { signedIn?: boolean } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/engineering"]}>
+      <MemoryRouter initialEntries={[downloadStatsPaths.overview]}>
         <Routes>
           <Route element={<AuthGuard />}>
-            <Route path="engineering" element={<EngineeringOverviewPage />} />
+            <Route path={downloadStatsPaths.overview} element={<EngineeringOverviewPage />} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -85,19 +86,11 @@ function renderOverview({ signedIn = true }: { signedIn?: boolean } = {}) {
   );
 }
 
+// The preview, not-connected and https rungs are the shell's, and
+// DownloadStatsShell.test.tsx walks them. Two are kept here on the real
+// screen, because a probe cannot prove that a screen with three queries
+// sends none of them.
 describe("Engineering Overview", () => {
-  it("says Engineering is not available when the preview switch is off", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: {},
-    } as Window["config"];
-
-    renderOverview();
-
-    expect(screen.getByText(/engineering isn't available yet/i)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
-  });
-
   it("shows the API's release-download figures, the 30-day chart, and the top products", async () => {
     window.config = {
       ...(window.config ?? {}),
@@ -171,8 +164,10 @@ describe("Engineering Overview", () => {
 
     renderOverview();
 
-    expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
-    expect(screen.getByText("Yesterday's Downloads")).toBeInTheDocument();
+    // The shell's title is up before the figures; the first tile is the sign
+    // the figures have arrived.
+    expect(await screen.findByText("Yesterday's Downloads")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Overview" })).toBeInTheDocument();
     expect(screen.getByText("205")).toBeInTheDocument();
     expect(screen.getByText("3.0%")).toBeInTheDocument();
     expect(screen.getByText("This Month's Downloads")).toBeInTheDocument();
@@ -273,7 +268,7 @@ describe("Engineering Overview", () => {
     renderOverview();
 
     expect(screen.getByText(/needs an https address/i)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Yesterday's Downloads")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -309,7 +304,7 @@ describe("Engineering Overview", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/^http:\/\/\[::1\]:8080\//);
   });
 
-  it("says Product Download Stats is not connected when the API address is missing", () => {
+  it("says Download Stats is not connected when the API address is missing, and asks for nothing", () => {
     window.config = {
       ...(window.config ?? {}),
       ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
@@ -320,9 +315,9 @@ describe("Engineering Overview", () => {
 
     renderOverview();
 
-    expect(screen.getByText(/isn't connected yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/download stats isn't connected yet/i)).toBeInTheDocument();
     expect(screen.getByText("ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Yesterday's Downloads")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

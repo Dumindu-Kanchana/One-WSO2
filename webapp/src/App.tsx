@@ -222,12 +222,7 @@ import UmtReleaseChunksPage from "@features/umt/pages/UmtReleaseChunksPage";
 import UmtStatisticsPage from "@features/umt/pages/UmtStatisticsPage";
 import UmtUpdateView from "@features/umt/pages/UmtUpdateView";
 import UmtUpdatesPage from "@features/umt/pages/UmtUpdatesPage";
-import EngineeringDownloadsPage from "@features/engineering/pages/EngineeringDownloadsPage";
-import EngineeringVersionsPage from "@features/engineering/pages/EngineeringVersionsPage";
-import EngineeringPackagesPage from "@features/engineering/pages/EngineeringPackagesPage";
-import EngineeringRepositoryStatsPage from "@features/engineering/pages/EngineeringRepositoryStatsPage";
-import EngineeringAdminPage from "@features/engineering/pages/EngineeringAdminPage";
-import EngineeringOverviewPage from "@features/engineering/pages/EngineeringOverviewPage";
+import { engineeringRoutes } from "@features/engineering/routes";
 import InfraHomePage from "@features/infra/pages/InfraHomePage";
 import InfraNewRepositoryPage from "@features/infra/pages/InfraNewRepositoryPage";
 
@@ -256,15 +251,12 @@ export default function App() {
               <Route path="umt/statistics" element={<UmtStatisticsPage />} />
             </>
           )}
-          {/* Registered even while the engineering preview flag is off. The page
-              says Engineering is not available; omitting the route would send a
-              direct visit home with no answer. */}
-          <Route path="engineering" element={<EngineeringOverviewPage />} />
-          <Route path="engineering/downloads" element={<EngineeringDownloadsPage />} />
-          <Route path="engineering/versions" element={<EngineeringVersionsPage />} />
-          <Route path="engineering/packages" element={<EngineeringPackagesPage />} />
-          <Route path="engineering/repository-stats" element={<EngineeringRepositoryStatsPage />} />
-          <Route path="engineering/admin" element={<EngineeringAdminPage />} />
+          {/* Engineering → Download Stats, routed as perspective / app / screen
+              with the preview-era addresses redirecting. The feature owns the
+              tree, as CadO2 and the GRC modules own theirs; see
+              @features/engineering/routes for why it is registered even while
+              the engineering preview flag is off. */}
+          {engineeringRoutes}
           {isPreviewEnabled("infra") && (
             <>
               <Route path="infra" element={<InfraHomePage />} />

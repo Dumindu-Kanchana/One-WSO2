@@ -32,19 +32,17 @@ import type { JSX } from "react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { isPreviewEnabled } from "@config/previewFeatures";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
   dailyRange,
   getReleaseFiles,
   getRepositories,
   getVersionSeries,
-  isCredentialedProductDownloadStatsUrl,
-  isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
   type ReleaseDownloadGrain,
   type VersionSeriesItem,
 } from "@features/engineering/api/productDownloadStats";
+import DownloadStatsShell from "../components/DownloadStatsShell";
 import { formatCount, productLabel } from "./display";
 import { seriesStroke } from "./dailyChartModel";
 
@@ -80,24 +78,28 @@ function mostRecent(series: readonly VersionSeriesItem[], limit: number): Versio
 }
 
 export default function EngineeringVersionsPage(): JSX.Element {
-  const preview = isPreviewEnabled("engineering");
-  const configured = isProductDownloadStatsConfigured();
+  return (
+    <DownloadStatsShell screen="versions">
+      <VersionsScreen />
+    </DownloadStatsShell>
+  );
+}
+
+/** Inside the shell, so it is mounted — and asks — only once the shell has let the reader through. */
+function VersionsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const allowed = isCredentialedProductDownloadStatsUrl(base);
   const defaults = dailyRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
   const interval = readGrain(params.get("interval"));
-  const enabled = preview && configured && allowed;
   const [release, setRelease] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string[] | null>(null);
   const [search, setSearch] = useState("");
 
   const repositories = useQuery({
     queryKey: ["product-download-stats", "repositories", base],
-    enabled,
     queryFn: async () => getRepositories(await getToken()),
   });
   const active = (repositories.data?.repositories ?? []).filter(
@@ -111,43 +113,23 @@ export default function EngineeringVersionsPage(): JSX.Element {
 
   const versions = useQuery({
     queryKey: ["product-download-stats", "versions", base, repoId, from, to, interval],
-    enabled: enabled && repoId > 0 && !rangeInverted,
+    enabled: repoId > 0 && !rangeInverted,
     queryFn: async () => getVersionSeries(await getToken(), { repoId, from, to, interval }),
   });
   const files = useQuery({
     queryKey: ["product-download-stats", "assets", base, repoId, from, to, release],
-    enabled: enabled && repoId > 0 && release != null && !rangeInverted,
+    enabled: repoId > 0 && release != null && !rangeInverted,
     queryFn: async () =>
       getReleaseFiles(await getToken(), { repoId, from, to, version: release ?? "" }),
   });
 
   const firstReady = repositories.isSuccess;
   useEffect(() => {
-    if (!enabled || !firstReady || firstId == null || requestedIsActive) return;
+    if (!firstReady || firstId == null || requestedIsActive) return;
     const next = new URLSearchParams(params);
     next.set("repo", String(firstId));
     setParams(next, { replace: true });
-  }, [enabled, firstReady, params, firstId, requestedIsActive, setParams]);
-
-  if (!preview) {
-    return <Typography>Engineering isn't available yet.</Typography>;
-  }
-  if (!configured) {
-    return (
-      <Typography>
-        Product Download Stats isn't connected yet. Set{" "}
-        <code>ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL</code> in config.js.
-      </Typography>
-    );
-  }
-  if (!allowed) {
-    return (
-      <Typography>
-        Product Download Stats needs an https address. An http address is only accepted for
-        localhost.
-      </Typography>
-    );
-  }
+  }, [firstReady, params, firstId, requestedIsActive, setParams]);
 
   const replace = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -182,10 +164,7 @@ export default function EngineeringVersionsPage(): JSX.Element {
 
   return (
     <Box>
-      <Typography component="h1" variant="h5">
-        Versions
-      </Typography>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ my: 2, flexWrap: "wrap" }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
         <TextField
           label="From"
           type="date"

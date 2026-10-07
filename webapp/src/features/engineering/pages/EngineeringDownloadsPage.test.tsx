@@ -20,6 +20,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import EngineeringDownloadsPage from "./EngineeringDownloadsPage";
 import EngineeringOverviewPage from "./EngineeringOverviewPage";
 
@@ -50,20 +51,23 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function renderDownloads(path = "/engineering/downloads") {
+function renderDownloads(path: string = downloadStatsPaths.downloads) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <Where />
         <Routes>
-          <Route path="engineering/downloads" element={<EngineeringDownloadsPage />} />
+          <Route path={downloadStatsPaths.downloads} element={<EngineeringDownloadsPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
+// The preview, not-connected and https rungs are the shell's —
+// DownloadStatsShell.test.tsx walks them, and the Overview suite keeps two on
+// a real screen.
 describe("Downloads", () => {
   it("opens on the last 30 days and lists the API's daily release downloads", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -135,7 +139,7 @@ describe("Downloads", () => {
   it("keeps the current date when the field is cleared", async () => {
     window.config = configured();
     vi.stubGlobal("fetch", vi.fn(async () => json({ series: [], repositories: [] })));
-    renderDownloads("/engineering/downloads?from=2026-01-01&to=2026-01-15");
+    renderDownloads(`${downloadStatsPaths.downloads}?from=2026-01-01&to=2026-01-15`);
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "" } });
     expect(screen.getByTestId("where")).toHaveTextContent("from=2026-01-01");
     expect((screen.getByLabelText("From") as HTMLInputElement).value).toBe("2026-01-01");
@@ -147,45 +151,9 @@ describe("Downloads", () => {
       url.includes("/stats/") ? json({ message: "no" }, 500) : json({ repositories: [] }),
     );
     vi.stubGlobal("fetch", fetchMock);
-    renderDownloads("/engineering/downloads?from=2026-09-10&to=2026-09-01");
+    renderDownloads(`${downloadStatsPaths.downloads}?from=2026-09-10&to=2026-09-01`);
     expect(await screen.findByText("From is after To.")).toBeInTheDocument();
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/stats/"))).toBe(false);
-  });
-
-  it("says Engineering is not available when the preview is off", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { engineering: false },
-      ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "https://stats.example",
-    } as Window["config"];
-    renderDownloads();
-    expect(screen.getByText(/engineering isn't available yet/i)).toBeInTheDocument();
-  });
-
-  it("does not send the access token to an http address", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-      ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "http://stats.example",
-    } as Window["config"];
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    renderDownloads();
-    expect(screen.getByText(/needs an https address/i)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("says Downloads is not connected and makes no request", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-    } as Window["config"];
-    delete window.config?.ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL;
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    renderDownloads();
-    expect(screen.getByText(/isn't connected yet/i)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("limits the request to the products in the address", async () => {
@@ -199,7 +167,7 @@ describe("Downloads", () => {
       return json({ series: [] });
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderDownloads("/engineering/downloads?repos=1");
+    renderDownloads(`${downloadStatsPaths.downloads}?repos=1`);
     expect(await screen.findByText("No data for the selected range")).toBeInTheDocument();
     const dailyCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("/stats/daily"));
     expect(new URL(String(dailyCall?.[0])).searchParams.get("repos")).toBe("1");
@@ -217,7 +185,7 @@ describe("Downloads", () => {
       return json({}, 404);
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderDownloads("/engineering/downloads?interval=month");
+    renderDownloads(`${downloadStatsPaths.downloads}?interval=month`);
     expect((await screen.findAllByText("12")).length).toBeGreaterThan(0);
     expect(screen.queryByRole("group", { name: "Chart type" })).not.toBeInTheDocument();
     const dailyCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("/stats/daily"));
@@ -236,7 +204,7 @@ describe("Downloads", () => {
       return json({}, 404);
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderDownloads("/engineering/downloads?interval=cumulative");
+    renderDownloads(`${downloadStatsPaths.downloads}?interval=cumulative`);
     expect(await screen.findByText("900")).toBeInTheDocument();
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/stats/total"))).toBe(true);
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/stats/daily"))).toBe(false);
@@ -292,27 +260,28 @@ describe("Downloads", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter initialEntries={["/engineering"]}>
+        <MemoryRouter initialEntries={[downloadStatsPaths.overview]}>
           <Where />
           <Routes>
-            <Route path="engineering" element={<EngineeringOverviewPage />} />
-            <Route path="engineering/downloads" element={<EngineeringDownloadsPage />} />
+            <Route path={downloadStatsPaths.overview} element={<EngineeringOverviewPage />} />
+            <Route path={downloadStatsPaths.downloads} element={<EngineeringDownloadsPage />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     );
     expect(await screen.findByRole("link", { name: /this month's downloads/i })).toHaveAttribute(
       "href",
-      "/engineering/downloads?interval=month&from=2026-09-01&to=2026-09-28",
+      "/engineering/download-stats/downloads?interval=month&from=2026-09-01&to=2026-09-28",
     );
     expect(screen.getByRole("link", { name: /total downloads/i })).toHaveAttribute(
       "href",
-      "/engineering/downloads?interval=cumulative",
+      "/engineering/download-stats/downloads?interval=cumulative",
     );
     await userEvent.click(await screen.findByRole("link", { name: /yesterday's downloads/i }));
     expect(await screen.findByTestId("where")).toHaveTextContent(
-      "/engineering/downloads?interval=day&from=2026-09-28&to=2026-09-28",
+      "/engineering/download-stats/downloads?interval=day&from=2026-09-28&to=2026-09-28",
     );
+    expect(await screen.findByRole("heading", { name: "Downloads" })).toBeInTheDocument();
   });
 });
 

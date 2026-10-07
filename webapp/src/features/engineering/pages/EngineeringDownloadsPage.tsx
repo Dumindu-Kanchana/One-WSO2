@@ -32,17 +32,15 @@ import { Bar, BarChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import type { JSX } from "react";
 import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { isPreviewEnabled } from "@config/previewFeatures";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
   dailyRange,
   getReleaseDownloads,
   getRepositories,
-  isCredentialedProductDownloadStatsUrl,
-  isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
   type ReleaseDownloadGrain,
 } from "@features/engineering/api/productDownloadStats";
+import DownloadStatsShell from "../components/DownloadStatsShell";
 import { dailyChartModel } from "./dailyChartModel";
 import { formatCount, isIsolatedPoint, productLabel } from "./display";
 
@@ -52,12 +50,18 @@ function readGrain(value: string | null): ReleaseDownloadGrain {
 }
 
 export default function EngineeringDownloadsPage(): JSX.Element {
-  const preview = isPreviewEnabled("engineering");
-  const configured = isProductDownloadStatsConfigured();
+  return (
+    <DownloadStatsShell screen="downloads">
+      <DownloadsScreen />
+    </DownloadStatsShell>
+  );
+}
+
+/** Inside the shell, so it is mounted — and asks — only once the shell has let the reader through. */
+function DownloadsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const allowed = isCredentialedProductDownloadStatsUrl(base);
   const defaults = dailyRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
@@ -67,39 +71,17 @@ export default function EngineeringDownloadsPage(): JSX.Element {
     .map((part) => Number(part))
     .filter((id) => Number.isInteger(id) && id > 0);
   const chart = params.get("chart") === "bar" ? "bar" : "line";
-  const enabled = preview && configured && allowed;
 
   const repositories = useQuery({
     queryKey: ["product-download-stats", "repositories", base],
-    enabled,
     queryFn: async () => getRepositories(await getToken()),
   });
   const rangeInverted = from > to;
   const downloads = useQuery({
     queryKey: ["product-download-stats", "downloads", base, from, to, interval, repos.join(",")],
-    enabled: enabled && !rangeInverted,
+    enabled: !rangeInverted,
     queryFn: async () => getReleaseDownloads(await getToken(), { from, to, interval, repos }),
   });
-
-  if (!preview) {
-    return <Typography>Engineering isn't available yet.</Typography>;
-  }
-  if (!configured) {
-    return (
-      <Typography>
-        Product Download Stats isn't connected yet. Set{" "}
-        <code>ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL</code> in config.js.
-      </Typography>
-    );
-  }
-  if (!allowed) {
-    return (
-      <Typography>
-        Product Download Stats needs an https address. An http address is only accepted for
-        localhost.
-      </Typography>
-    );
-  }
 
   const active = (repositories.data?.repositories ?? []).filter(
     (repository) => repository.isActive !== false,
@@ -124,10 +106,7 @@ export default function EngineeringDownloadsPage(): JSX.Element {
 
   return (
     <Box>
-      <Typography component="h1" variant="h5">
-        Downloads
-      </Typography>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ my: 2, flexWrap: "wrap" }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
         <TextField
           label="From"
           type="date"

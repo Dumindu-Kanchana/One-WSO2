@@ -81,9 +81,9 @@ export type PreviewFeature =
   | "promotion"
   /**
    * The whole Engineering perspective — waffle tile, rail, favourites,
-   * landing choices, and the Product Download Stats screens. The perspective
-   * stays hidden until this is on. A direct visit while it is off says
-   * Engineering is not available.
+   * landing choices, and the Download Stats screens. The perspective stays
+   * hidden until this is on. A direct visit while it is off says Engineering
+   * is not available.
    */
   | "engineering"
   /**

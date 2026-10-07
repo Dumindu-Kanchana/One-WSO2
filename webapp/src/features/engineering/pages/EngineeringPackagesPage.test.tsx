@@ -20,6 +20,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import EngineeringPackagesPage from "./EngineeringPackagesPage";
 
 vi.mock("recharts", async () => {
@@ -49,14 +50,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function renderPackages(path = "/engineering/packages") {
+function renderPackages(path: string = downloadStatsPaths.packages) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <Where />
         <Routes>
-          <Route path="engineering/packages" element={<EngineeringPackagesPage />} />
+          <Route path={downloadStatsPaths.packages} element={<EngineeringPackagesPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -204,7 +205,7 @@ describe("Packages", () => {
       return json({ packages: [], series: [] });
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderPackages("/engineering/packages?from=2026-09-10&to=2026-09-01&repo=3");
+    renderPackages(`${downloadStatsPaths.packages}?from=2026-09-10&to=2026-09-01&repo=3`);
     expect(await screen.findByText("From is after To.")).toBeInTheDocument();
     expect(fetchMock.mock.calls.some((call) => /\/stats\/packages\/3/.test(String(call[0])))).toBe(false);
   });
@@ -226,7 +227,7 @@ describe("Packages", () => {
       return json({ packages: [] });
     });
     vi.stubGlobal("fetch", fetchMock);
-    renderPackages("/engineering/packages?interval=month&repo=3");
+    renderPackages(`${downloadStatsPaths.packages}?interval=month&repo=3`);
     expect(await screen.findByText("No packages in the selected range")).toBeInTheDocument();
     const seriesCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("/series"));
     expect(new URL(String(seriesCall?.[0])).searchParams.get("interval")).toBe("month");
@@ -278,7 +279,7 @@ describe("Packages", () => {
         });
       }),
     );
-    renderPackages("/engineering/packages?interval=cumulative&repo=3");
+    renderPackages(`${downloadStatsPaths.packages}?interval=cumulative&repo=3`);
     expect(await screen.findByText("80")).toBeInTheDocument();
     expect(screen.queryByText("10")).not.toBeInTheDocument();
   });

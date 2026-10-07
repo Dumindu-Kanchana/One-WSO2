@@ -15,8 +15,9 @@
 // under the License.
 
 import { useQuery } from "@tanstack/react-query";
+import { HttpError } from "@api/http";
 import type { VisibilityAnswer } from "@components/side-rail/visibilityFold";
-import { ENGINEERING_ADMIN_ITEM_ID } from "@constants/perspectives";
+import { ENGINEERING_ADMIN_ITEM_ID } from "@constants/downloadStatsApps";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
   getProductDownloadStatsUser,
@@ -33,13 +34,20 @@ export function engineeringAdminVisibility(gate: { isAdmin: boolean; resolving: 
   };
 }
 
-// Asks the Product Download Stats API whether this caller is an admin.
-// The rail uses the answer to show or hide Admin. A failed read hides the
+// Asks the Download Stats API whether this caller is an Admin. The rail uses
+// the answer to show or hide the Admin row, and the app shell walks the same
+// answer as a ladder in front of the Admin screen. A failed read hides the
 // row; it does not fail the rest of Engineering.
 export function useEngineeringAdminGate(enabled: boolean): {
   isAdmin: boolean;
   isResolving: boolean;
+  /** The check itself failed — network, gateway, identity. Distinct from a refusal. */
   isError: boolean;
+  /**
+   * The API answered with a 403: that is the answer "no", not a failed check,
+   * so a shell shows the refusal rather than an error with Retry.
+   */
+  isForbidden: boolean;
   error: unknown;
   retry: () => void;
 } {
@@ -52,10 +60,12 @@ export function useEngineeringAdminGate(enabled: boolean): {
     enabled: ask,
     queryFn: async () => getProductDownloadStatsUser(await getToken()),
   });
+  const forbidden = query.error instanceof HttpError && query.error.status === 403;
   return {
     isAdmin: query.data?.isAdmin === true,
     isResolving: ask && query.isPending,
-    isError: ask && query.isError,
+    isError: ask && query.isError && !forbidden,
+    isForbidden: ask && forbidden,
     error: query.error,
     retry: () => void query.refetch(),
   };

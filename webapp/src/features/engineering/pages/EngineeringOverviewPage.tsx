@@ -27,66 +27,45 @@ import { Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } f
 import type { JSX } from "react";
 import { Link as RouterLink } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { isPreviewEnabled } from "@config/previewFeatures";
+import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
   dailyRange,
   getDaily,
   getRepositories,
   getSummary,
-  isCredentialedProductDownloadStatsUrl,
-  isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
   type DailySeries,
 } from "@features/engineering/api/productDownloadStats";
+import DownloadStatsShell from "../components/DownloadStatsShell";
 import { dailyChartModel } from "./dailyChartModel";
 import { activityDate, formatCount, productLabel } from "./display";
 
 export default function EngineeringOverviewPage(): JSX.Element {
-  const preview = isPreviewEnabled("engineering");
+  return (
+    <DownloadStatsShell screen="overview">
+      <OverviewScreen />
+    </DownloadStatsShell>
+  );
+}
+
+/** Inside the shell, so it is mounted — and asks — only once the shell has let the reader through. */
+function OverviewScreen(): JSX.Element {
   const base = productDownloadStatsBackendUrl();
-  const configured = isProductDownloadStatsConfigured();
-  const allowed = isCredentialedProductDownloadStatsUrl(base);
   const getToken = useAccessToken();
-  const enabled = preview && configured && allowed;
 
   const summary = useQuery({
     queryKey: ["product-download-stats", "summary", base],
-    enabled,
     queryFn: async () => getSummary(await getToken()),
   });
   const daily = useQuery({
     queryKey: ["product-download-stats", "daily", base],
-    enabled,
     queryFn: async () => getDaily(await getToken()),
   });
   const repositories = useQuery({
     queryKey: ["product-download-stats", "repositories", base],
-    enabled,
     queryFn: async () => getRepositories(await getToken()),
   });
-
-  if (!preview) {
-    return <Typography>Engineering isn't available yet.</Typography>;
-  }
-
-  if (!configured) {
-    return (
-      <Typography>
-        Product Download Stats isn't connected yet. Set{" "}
-        <code>ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL</code> in config.js.
-      </Typography>
-    );
-  }
-
-  if (!allowed) {
-    return (
-      <Typography>
-        Product Download Stats needs an https address. An http address is only accepted for
-        localhost.
-      </Typography>
-    );
-  }
 
   if (summary.isPending) {
     return (
@@ -116,13 +95,6 @@ export default function EngineeringOverviewPage(): JSX.Element {
 
   return (
     <Box>
-      <Typography component="h1" variant="h5">
-        Overview
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-        Download activity and repository stats across all WSO2 products.
-      </Typography>
-
       <Box
         sx={{
           display: "grid",
@@ -145,7 +117,7 @@ export default function EngineeringOverviewPage(): JSX.Element {
         <Figure
           label="Total Downloads"
           value={formatCount(totals.totalDownloads)}
-          to="/engineering/downloads?interval=cumulative"
+          to={`${downloadStatsPaths.downloads}?interval=cumulative`}
         />
         <Figure label="Products Tracked" value={formatCount(totals.trackedRepositories)} />
         <Figure label="Clones (14d)" value={formatCount(totals.totalClonesLast14d)} />
@@ -208,13 +180,13 @@ export default function EngineeringOverviewPage(): JSX.Element {
 function dayDownloadsPath(asOfDate: string | null | undefined): string | undefined {
   const day = activityDate(asOfDate);
   if (!day) return undefined;
-  return `/engineering/downloads?interval=day&from=${day}&to=${day}`;
+  return `${downloadStatsPaths.downloads}?interval=day&from=${day}&to=${day}`;
 }
 
 function monthDownloadsPath(asOfDate: string | null | undefined): string {
   const to = activityDate(asOfDate) ?? new Date().toISOString().slice(0, 10);
   const from = `${to.slice(0, 7)}-01`;
-  return `/engineering/downloads?interval=month&from=${from}&to=${to}`;
+  return `${downloadStatsPaths.downloads}?interval=month&from=${from}&to=${to}`;
 }
 
 function Figure({

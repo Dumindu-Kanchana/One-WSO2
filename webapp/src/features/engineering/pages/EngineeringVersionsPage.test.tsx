@@ -20,6 +20,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import EngineeringVersionsPage from "./EngineeringVersionsPage";
 
 vi.mock("recharts", async () => {
@@ -49,14 +50,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function renderVersions(path = "/engineering/versions") {
+function renderVersions(path: string = downloadStatsPaths.versions) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[path]}>
         <Where />
         <Routes>
-          <Route path="engineering/versions" element={<EngineeringVersionsPage />} />
+          <Route path={downloadStatsPaths.versions} element={<EngineeringVersionsPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -89,6 +90,9 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+// The preview, not-connected and https rungs are the shell's —
+// DownloadStatsShell.test.tsx walks them, and the Overview suite keeps two on
+// a real screen.
 describe("Versions", () => {
   it("opens on the first active product, narrows the chart, and lists a chosen release's files", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -271,7 +275,7 @@ describe("Versions", () => {
         return json({ assets: [] });
       }),
     );
-    renderVersions("/engineering/versions?interval=cumulative");
+    renderVersions(`${downloadStatsPaths.versions}?interval=cumulative`);
     expect((await screen.findAllByText("20")).length).toBeGreaterThan(0);
     expect(screen.queryByText("30")).not.toBeInTheDocument();
     expect(screen.getByText("100.0%")).toBeInTheDocument();
@@ -328,7 +332,7 @@ describe("Versions", () => {
         return json({ assets: [] });
       }),
     );
-    renderVersions("/engineering/versions?interval=month");
+    renderVersions(`${downloadStatsPaths.versions}?interval=month`);
     expect(await screen.findByRole("button", { name: "v1.0" })).toBeInTheDocument();
     const fills = [...document.querySelectorAll("[fill]")].map((node) => node.getAttribute("fill"));
     expect(fills).toContain("#3E6FA3");
@@ -345,19 +349,6 @@ describe("Versions", () => {
     renderVersions();
     expect(await screen.findByText(/couldn't load products/i)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("/series"))).toBe(false);
-  });
-
-  it("does not send the access token to an http address", () => {
-    window.config = {
-      ...(window.config ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-      ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "http://stats.example",
-    } as Window["config"];
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    renderVersions();
-    expect(screen.getByText(/needs an https address/i)).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

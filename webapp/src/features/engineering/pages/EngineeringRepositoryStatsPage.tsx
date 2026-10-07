@@ -32,15 +32,12 @@ import { Bar, BarChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { useState, type JSX } from "react";
 import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { isPreviewEnabled } from "@config/previewFeatures";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
   dailyRange,
   getCloneSeries,
   getMetricSeries,
   getRepositories,
-  isCredentialedProductDownloadStatsUrl,
-  isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
   type CloneSeriesItem,
   type DailySeries,
@@ -48,6 +45,7 @@ import {
   type RepositoryMeasure,
   type RepositorySnapshot,
 } from "@features/engineering/api/productDownloadStats";
+import DownloadStatsShell from "../components/DownloadStatsShell";
 import { dailyChartModel } from "./dailyChartModel";
 import { formatCount, productLabel } from "./display";
 
@@ -205,21 +203,26 @@ function cloneChartSeries(
 }
 
 export default function EngineeringRepositoryStatsPage(): JSX.Element {
-  const preview = isPreviewEnabled("engineering");
-  const configured = isProductDownloadStatsConfigured();
+  return (
+    <DownloadStatsShell screen="repositoryStats">
+      <RepositoryStatsScreen />
+    </DownloadStatsShell>
+  );
+}
+
+/** Inside the shell, so it is mounted — and asks — only once the shell has let the reader through. */
+function RepositoryStatsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const allowed = isCredentialedProductDownloadStatsUrl(base);
   const defaults = dailyRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
   const interval = readGrain(params.get("interval"));
   const stat = readStat(params.get("stat"));
   const repos = readRepos(params.get("repos"));
-  const enabled = preview && configured && allowed;
   const rangeInverted = from > to;
-  const queryEnabled = enabled && !rangeInverted;
+  const queryEnabled = !rangeInverted;
   const repoKey = repos.join(",");
   const [tableMode, setTableMode] = useState<TableMode>("total");
   const [pickedDate, setPickedDate] = useState<string | null>(null);
@@ -228,7 +231,6 @@ export default function EngineeringRepositoryStatsPage(): JSX.Element {
 
   const repositories = useQuery({
     queryKey: ["product-download-stats", "repositories", base],
-    enabled,
     queryFn: async () => getRepositories(await getToken()),
   });
   const clones = useQuery({
@@ -252,26 +254,6 @@ export default function EngineeringRepositoryStatsPage(): JSX.Element {
   const forksTable = useDayMetric("forks", { base, from, to, repoKey, repos, enabled: dayEnabled("forks"), getToken });
   const watchersTable = useDayMetric("watchers", { base, from, to, repoKey, repos, enabled: dayEnabled("watchers"), getToken });
   const issuesTable = useDayMetric("openIssues", { base, from, to, repoKey, repos, enabled: dayEnabled("openIssues"), getToken });
-
-  if (!preview) {
-    return <Typography>Engineering isn't available yet.</Typography>;
-  }
-  if (!configured) {
-    return (
-      <Typography>
-        Product Download Stats isn't connected yet. Set{" "}
-        <code>ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL</code> in config.js.
-      </Typography>
-    );
-  }
-  if (!allowed) {
-    return (
-      <Typography>
-        Product Download Stats needs an https address. An http address is only accepted for
-        localhost.
-      </Typography>
-    );
-  }
 
   const replace = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(params);
@@ -350,10 +332,7 @@ export default function EngineeringRepositoryStatsPage(): JSX.Element {
 
   return (
     <Box>
-      <Typography component="h1" variant="h5">
-        Repository Stats
-      </Typography>
-      <Typography sx={{ mt: 1 }}>
+      <Typography>
         Unique cloners are summed per day and the same person on different days counts separately.
       </Typography>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ my: 2, flexWrap: "wrap" }}>

@@ -19,7 +19,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { ENGINEERING_ADMIN_ITEM_ID } from "@constants/perspectives";
+import { ENGINEERING_ADMIN_ITEM_ID, downloadStatsPaths } from "@constants/downloadStatsApps";
 import { claimOf, foldVisibility, type VisibilityShell } from "@components/side-rail/visibilityFold";
 import { engineeringAdminVisibility } from "@features/engineering/api/engineeringAdminVisibility";
 import { formatJobTime } from "./display";
@@ -45,9 +45,9 @@ function renderAdmin() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/engineering/admin"]}>
+      <MemoryRouter initialEntries={[downloadStatsPaths.admin]}>
         <Routes>
-          <Route path="engineering/admin" element={<EngineeringAdminPage />} />
+          <Route path={downloadStatsPaths.admin} element={<EngineeringAdminPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
