@@ -16,8 +16,9 @@
 
 // Helpers the current screens still read while they wait to be rebuilt on the
 // kit (../utils/format.ts, ../utils/filters.ts). The compact figure, the
-// Product label and the local date-time moved there; what is left here has no
-// counterpart in the standalone and goes when its screen does.
+// Product label, the local date-time and the calendar-day guard moved there;
+// what is left here has no counterpart in the standalone and goes when its
+// screen does.
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   SUCCESS: "Success",
@@ -28,12 +29,6 @@ const JOB_STATUS_LABEL: Record<string, string> = {
 
 export function jobStatusLabel(status: string): string {
   return JOB_STATUS_LABEL[status] ?? status;
-}
-
-const activityDatePattern = /^\d{4}-\d{2}-\d{2}$/;
-
-export function activityDate(value: string | null | undefined): string | undefined {
-  return value && activityDatePattern.test(value) ? value : undefined;
 }
 
 export function isIsolatedPoint(

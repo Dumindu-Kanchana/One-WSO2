@@ -15,15 +15,7 @@
 // under the License.
 
 import { describe, expect, it } from "vitest";
-import { activityDate, isIsolatedPoint, jobStatusLabel } from "./display";
-
-describe("activityDate", () => {
-  it("keeps a calendar date and drops anything else", () => {
-    expect(activityDate("2026-09-28")).toBe("2026-09-28");
-    expect(activityDate("28 Sep 2026")).toBeUndefined();
-    expect(activityDate(null)).toBeUndefined();
-  });
-});
+import { isIsolatedPoint, jobStatusLabel } from "./display";
 
 describe("jobStatusLabel", () => {
   it("names the collection job states and keeps an unknown one", () => {

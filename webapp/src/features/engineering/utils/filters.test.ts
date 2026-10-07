@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import type { ChartSeries } from "./chartTypes";
 import {
   buildDateMatrix,
+  calendarDay,
   defaultRange,
   mergeParams,
   parseFilters,
@@ -25,6 +26,15 @@ import {
   productNameById,
   toChartSeries,
 } from "./filters";
+
+describe("calendarDay", () => {
+  it("keeps a calendar day and drops anything else", () => {
+    expect(calendarDay("2026-09-28")).toBe("2026-09-28");
+    expect(calendarDay("28 Sep 2026")).toBeUndefined();
+    expect(calendarDay("2026-09-28T00:00:00Z")).toBeUndefined();
+    expect(calendarDay(null)).toBeUndefined();
+  });
+});
 
 describe("defaultRange", () => {
   it("is the last 30 days through today", () => {

@@ -73,6 +73,15 @@ export function parseFilters(params: URLSearchParams, now = new Date()): StatsFi
   };
 }
 
+const calendarDayPattern = /^\d{4}-\d{2}-\d{2}$/;
+
+// The value when it is a plain calendar day (YYYY-MM-DD), else undefined. The
+// Overview writes the API's as-of date into a Downloads address as `from` and
+// `to` this way, so nothing but a day can go there.
+export function calendarDay(value: string | null | undefined): string | undefined {
+  return value && calendarDayPattern.test(value) ? value : undefined;
+}
+
 type ParamValue = string | number | number[] | null | undefined;
 
 // Returns a new URLSearchParams with the given keys merged in. Empty arrays /

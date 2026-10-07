@@ -17,6 +17,7 @@
 import { alpha, Box, Card, Skeleton, Tooltip, Typography, useTheme } from "@wso2/oxygen-ui";
 import { Info } from "@wso2/oxygen-ui-icons-react";
 import { type JSX, type ReactNode } from "react";
+import { activateOnEnterOrSpace } from "../utils/activation";
 
 export interface StatCardProps {
   label: string;
@@ -55,16 +56,7 @@ export function StatCard({
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={
-        onClick
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
+      onKeyDown={onClick ? activateOnEnterOrSpace(onClick) : undefined}
       sx={{
         display: "flex",
         flexDirection: "column",

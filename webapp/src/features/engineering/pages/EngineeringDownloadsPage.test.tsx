@@ -269,15 +269,9 @@ describe("Downloads", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(await screen.findByRole("link", { name: /this month's downloads/i })).toHaveAttribute(
-      "href",
-      "/engineering/download-stats/downloads?interval=month&from=2026-09-01&to=2026-09-28",
-    );
-    expect(screen.getByRole("link", { name: /total downloads/i })).toHaveAttribute(
-      "href",
-      "/engineering/download-stats/downloads?interval=cumulative",
-    );
-    await userEvent.click(await screen.findByRole("link", { name: /yesterday's downloads/i }));
+    // The three tiles' addresses are the Overview suite's; this is the round
+    // trip, from a tile to the Downloads screen reading that address.
+    await userEvent.click(await screen.findByRole("button", { name: /yesterday's downloads/i }));
     expect(await screen.findByTestId("where")).toHaveTextContent(
       "/engineering/download-stats/downloads?interval=day&from=2026-09-28&to=2026-09-28",
     );
