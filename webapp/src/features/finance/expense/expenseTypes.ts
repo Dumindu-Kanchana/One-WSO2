@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// DTOs + enums mirrored from digiops-finance/apps/expense-claims/backend.
+// DTOs and enums for the expense-claims backend's responses.
 
 export type ExpenseClaimStatus =
   | "PENDING_LEAD"
@@ -172,3 +172,105 @@ export function nextStatus(view: ApproverView, decision: "approve" | "reject"): 
   if (view === "LEAD") return decision === "approve" ? "PENDING_FINANCE" : "LEAD_REJECTED";
   return decision === "approve" ? "APPROVED" : "FINANCE_REJECTED";
 }
+
+// ---- dashboard ---------------------------------------------------------
+//
+// Response types for the expense-claims backend's claims report. GET
+// /claims-report is the one org-wide, aggregated report behind this dashboard.
+// It is visible to finance readers only, the same audience `enableFinanceView`
+// above describes, so that flag is also the correct gate here. See
+// useFinanceGate's `finance-overview` case.
+
+/** `/subsidiaries` on the expense-claims backend. Master Data's own
+ *  `/subsidiaries` lives on a different backend with a different response, so
+ *  this has its own type rather than reusing masterDataTypes' `Subsidiary`. */
+export interface ExpenseSubsidiarySummary {
+  id: number;
+  code: string;
+  legalName: string;
+  currencyCode: string;
+  country: string;
+}
+
+export interface ExpenseReportTotals {
+  claimCount: number;
+  totalValue: number;
+  averageClaimValue: number;
+}
+
+export interface ExpenseReportStatusItem {
+  status: string;
+  count: number;
+  averageDaysPending: number;
+}
+
+export interface ExpenseReportEntityItem {
+  businessEntity: string;
+  legalName: string;
+  claimCount: number;
+  totalValue: number;
+  averageClaimValue: number;
+  // Absent when there is no prior period to compare against ("All Time"), the
+  // same as the top-level changes above.
+  totalValueChangePercentage?: number;
+}
+
+export interface ExpenseReportTypeAmount {
+  expenseType: string;
+  amount: number;
+}
+
+export interface ExpenseReportMonthlyItem {
+  month: string;
+  label: string;
+  amounts: ExpenseReportTypeAmount[];
+  total: number;
+  percentageOfTotal: number;
+}
+
+export interface ExpenseReportEmployeeItem {
+  employeeEmail: string;
+  employeeName: string;
+  claimCount: number;
+  pendingCount: number;
+  claimsPerMonth: number;
+  totalValue: number;
+}
+
+export interface ExpenseClaimsReport {
+  reportingCurrency: string;
+  current: ExpenseReportTotals;
+  prior: ExpenseReportTotals;
+  // Absent for an open-ended period ("All Time"), which has no prior period
+  // to compare against.
+  claimCountChangePercentage?: number;
+  totalValueChangePercentage?: number;
+  averageClaimValueChangePercentage?: number;
+  statusBreakdown: ExpenseReportStatusItem[];
+  entityBreakdown: ExpenseReportEntityItem[];
+  expenseTypeColumns: string[];
+  monthlyBreakdown: ExpenseReportMonthlyItem[];
+  employeeBreakdown: ExpenseReportEmployeeItem[];
+  availableSalesRegions: string[];
+}
+
+/** GET /claims-report query params. `status` is one value per request, not
+ *  an array — the backend's own `string[]? status` binds a bare repeated
+ *  `status=` query key, not axios/fetch's `status[]=` array encoding. */
+export interface ExpenseClaimsReportFilter {
+  startDate?: string;
+  endDate: string;
+  status?: string;
+  businessEntity?: string;
+  expenseTypeId?: number;
+  salesRegion?: string;
+}
+
+export const EXPENSE_DASHBOARD_PERIODS = [
+  "Monthly",
+  "Quarterly",
+  "Annually",
+  "All Time",
+  "Custom",
+] as const;
+export type ExpenseDashboardPeriod = (typeof EXPENSE_DASHBOARD_PERIODS)[number];

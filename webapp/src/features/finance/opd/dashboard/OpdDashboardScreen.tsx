@@ -24,7 +24,8 @@ import { money } from "../../util/financeFormat";
 import { useOpdUserInfo } from "../useOpd";
 import { OPD_ROLE, opdHasRole } from "../opdTypes";
 import { useOpdDashboardSummary } from "./useOpdDashboard";
-import { OpdDashboardPanel, OpdStatCard, OpdSubmittersTable } from "./OpdDashboardParts";
+import { OpdStatCard, OpdSubmittersTable } from "./OpdDashboardParts";
+import { DashboardPanel } from "../../components/DashboardPanel";
 import { OpdUtilizationTable } from "./OpdUtilizationTable";
 import { claimLimitOf } from "./opdDashboardTypes";
 
@@ -129,23 +130,23 @@ function DashboardBody() {
         <OpdStatCard title="Value pending" value={money(data.valuePending)} />
       </Box>
 
-      <OpdDashboardPanel title="Employees who submitted OPD claims">
+      <DashboardPanel title="Employees who submitted OPD claims">
         <OpdSubmittersTable
           submittedThisYear={data.employeesSubmittedThisYear}
           submittedLastYear={data.employeesSubmittedLastYear}
           fullyUtilisedThisYear={data.employeesFullyUtilizedThisYear}
           fullyUtilisedLastYear={data.employeesFullyUtilizedLastYear}
         />
-      </OpdDashboardPanel>
+      </DashboardPanel>
 
-      <OpdDashboardPanel
+      <DashboardPanel
         title="Claim limit utilization"
         // Read off the first row, as the source does: the limit is the same for
         // everyone, and with no rows there is no limit to quote.
         aside={limit === null ? undefined : `(Limit: ${money(limit)} per employee)`}
       >
         <OpdUtilizationTable rows={data.utilization} />
-      </OpdDashboardPanel>
+      </DashboardPanel>
     </Box>
   );
 }

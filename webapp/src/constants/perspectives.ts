@@ -45,6 +45,7 @@ import {
   UsersIcon,
   UsersRoundIcon,
   VideoIcon,
+  HandshakeIcon,
   WalletIcon,
   ServerIcon,
   type LucideIcon,
@@ -525,6 +526,15 @@ const SALES_MEETINGS_SECTION: PerspectiveSection = {
 
 const SALES_SECTIONS: PerspectiveSection[] = [
   SALES_MEETINGS_SECTION,
+  {
+    // One row per Opportunity with its MEDDPICC state, beside the calls it came from.
+    // Served by the MEDDPICC backend rather than meet-app, but gated like Meetings: it is
+    // the same sales team, and meet-app's answer is the one the rail already has.
+    id: "sales-deals",
+    label: "Deals",
+    icon: HandshakeIcon,
+    path: "/sales/deals",
+  },
   // CadO2 answers to its own backend (CADO2_ITEM_IDS, the `cado2` adapter).
   // With the flag off the group doesn't exist, so nothing asks that backend.
   ...(isPreviewEnabled("cado2") ? appsToSections(CADO2_APPS) : []),
@@ -536,10 +546,10 @@ const SALES_SECTIONS: PerspectiveSection[] = [
  * groups, so the only way to know a caller has none is its 403; until this gate existed the
  * Meetings row stayed in the rail beside a "Nothing here for you yet" card.
  *
- * Meetings only: CadO2's rows sit in the same perspective but belong to its own adapter, and
+ * Meetings and Deals: CadO2's rows sit in the same perspective but belong to its own adapter, and
  * two adapters claiming one id is a test failure (claimConflicts).
  */
-export const SALES_ITEM_IDS: ReadonlySet<string> = new Set([SALES_MEETINGS_SECTION.id]);
+export const SALES_ITEM_IDS: ReadonlySet<string> = new Set([SALES_MEETINGS_SECTION.id, "sales-deals"]);
 
 export interface PerspectiveDef {
   key: string;

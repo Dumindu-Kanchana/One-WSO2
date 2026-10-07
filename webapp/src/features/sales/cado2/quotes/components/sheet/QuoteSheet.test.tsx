@@ -34,6 +34,8 @@ describe("QuoteSheet", () => {
     expect(within(band).getByText("Partner deal")).toBeInTheDocument();
     expect(within(band).getByText("Acme Reseller")).toBeInTheDocument();
     expect(within(band).getByText("Renewal of 1 opportunity")).toBeInTheDocument();
+    expect(within(band).getByTitle("Sales region")).toHaveTextContent("APAC");
+    expect(within(band).getByTitle("Sub-region")).toHaveTextContent("South Asia");
 
     // Two contacts, both on the order form; no primary contact.
     expect(within(band).queryByLabelText("Primary contact")).toBeNull();

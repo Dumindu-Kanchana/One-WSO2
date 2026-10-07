@@ -130,15 +130,6 @@ function InboxRow({ item, now }: { item: ApprovalInboxItem; now: Date }): JSX.El
         <Typography variant="caption" color="text.secondary">
           v{item.versionNumber}
         </Typography>
-        {/* Unmapped products whose category the rep chose, for Deal Desk to check. */}
-        {item.repCategorisedLines ? (
-          <Chip
-            size="small"
-            color="warning"
-            variant="outlined"
-            label={item.repCategorisedLines === 1 ? "1 category chosen by rep" : `${item.repCategorisedLines} categories chosen by rep`}
-          />
-        ) : null}
       </Stack>
       <Typography
         variant="subtitle2"

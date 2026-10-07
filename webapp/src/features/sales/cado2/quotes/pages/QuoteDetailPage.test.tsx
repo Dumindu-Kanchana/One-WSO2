@@ -64,6 +64,12 @@ vi.mock("@features/sales/cado2/quotes/api/useQuoteApi", () => ({
   useDocumentFiles: () => files,
 }));
 
+/** The submitted quote with every product mapped: no category chosen by the rep. */
+const allMapped: DraftResponse = {
+  ...submitted,
+  version: { ...submitted.version, lines: submitted.version.lines.map((l) => ({ ...l, categorySource: "MAPPED" as const })) },
+};
+
 const recalledV1: DraftResponse = {
   ...submitted,
   quote: { ...submitted.quote, status: "RECALLED", actions: ["REVISE", "CLOSE"] },
@@ -232,7 +238,10 @@ describe("QuoteDetailPage — lifecycle", () => {
     expect(within(chain).getByRole("listitem", { name: "Deal Desk" })).toHaveTextContent("Overdue by 2 h"); // its deadline
     expect(within(chain).getByRole("listitem", { name: "Regional Director" })).toHaveTextContent("above the Account Manager's 5% limit");
 
-    await user.click(screen.getByRole("button", { name: "Request changes" }));
+    // From another tab, the header's "Your approval" goes back to the Quote tab's panel.
+    await user.click(screen.getByRole("button", { name: "Your approval" }));
+    const panel = await screen.findByRole("region", { name: "Your approval as Deal Desk" });
+    await user.click(within(panel).getByRole("button", { name: "Request changes" }));
     const dialog = screen.getByRole("dialog");
     const send = within(dialog).getByRole("button", { name: "Request changes" });
     expect(send).toBeDisabled();
@@ -294,7 +303,7 @@ describe("QuoteDetailPage — lifecycle", () => {
         reasonStep("CRO", 12, { triggers: because(`${line} is above the Area GM's 30% limit`) }),
         reasonStep("CFO", 13, { triggers: because(`${line} is above the CRO's 40% limit`) })],
     };
-    show({ ...submitted.quote, actions: [] }, submitted);
+    show({ ...submitted.quote, actions: [] }, allMapped);
     const panel = screen.getByRole("region", { name: "Your approval as Deal Desk" });
     expect(panel).not.toHaveTextContent("After you"); // who approves is in the Approvals tab
     const points = within(within(panel).getByRole("list", { name: "What's non-standard" })).getAllByRole("listitem");
@@ -309,7 +318,7 @@ describe("QuoteDetailPage — lifecycle", () => {
       status: "IN_PROGRESS", createdAt: "2026-10-06T09:00:00Z", completedAt: null,
       steps: [reasonStep("DEAL_DESK", 11, { status: "PENDING", canAct: true })],
     };
-    show({ ...submitted.quote, actions: [] }, submitted);
+    show({ ...submitted.quote, actions: [] }, allMapped);
     expect(screen.getByRole("region", { name: "Your approval as Deal Desk" })).toHaveTextContent(
       "Nothing non-standard: no further approvals are needed.",
     );
@@ -320,7 +329,7 @@ describe("QuoteDetailPage — lifecycle", () => {
       status: "IN_PROGRESS", createdAt: "2026-10-06T09:00:00Z", completedAt: null,
       steps: [reasonStep("DEAL_DESK", 11, { status: "PENDING", canAct: true }), reasonStep("CFO", 12)],
     };
-    show({ ...submitted.quote, actions: [] }, submitted);
+    show({ ...submitted.quote, actions: [] }, allMapped);
     const panel = screen.getByRole("region", { name: "Your approval as Deal Desk" });
     expect(panel).toHaveTextContent("Further approvals follow, with no specific points recorded.");
     expect(panel).not.toHaveTextContent("no further approvals are needed");
@@ -374,7 +383,8 @@ describe("QuoteDetailPage — lifecycle", () => {
     expect(within(list()).getAllByRole("listitem")).toHaveLength(5);
   });
 
-  it("names the role on the buttons only when two steps are open at once", () => {
+  it("keeps the header short with two open steps: each role decides in its own card", async () => {
+    const user = userEvent.setup();
     me.data.approverRoles = ["LEGAL", "REGIONAL_DIRECTOR"];
     workflow.data = {
       status: "IN_PROGRESS", createdAt: "2026-10-06T09:00:00Z", completedAt: null,
@@ -382,11 +392,19 @@ describe("QuoteDetailPage — lifecycle", () => {
         reasonStep("REGIONAL_DIRECTOR", 2, { status: "PENDING", canAct: true, roleLabel: "Regional Director" })],
     };
     show({ ...submitted.quote, actions: [] }, submitted);
-    expect(screen.getByRole("button", { name: "Approve as Legal" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reject as Regional Director" })).toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "Your approvals (2)" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /as Legal|as Regional Director/ })).toBeNull();
+    // One short set of buttons per role, inside its card.
+    const rd = screen.getByRole("region", { name: "Your approval as Regional Director" });
+    await user.click(within(rd).getByRole("button", { name: "Reject" }));
+    expect(within(screen.getByRole("dialog")).getByRole("heading")).toHaveTextContent("Reject");
+    await user.type(within(screen.getByRole("dialog")).getByRole("textbox"), "Too deep");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Reject" }));
+    expect(decide.mutate).toHaveBeenCalledWith(expect.objectContaining({ stepId: 2, outcome: "reject" }), expect.anything());
   });
 
-  it("shows Deal Desk the categories the rep chose, and asks them to confirm on approval", async () => {
+  it("shows a rep-chosen category on its line and in Deal Desk's summary, nowhere else", async () => {
     const user = userEvent.setup();
     const [first, ...rest] = submitted.version.lines;
     const mixed: DraftResponse = {
@@ -405,14 +423,16 @@ describe("QuoteDetailPage — lifecycle", () => {
     };
     show({ ...submitted.quote, actions: [] }, mixed);
 
-    const notice = screen.getByRole("region", { name: "Categories chosen by the rep" });
-    expect(notice).toHaveTextContent("1 line uses a category chosen by the rep");
-    expect(notice).toHaveTextContent(first.productName);
+    // 1. The tag on the line, for everyone.
     expect(within(screen.getByRole("table", { name: "Products" })).getAllByText("Category chosen by rep")).toHaveLength(1);
-
+    // 2. A point in Deal Desk's summary.
+    const points = within(screen.getByRole("region", { name: "Your approval as Deal Desk" })).getByRole("list", { name: "What's non-standard" });
+    expect(points).toHaveTextContent(`Line ${first.lineNumber} · ${first.productName}`);
+    expect(points).toHaveTextContent("Category chosen by the rep");
+    // Nowhere else: no warning box, and nothing in the approval dialog.
+    expect(screen.queryByRole("region", { name: "Categories chosen by the rep" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Approve" }));
-    const dialog = within(screen.getByRole("dialog"));
-    expect(dialog.getByRole("region", { name: "Categories chosen by the rep" })).toHaveTextContent(/By approving, you confirm/);
+    expect(screen.getByRole("dialog")).not.toHaveTextContent(/category/i);
   });
 
   it("shows no category notice when every product is mapped", () => {

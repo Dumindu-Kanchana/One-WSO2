@@ -25,6 +25,7 @@ import TilHomePage from "@features/til/pages/TilHomePage";
 import OrgChartPage from "@features/org-chart/pages/OrgChartPage";
 import SalesMeetingsPage from "@features/sales/pages/SalesMeetingsPage";
 import MeetingDetailPage from "@features/sales/pages/MeetingDetailPage";
+import SalesDealsPage from "@features/sales/pages/SalesDealsPage";
 import PromotionHistoryPage from "@features/promotion/pages/PromotionHistoryPage";
 import PromotionRequiresLeadRoute from "@features/promotion/components/PromotionRequiresLeadRoute";
 import LeadPortalPage, { LeadPortalIndex } from "@features/promotion/pages/LeadPortalPage";
@@ -171,6 +172,7 @@ import OpdNewClaimPage from "@features/finance/opd/pages/OpdNewClaimPage";
 // not your own. Claim History used to live here too as its own Finance app;
 // retired once Me → Claims → OPD covered the same queue, filters and all.
 import OpdDashboardScreen from "@features/finance/opd/dashboard/OpdDashboardScreen";
+import ExpenseDashboardScreen from "@features/finance/expense/dashboard/ExpenseDashboardScreen";
 import OpdClaimsTab from "@features/finance/opd/pages/OpdHistoryPage";
 import FinanceOverviewPage from "@features/finance/overview/FinanceOverviewPage";
 import { FINANCE_OVERVIEW_ROUTE } from "@features/finance/overview/financeOverviewPaths";
@@ -427,6 +429,7 @@ export default function App() {
           <Route path="finance/cc/history" element={<CcHistoryPage />} />
           <Route path="finance/cc/settings" element={<CcSettingsPage />} />
           <Route path="finance/opd/dashboard" element={<OpdDashboardScreen />} />
+          <Route path="finance/expense/dashboard" element={<ExpenseDashboardScreen />} />
           {/* Finance → Master Data: the four reference tables the other
               finance apps are keyed against, each its own route.
               MasterDataRoute-guarded: this backend has no role scheme of its
@@ -969,6 +972,9 @@ export default function App() {
               preview flag; Cado2Shell resolves access for every page. See
               @features/sales/cado2/routes and docs/ported-apps/cado2.md. */}
           {isPreviewEnabled("cado2") && cado2Routes}
+          {/* Deals — MEDDPICC per Opportunity, from the MEDDPICC backend (shows a
+              not-connected state when ONE_WSO2_ECHO_BACKEND_URL is unset). */}
+          <Route path="sales/deals" element={<SalesDealsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           {/* Me → Menu: the cafeteria screen ported from the standalone
               menu app. One page, as the original was. */}

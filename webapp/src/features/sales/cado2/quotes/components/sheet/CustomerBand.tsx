@@ -16,7 +16,7 @@
 
 import type { JSX } from "react";
 import { Avatar, Box, Chip, Paper, Stack, Typography } from "@wso2/oxygen-ui";
-import { BriefcaseIcon, HandshakeIcon, RepeatIcon } from "@wso2/oxygen-ui-icons-react";
+import { BriefcaseIcon, GlobeIcon, HandshakeIcon, RepeatIcon } from "@wso2/oxygen-ui-icons-react";
 import type { QuoteSheet } from "@features/sales/cado2/quotes/sheet/sheetModel";
 import { initialsOfName as initialsFor } from "@features/sales/cado2/utils/initials";
 
@@ -59,6 +59,10 @@ export default function CustomerBand({ sheet }: { sheet: QuoteSheet }): JSX.Elem
                     : "New business"
                 }
               />
+              {sheet.salesRegion ? (
+                <Chip size="small" variant="outlined" icon={<GlobeIcon size={12} />} label={sheet.salesRegion} title="Sales region" />
+              ) : null}
+              {sheet.subRegion ? <Chip size="small" variant="outlined" label={sheet.subRegion} title="Sub-region" /> : null}
               {sheet.currency ? <Chip size="small" variant="outlined" label={sheet.currency} /> : null}
             </Stack>
           </Box>

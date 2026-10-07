@@ -33,6 +33,8 @@ import {
 import type { Meeting, MeetingScope } from "../api/salesTypes";
 import { meetingCustomer, meetingTypeLabel } from "../api/salesTypes";
 import { formatDateTime } from "../util/salesTime";
+import MeetingCoverageCell from "../meddpicc/components/MeetingCoverageCell";
+import type { LetterKey, MeetingCoverage } from "../meddpicc/types";
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
@@ -41,6 +43,7 @@ const COLUMNS = [
   { key: "title", label: "Title", width: "auto" },
   { key: "customer", label: "Account", width: 200 },
   { key: "type", label: "Call type", width: 160 },
+  { key: "meddpicc", label: "MEDDPICC", width: 230 },
   { key: "host", label: "Account Owner", width: 180 },
   { key: "start", label: "Start", width: 150 },
   { key: "end", label: "End", width: 150 },
@@ -54,6 +57,11 @@ const COLUMNS = [
  * already carries the toolbar, footer pagination and empty state, and its
  * Provider takes `totalCount` separately from the rows, which is exactly the
  * shape server-side paging needs.
+ *
+ * The MEDDPICC column appears when the page passes `coverage`: one batched
+ * lookup for the visible page, made by the page rather than per row. A row
+ * whose call belongs to a deal opens that deal's panel; the links and buttons
+ * inside it keep their own clicks.
  *
  * The Cancel column appears only in the All scope, matching the standalone app.
  * The reasoning holds up: in the Past scope nothing is cancellable — every row
@@ -72,6 +80,12 @@ export default function MeetingsTable({
   onOpenAttachments,
   onCancelMeeting,
   canCancel,
+  coverage,
+  coverageLoading = false,
+  onOpenDeal,
+  canReanalyse,
+  onReanalyse,
+  reanalysingId = null,
 }: {
   meetings: Meeting[];
   totalCount: number;
@@ -84,11 +98,21 @@ export default function MeetingsTable({
   onOpenAttachments: (meeting: Meeting) => void;
   onCancelMeeting: (meeting: Meeting) => void;
   canCancel: (meeting: Meeting) => boolean;
+  /** MEDDPICC coverage by meetingId. Omit to leave the column out. */
+  coverage?: Map<number, MeetingCoverage>;
+  coverageLoading?: boolean;
+  onOpenDeal?: (opportunityId: string, letter?: LetterKey) => void;
+  canReanalyse?: (meeting: Meeting) => boolean;
+  onReanalyse?: (meeting: Meeting) => void;
+  /** The meeting whose re-analysis request is in flight. */
+  reanalysingId?: number | null;
 }) {
   const showCancel = scope === "all";
+  const showMeddpicc = coverage !== undefined;
+  const baseColumns = showMeddpicc ? COLUMNS : COLUMNS.filter((column) => column.key !== "meddpicc");
   const columns = showCancel
-    ? [...COLUMNS, { key: "cancel", label: "Cancel", width: 80, center: true } as const]
-    : COLUMNS;
+    ? [...baseColumns, { key: "cancel", label: "Cancel", width: 80, center: true } as const]
+    : baseColumns;
 
   return (
     <ListingTable.Provider
@@ -133,9 +157,20 @@ export default function MeetingsTable({
                   const isCancelled = meeting.meetingStatus === "CANCELLED";
                   const customer = meetingCustomer(meeting);
                   const typeLabel = meetingTypeLabel(meeting.meetingType);
+                  const meetingCoverage = coverage?.get(meeting.meetingId);
+                  // The backend's link first: an included call belongs to a deal the
+                  // meeting row itself was never linked to.
+                  const dealId = meetingCoverage?.opportunityId ?? meeting.opportunityId ?? null;
+                  const openDeal = dealId && onOpenDeal ? () => onOpenDeal(dealId) : undefined;
 
                   return (
-                    <ListingTable.Row key={meeting.meetingId}>
+                    <ListingTable.Row
+                      key={meeting.meetingId}
+                      clickable={Boolean(openDeal)}
+                      hover={Boolean(openDeal)}
+                      onClick={openDeal}
+                      sx={openDeal ? { cursor: "pointer" } : undefined}
+                    >
                       <ListingTable.Cell>
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                           {/* A link, not a row click: the title is the thing that names
@@ -159,6 +194,7 @@ export default function MeetingsTable({
                               color: isCancelled ? "text.disabled" : "text.primary",
                             }}
                             title={meeting.title}
+                            onClick={(event) => event.stopPropagation()}
                           >
                             {meeting.title}
                           </Link>
@@ -204,6 +240,22 @@ export default function MeetingsTable({
                         </Typography>
                       </ListingTable.Cell>
 
+                      {showMeddpicc && (
+                        <ListingTable.Cell>
+                          <MeetingCoverageCell
+                            meetingTitle={meeting.title}
+                            coverage={meetingCoverage}
+                            loading={coverageLoading}
+                            canReanalyse={Boolean(onReanalyse && canReanalyse?.(meeting))}
+                            reanalysing={reanalysingId === meeting.meetingId}
+                            onReanalyse={() => onReanalyse?.(meeting)}
+                            onLetterClick={
+                              dealId && onOpenDeal ? (letter) => onOpenDeal(dealId, letter) : undefined
+                            }
+                          />
+                        </ListingTable.Cell>
+                      )}
+
                       <ListingTable.Cell sx={{ whiteSpace: "nowrap" }}>
                         <Typography variant="body2" color="text.secondary">
                           {meeting.host}
@@ -227,7 +279,10 @@ export default function MeetingsTable({
                         <Tooltip title="View files" arrow>
                           <IconButton
                             size="small"
-                            onClick={() => onOpenAttachments(meeting)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onOpenAttachments(meeting);
+                            }}
                             aria-label={`View files for ${meeting.title}`}
                           >
                             <PaperclipIcon size={16} />
@@ -248,12 +303,19 @@ export default function MeetingsTable({
                             {/* The span is required: a disabled button fires no
                                 pointer events, so without it the tooltip that
                                 explains WHY it is disabled never appears. */}
-                            <Box component="span" sx={{ display: "inline-flex" }}>
+                            <Box
+                              component="span"
+                              sx={{ display: "inline-flex" }}
+                              onClick={(event) => event.stopPropagation()}
+                            >
                               <IconButton
                                 size="small"
                                 color="error"
                                 disabled={!cancellable}
-                                onClick={() => onCancelMeeting(meeting)}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onCancelMeeting(meeting);
+                                }}
                                 aria-label={`Cancel ${meeting.title}`}
                               >
                                 <Trash2Icon size={16} />

@@ -127,13 +127,14 @@ describe("CadO2's rail entries", () => {
 
   it("are gone when the flag is off, or never mentioned", async () => {
     for (const preview of [{ cado2: false }, {}]) {
-      expect(salesIdsIn(await load(preview))).toEqual(["sales-meetings"]);
+      expect(salesIdsIn(await load(preview))).toEqual(["sales-meetings", "sales-deals"]);
     }
   });
 
   it("never join the Meetings gate's ids", async () => {
     const { SALES_ITEM_IDS } = await load({ cado2: true });
-    expect([...SALES_ITEM_IDS]).toEqual(["sales-meetings"]);
+    // Meetings and Deals are the meet-app-gated rows; nothing of CadO2's joins them.
+    expect([...SALES_ITEM_IDS]).toEqual(["sales-meetings", "sales-deals"]);
   });
 });
 

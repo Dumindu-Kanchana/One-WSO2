@@ -45,6 +45,8 @@ export function stepChecks(v: DraftFormValues): [StepCheck[], StepCheck[], StepC
     if (!ok) list.push({ field, message });
   };
   need(overview, Boolean(v.accountId), "sfAccountId", "Choose the account");
+  // Approvals will route on the region (2026-10-07): no quote without it.
+  if (v.accountId) need(overview, Boolean(v.accountSalesRegion), "salesRegion", "The account has no sales region in Salesforce");
   need(overview, Boolean(v.opportunityId), "sfOpportunityId", "Choose the opportunity");
   if (v.opportunityId) {
     need(overview, v.dealType !== null, "dealType", "The opportunity has no Direct / Partner value in Salesforce");

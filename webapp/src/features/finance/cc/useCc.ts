@@ -27,6 +27,7 @@ import type {
   CcEmployee,
   CcExpenseTypeList,
   CcCardHolderCompliance,
+  CcManagerCompliance,
   CcCategoryMonthAmount,
   CcJobNumberDetails,
   CcLeadApprovalSummary,
@@ -294,6 +295,23 @@ export function useCcCardHolderCompliance(
     dashboardQuery<CcCardHolderCompliance[]>(
       ["cc-cardholder-compliance", dateFrom ?? null, ownedCardsOnly],
       scoped(ccServiceUrls.cardHolderCompliance, { dateFrom, ownedCardsOnly }),
+      enabled && isSignedIn && configured,
+      getAccessToken,
+    ),
+  );
+}
+
+/** Admin view's "Group by: Reporting Manager" — Finance only, same window as
+ *  `useCcCardHolderCompliance`, unscoped by card ownership (it is already
+ *  company-wide by nature). */
+export function useCcManagerCompliance(dateFrom: string | undefined, enabled: boolean) {
+  const { isSignedIn } = useAsgardeo();
+  const getAccessToken = useAccessToken();
+  const configured = isCcBackendConfigured();
+  return useQuery<CcManagerCompliance[]>(
+    dashboardQuery<CcManagerCompliance[]>(
+      ["cc-manager-compliance", dateFrom ?? null],
+      scoped(ccServiceUrls.managerCompliance, { dateFrom }),
       enabled && isSignedIn && configured,
       getAccessToken,
     ),

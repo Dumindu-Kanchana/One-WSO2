@@ -30,13 +30,15 @@ const renewal: Opportunity = {
   recordTypeName: "Renewal", dealKind: "RENEWAL", arr: 34000,
   pricebook: { id: "01sUSD00000000001A", name: "USD Price Book (Current)" },
 };
+/** What the account search finds (set by one test). */
+let searchResults: unknown[] = [];
 /** The opportunity's currency in Salesforce (changed by one test). */
 let oppCurrency = "USD";
 const lookup = (data: unknown) => ({ data, isPending: false, isFetching: false, error: null });
 
 vi.mock("@features/sales/cado2/quotes/api/useQuoteApi", () => ({
   MIN_ACCOUNT_SEARCH: 3,
-  useAccountSearch: () => lookup([]),
+  useAccountSearch: () => lookup(searchResults),
   useAccountOpportunities: () => lookup([{ ...renewal, currencyIsoCode: oppCurrency }]),
   useAccountContacts: () => lookup([{ id: "003A", name: "Marco Ruiz" }, { id: "003B", name: "Ana" }]),
   useActiveLegalEntities: () => lookup([]),
@@ -63,7 +65,10 @@ function Harness({ values, locked = false }: { values: Partial<DraftFormValues>;
   );
 }
 
-const account = { accountId: "001A", accountName: "Northwind", accountAddress: { street: null, city: "Philadelphia", stateProvince: null, postalCode: null, country: "USA" } };
+const account = {
+  accountId: "001A", accountName: "Northwind", accountSalesRegion: "NA", accountSubRegion: "US East",
+  accountAddress: { street: null, city: "Philadelphia", stateProvince: null, postalCode: null, country: "USA" },
+};
 const deal = {
   ...account, opportunityId: "006A", opportunityName: "API Platform 2027", dealType: "PARTNER" as const,
   partner: { id: "001P", name: "Acme Reseller", role: "Reseller", billingAddress: null }, dealKind: "RENEWAL" as const,
@@ -86,6 +91,53 @@ describe("OverviewStep — Salesforce first (2026-09-28)", () => {
     expect(within(found).getByText("1 found, newest first")).toBeInTheDocument();
     expect(within(found).getByText("Philadelphia, USA")).toBeInTheDocument();
     for (const r of REST) expect(screen.queryByRole("region", { name: r })).toBeNull();
+  });
+
+  it("shows the account's location and sales region, not its name again", async () => {
+    render(<Harness values={account} />);
+    const found = await screen.findByLabelText("Found in Salesforce for this account", {}, { timeout: 3000 });
+    await within(found).findByText("2 found", {}, { timeout: 3000 });
+    // The name is shown above the findings; no "Account" line repeats it.
+    expect(within(found).queryByText("Account")).toBeNull();
+    expect(within(found).getByText("Location")).toBeInTheDocument();
+    expect(within(found).getByText("NA")).toBeInTheDocument();
+    expect(within(found).getByText("US East")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the picked account above its findings, without repeating it", async () => {
+    const user = userEvent.setup();
+    searchResults = [{
+      id: "001N", name: "Northwind Logistics", salesRegion: "NA", subRegion: "US East",
+      billingAddress: { street: null, city: "Philadelphia", stateProvince: null, postalCode: null, country: "USA" },
+    }];
+    render(<Harness values={{}} />);
+    await user.type(screen.getByRole("combobox", { name: "Account" }), "North");
+    await user.click(await screen.findByRole("option", { name: /Northwind Logistics/ }));
+
+    expect(screen.getByLabelText("Chosen account")).toHaveTextContent("Northwind Logistics");
+    const found = await screen.findByLabelText("Found in Salesforce for this account", {}, { timeout: 3000 });
+    await within(found).findByText("2 found", {}, { timeout: 3000 });
+    expect(within(found).queryByText("Northwind Logistics")).toBeNull();
+    expect(within(found).queryByText("Found")).toBeNull();
+    searchResults = [];
+  });
+
+  it("says when Salesforce has no sub-region, without stopping the quote", async () => {
+    render(<Harness values={{ ...account, accountSubRegion: "" }} />);
+    const found = await screen.findByLabelText("Found in Salesforce for this account", {}, { timeout: 3000 });
+    await within(found).findByText("2 found", {}, { timeout: 3000 }); // the last line is in
+    expect(within(found).getByText("NA")).toBeInTheDocument();
+    expect(within(found).getByText("Not set in Salesforce")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("stops the quote when the account has no sales region in Salesforce", async () => {
+    render(<Harness values={{ ...account, accountSalesRegion: "", accountSubRegion: "" }} />);
+    const found = await screen.findByLabelText("Found in Salesforce for this account", {}, { timeout: 3000 });
+    expect(await within(found).findByText("Not set in Salesforce", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("This account has no sales region in Salesforce");
+    expect(screen.getByRole("alert")).toHaveTextContent("Sales_Regions__c");
   });
 
   it("shows the deal's findings, then the rest of the step", async () => {

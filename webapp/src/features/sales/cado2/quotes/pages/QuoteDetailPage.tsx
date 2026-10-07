@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useMemo, useState, type JSX } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { Box, Button, Chip, CircularProgress, Stack, Tab, Tabs } from "@wso2/oxygen-ui";
 import DeleteDraftDialog from "@features/sales/cado2/quotes/components/detail/DeleteDraftDialog";
@@ -31,7 +31,6 @@ import { sheetFromVersion } from "@features/sales/cado2/quotes/sheet/sheetModel"
 import QuoteSheet from "@features/sales/cado2/quotes/components/sheet/QuoteSheet";
 import DocumentsPanel from "@features/sales/cado2/quotes/components/detail/DocumentsPanel";
 import StatusPanel from "@features/sales/cado2/quotes/components/detail/StatusPanel";
-import RepCategoriesNotice from "@features/sales/cado2/quotes/components/detail/RepCategoriesNotice";
 import PageHeader from "@features/sales/cado2/components/page-header/PageHeader";
 import { STATUS_COLOR, quoteLabel, quoteStatusLabel } from "@features/sales/cado2/quotes/lifecycle/lifecycle";
 import LifecycleDialog from "@features/sales/cado2/quotes/components/detail/LifecycleDialog";
@@ -44,13 +43,17 @@ import {
   useStoredApprovalPreview,
 } from "@features/sales/cado2/approvals/api/useApprovalApi";
 import type { ApprovalOutcome, ApprovalStep } from "@features/sales/cado2/approvals/api/approvalTypes";
-import { decisionNote } from "@features/sales/cado2/approvals/model/myApprovals";
-import YourApprovalPanel from "@features/sales/cado2/approvals/components/YourApprovalPanel";
+import { decisionNote, repCategoryPoints } from "@features/sales/cado2/approvals/model/myApprovals";
+import YourApprovalPanel, { YOUR_APPROVAL_ANCHOR } from "@features/sales/cado2/approvals/components/YourApprovalPanel";
+import { ArrowDownIcon } from "@wso2/oxygen-ui-icons-react";
 import { useCado2Me } from "@features/sales/cado2/api/useCado2Me";
 import { cado2Paths, type Cado2QuoteTab } from "@features/sales/cado2/cado2Paths";
 import { useDocumentTitle } from "@hooks/useDocumentTitle";
 
 type Dialog = "recall" | "revise" | "close" | "delete" | null;
+
+const scrollToYourApproval = () =>
+  document.getElementById(YOUR_APPROVAL_ANCHOR)?.scrollIntoView?.({ behavior: "smooth", block: "start" });
 /** An approver's decision on one step. */
 type Decision = { outcome: ApprovalOutcome; step: ApprovalStep } | null;
 const TABS = ["Quote", "Approvals", "Versions", "History"] as const;
@@ -93,6 +96,14 @@ export default function QuoteDetailPage(): JSX.Element {
   // After a decision: what was recorded, shown above the next step (if any).
   // Kept with its quote, as the page stays mounted when another quote opens.
   const [decisionNoteState, setDecisionNoteState] = useState<{ quoteId: number; text: string } | null>(null);
+  // Set by the header's "Your approval" from another tab; scrolls once the
+  // Quote tab shows the panel.
+  const jumpPending = useRef(false);
+  useEffect(() => {
+    if (!jumpPending.current || tab !== 0) return;
+    jumpPending.current = false;
+    scrollToYourApproval();
+  }, [tab]);
   useDocumentTitle(quote.data ? quoteLabel(quote.data.quoteNumber, latest.data?.version.accountName, latest.data?.version.opportunityName) : "Quote");
 
   const openDialog = (d: Dialog) => {
@@ -130,8 +141,17 @@ export default function QuoteDetailPage(): JSX.Element {
   const actionable = (workflow.data?.steps ?? []).filter((s) => s.canAct);
   const approverRoles = me.data?.approverRoles ?? [];
   // Two steps open at once (parallel branches) need their buttons told apart.
-  const asRole = (s: ApprovalStep) => (actionable.length > 1 ? ` as ${s.roleLabel}` : "");
+
   const approvalProps = { isDraft, workflow, preview: approvalPreview };
+  // Opens the Quote tab if needed, then scrolls to "Your approval".
+  const jumpToYourApproval = () => {
+    if (tab === 0) {
+      scrollToYourApproval();
+      return;
+    }
+    jumpPending.current = true;
+    openTab(0);
+  };
   const openDecision = (outcome: ApprovalOutcome, step: ApprovalStep) => {
     decide.reset();
     setDecision({ outcome, step });
@@ -150,19 +170,12 @@ export default function QuoteDetailPage(): JSX.Element {
         }
         actions={
           <>
-            {actionable.map((s) => (
-              <Stack key={s.role} direction="row" spacing={1}>
-                <Button variant="contained" color="success" onClick={() => openDecision("approve", s)}>
-                  Approve{asRole(s)}
-                </Button>
-                <Button variant="outlined" onClick={() => openDecision("request-changes", s)}>
-                  Request changes{asRole(s)}
-                </Button>
-                <Button variant="outlined" color="error" onClick={() => openDecision("reject", s)}>
-                  Reject{asRole(s)}
-                </Button>
-              </Stack>
-            ))}
+            {/* Decisions are made in "Your approval", next to the reasons; this jumps there from any tab. */}
+            {actionable.length ? (
+              <Button variant="contained" endIcon={<ArrowDownIcon size={16} />} onClick={jumpToYourApproval}>
+                {actionable.length === 1 ? "Your approval" : `Your approvals (${actionable.length})`}
+              </Button>
+            ) : null}
             {v.status === "DRAFT" && can("CLOSE") ? (
               <Button variant="contained" component={RouterLink} to={cado2Paths.editVersion(q.id, v.versionNumber)}>
                 Continue draft v{v.versionNumber}
@@ -204,9 +217,13 @@ export default function QuoteDetailPage(): JSX.Element {
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", lg: "minmax(0,1fr) 320px" }, gap: 3, alignItems: "start" }}>
             <Stack spacing={2} sx={{ minWidth: 0 }}>
               {/* The viewer's turn: which role they act as, and why it's asked. */}
-              <YourApprovalPanel steps={workflow.data?.steps ?? []} actionable={actionable} note={decisionNoteState?.quoteId === quoteId ? decisionNoteState.text : null} />
-              {/* Deal Desk verifies what the rep chose for unmapped products. */}
-              <RepCategoriesNotice lines={sheet.lines} />
+              <YourApprovalPanel
+                steps={workflow.data?.steps ?? []}
+                actionable={actionable}
+                note={decisionNoteState?.quoteId === quoteId ? decisionNoteState.text : null}
+                repCategories={repCategoryPoints(sheet.lines)}
+                onDecide={openDecision}
+              />
               <QuoteSheet sheet={sheet} />
             </Stack>
             <StatusPanel
@@ -257,11 +274,6 @@ export default function QuoteDetailPage(): JSX.Element {
             : decision.outcome === "reject"
               ? `The approval stops for everyone, and version ${v.versionNumber} is rejected. The owner can revise it or close the quote.`
               : `The approval stops for everyone, and the owner is asked to change version ${v.versionNumber} and submit again.`}
-          {decision.outcome === "approve" && decision.step.role === "DEAL_DESK" && sheet ? (
-            <Box sx={{ mt: 2 }}>
-              <RepCategoriesNotice lines={sheet.lines} approving />
-            </Box>
-          ) : null}
         </LifecycleDialog>
       ) : null}
       {dialog === "recall" ? (

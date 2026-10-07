@@ -176,6 +176,17 @@ export const PERSPECTIVE_HUES: Record<string, PerspectiveHue> = {
     light: { bg: "#F7DEE2", fg: "#9B2736" },
     dark: { bg: "#30171B", fg: "#DD4B5E" },
   },
+
+  // Engineering. Amber at 27 degrees, 14.5 from Me and 15.7 from Security —
+  // the tightest pair on the wheel, so the terminal mark's silhouette does more
+  // of the telling apart than the colour does. Light wash is the hue at 14%,
+  // dark wash the hue at 12% over the dark tile. Measured 5.34:1 light,
+  // 4.38:1 dark.
+  engineering: {
+    hue: "#D96B12",
+    light: { bg: "#FAEADE", fg: "#984B0D" },
+    dark: { bg: "#2D2420", fg: "#D96B12" },
+  },
 };
 
 export function perspectiveHue(key: string): PerspectiveHue | undefined {

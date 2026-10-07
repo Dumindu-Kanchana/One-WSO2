@@ -37,6 +37,10 @@ window.config = {
 
   // Email groups backend (Google Groups subscriptions).
   // ONE_WSO2_EMAIL_GROUPS_BACKEND_URL: "<your-email-groups-backend-url>",
+  // MEDDPICC backend (digiops-sales echo-backend). Powers the Deals tab and the
+  // MEDDPICC column on Sales -> Meetings. When unset, Deals shows that it is not
+  // connected and Meetings leaves the MEDDPICC column out.
+  // ONE_WSO2_ECHO_BACKEND_URL: "https://apis-stg.wso2.com/<component>/echo-backend/v1.0",
 
   // Sales meetings backend — powers the Sales perspective's meeting history.
   // Leaving it unset does NOT hide Sales: the perspective is registered

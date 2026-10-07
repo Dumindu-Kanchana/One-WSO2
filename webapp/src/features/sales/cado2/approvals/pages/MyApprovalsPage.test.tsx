@@ -56,7 +56,7 @@ describe("MyApprovalsPage", () => {
     expect(row).toHaveTextContent("As Deal Desk");
     expect(row).toHaveTextContent("USD 19,440.00");
     expect(row).toHaveTextContent("from rep@wso2.com");
-    expect(row).toHaveTextContent("2 categories chosen by rep"); // for Deal Desk to check
+    expect(row).not.toHaveTextContent("chosen by rep"); // shown on the quote, not in the inbox
   });
 
   it("shows each step's deadline, red once overdue", () => {

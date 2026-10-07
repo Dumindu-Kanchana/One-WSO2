@@ -24,12 +24,19 @@ import { localIsoMonth } from "@utils/localDate";
 
 vi.mock("@hooks/useAccessToken", () => ({ useAccessToken: () => async () => "token" }));
 vi.mock("@asgardeo/react", () => ({ useAsgardeo: () => ({ isSignedIn: true }) }));
+// The copy-reminder button reports its outcome through the notifications
+// context; the page is rendered here without the provider.
+const notify = { showSuccess: vi.fn(), showError: vi.fn() };
+vi.mock("@context/notifications/NotificationsContext", () => ({
+  useNotifications: () => notify,
+}));
 
 // Who is looking, and what each hook was asked for.
 const role = { privileges: ["employee"] as string[] };
 const asked = {
   summary: [] as { dateFrom: string | undefined; ownedCardsOnly: boolean; leadEmail?: string }[],
   compliance: [] as { ownedCardsOnly: boolean; enabled: boolean }[],
+  managerCompliance: [] as { enabled: boolean }[],
   leadSummary: [] as { enabled: boolean }[],
   leadTeam: [] as { leadEmail: string | undefined }[],
 };
@@ -125,6 +132,40 @@ vi.mock("../useCc", () => ({
       isError: false,
     };
   },
+  useCcManagerCompliance: (_dateFrom: string | undefined, enabled: boolean) => {
+    asked.managerCompliance.push({ enabled });
+    return {
+      data: [
+        {
+          managerEmail: "lead@wso2.com",
+          managerName: "Lead Person",
+          reportCount: 1,
+          outstandingAmount: 700,
+          transactionCount: 2,
+          avgPendingDays: 20,
+          bucket0To7: 0,
+          bucket8To14: 0,
+          bucket15To30: 1,
+          bucket30Plus: 1,
+          reports: [
+            {
+              employeeEmail: "late@wso2.com",
+              cardHolderName: "Late Filer",
+              outstandingAmount: 700,
+              transactionCount: 2,
+              avgDaysToSubmit: 41.5,
+              bucket0To7: 0,
+              bucket8To14: 0,
+              bucket15To30: 1,
+              bucket30Plus: 1,
+            },
+          ],
+        },
+      ],
+      isLoading: false,
+      isError: false,
+    };
+  },
 }));
 
 vi.mock("../../components/FinanceShell", () => ({
@@ -145,8 +186,11 @@ beforeEach(() => {
   role.privileges = ["employee"];
   asked.summary.length = 0;
   asked.compliance.length = 0;
+  asked.managerCompliance.length = 0;
   asked.leadSummary.length = 0;
   asked.leadTeam.length = 0;
+  notify.showSuccess.mockClear();
+  notify.showError.mockClear();
 });
 
 // index.tsx:63-65 — only a lead or finance gets the company-wide view and the
@@ -342,5 +386,43 @@ describe("the cardholder table", () => {
     expect(row).toHaveTextContent("700");
     expect(row).not.toHaveTextContent("700.00");
     expect(row).toHaveTextContent("41.5");
+  });
+});
+
+// CcDashboardPage.tsx:659-760 — "Group by: Reporting Manager" rolls the backlog
+// up under each manager, and each row can be expanded or copied as a reminder.
+describe("the reporting-manager grouping", () => {
+  const groupByManager = async () => {
+    role.privileges = ["employee", "finance"];
+    render();
+    await userEvent.click(screen.getByRole("combobox", { name: "Group by" }));
+    await userEvent.click(screen.getByRole("option", { name: "Group by: Reporting Manager" }));
+  };
+
+  it("swaps the card-holder rows for one row per reporting manager", async () => {
+    await groupByManager();
+    const row = screen.getByText("Lead Person").closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent("700");
+    // Their reports stay folded away until the row is expanded.
+    expect(screen.queryByText("Late Filer")).not.toBeInTheDocument();
+  });
+
+  it("expands a manager into the individual reports behind them", async () => {
+    await groupByManager();
+    await userEvent.click(screen.getByRole("button", { name: "Expand reports" }));
+    expect(screen.getByText("Late Filer")).toBeInTheDocument();
+  });
+
+  it("copies a reminder for the manager to the clipboard", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    await groupByManager();
+
+    await userEvent.click(screen.getByRole("button", { name: "Copy reminder" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0][0] as string;
+    expect(copied).toContain("Hi Lead, 1 of your direct reports has unsubmitted credit card transactions:");
+    expect(copied).toContain("- Late Filer: 2 items, USD 700");
   });
 });

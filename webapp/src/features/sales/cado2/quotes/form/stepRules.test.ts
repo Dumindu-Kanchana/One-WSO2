@@ -46,6 +46,13 @@ describe("stepChecks", () => {
     expect(stepChecks(noPartner)[0].map((c) => c.field)).toEqual(["partner"]);
   });
 
+  it("stops at Overview when the account has no sales region; the sub-region is optional", () => {
+    const noRegion = { ...complete(), accountSalesRegion: "" };
+    expect(stepChecks(noRegion)[0].map((c) => c.field)).toEqual(["salesRegion"]);
+    expect(reachableStep(stepChecks(noRegion))).toBe(0);
+    expect(stepChecks({ ...complete(), accountSubRegion: "" })[0]).toEqual([]);
+  });
+
   it("needs the ship-to address on partner deals, or when it differs from bill-to", () => {
     const direct = { ...complete(), dealType: "DIRECT" as const, shipToSameAsBillTo: true, shipTo: emptyDraftForm().shipTo };
     expect(stepChecks(direct)[2]).toEqual([]);

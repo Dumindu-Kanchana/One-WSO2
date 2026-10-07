@@ -21,7 +21,7 @@
 import type { ApprovalOutcome, ApprovalStep, ApprovalWorkflow } from "@features/sales/cado2/approvals/api/approvalTypes";
 
 /** What kind of rule asked for the approval; picks the row's icon. */
-export type ReasonKind = "discount" | "review" | "terms" | "term" | "downsell" | "payment" | "other";
+export type ReasonKind = "discount" | "review" | "terms" | "term" | "downsell" | "payment" | "category" | "other";
 
 /**
  * One reason, split for display. From the backend's sentence
@@ -84,6 +84,29 @@ export function reasonRows(step: ApprovalStep): ReasonRow[] {
     );
   }
   return rows;
+}
+
+const CATEGORY_LABEL: Record<string, string> = {
+  SUBSCRIPTION: "Subscription",
+  SUPPORT: "Support",
+  PROFESSIONAL_SERVICE: "Professional Service",
+};
+
+/**
+ * For Deal Desk: lines whose category the rep chose because the product isn't
+ * mapped, e.g. "Line 3 · WSO2 Onboarding" / "Category chosen by the rep:
+ * Professional Service". Deal Desk verifies them (quote-submission.md D46).
+ */
+export function repCategoryPoints(
+  lines: readonly { number: number; productName: string; category: string; categoryByRep: boolean }[],
+): ReasonRow[] {
+  return lines
+    .filter((l) => l.categoryByRep)
+    .map((l) => ({
+      kind: "category" as const,
+      title: `Line ${l.number} · ${l.productName}`,
+      detail: `Category chosen by the rep: ${CATEGORY_LABEL[l.category] ?? l.category}`,
+    }));
 }
 
 /**

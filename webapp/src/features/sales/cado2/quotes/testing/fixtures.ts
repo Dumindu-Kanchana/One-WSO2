@@ -38,6 +38,8 @@ export const draft: DraftResponse = {
     status: "DRAFT",
     pricingRulesVersion: "2026-09-M9",
     accountName: "Acme Corp",
+    accountSalesRegion: "APAC",
+    accountSubRegion: "South Asia",
     opportunityName: "Acme APIM renewal",
     dealType: "DIRECT",
     partner: null,

@@ -257,3 +257,33 @@ export function LegalMark({ size }: MarkProps) {
     </Svg>
   );
 }
+
+/**
+ * Engineering — a terminal window: the body in `field`, the title bar in
+ * `lead`, and a `>_` prompt in `detail`.
+ *
+ * Built like the Security shield: the title bar is the window's own top
+ * section closed straight across, so the outline is drawn once.
+ *
+ * Drawn at 36x30 rather than filling the grid. At 40x34 it covered 59% of its
+ * box at 64px, heavier than any mark in the set (Security is 49%); at this
+ * size it measures 46% and L* 68.8.
+ */
+export function EngineeringMark({ size }: MarkProps) {
+  const t = appMarkTones("engineering")!;
+  return (
+    <Svg size={size}>
+      <rect x="6" y="9" width="36" height="30" rx="5.5" fill={t.field} />
+      <path d="M6 14.5A5.5 5.5 0 0 1 11.5 9h25a5.5 5.5 0 0 1 5.5 5.5V17H6z" fill={t.lead} />
+      <path
+        d="M13 23l5.5 5-5.5 5"
+        fill="none"
+        stroke={t.detail}
+        strokeWidth={4.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="22" y="30.9" width="12" height="4.2" rx="2.1" fill={t.detail} />
+    </Svg>
+  );
+}

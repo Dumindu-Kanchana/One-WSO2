@@ -242,6 +242,18 @@ export default function SummaryPanel({ values: v, legalEntityName, totals, prici
               </SfValue>
             ) : null}
           </Field>
+          {v.accountId ? (
+            <>
+              <Field label="Sales region">
+                {v.accountSalesRegion || (
+                  <Box component="span" sx={{ color: "error.main" }}>
+                    Not set in Salesforce
+                  </Box>
+                )}
+              </Field>
+              <Field label="Sub-region">{v.accountSubRegion || "Not set"}</Field>
+            </>
+          ) : null}
           <Field label="Opportunity">
             {v.opportunityId ? (
               <SfValue object="Opportunity" id={v.opportunityId}>

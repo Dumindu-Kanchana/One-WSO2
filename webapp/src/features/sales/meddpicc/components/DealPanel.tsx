@@ -1,0 +1,623 @@
+// Copyright (c) 2026 WSO2 LLC. (https://www.wso2.com).
+//
+// WSO2 LLC. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+import { useState, type ReactNode } from "react";
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Drawer,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@wso2/oxygen-ui";
+import {
+  ArrowRightIcon,
+  ChevronDownIcon,
+  ExternalLinkIcon,
+  XIcon,
+} from "@wso2/oxygen-ui-icons-react";
+import ErrorNotice from "@components/error-notice/ErrorNotice";
+import { useNotifications } from "@context/notifications/NotificationsContext";
+import { formatDateTime } from "../../util/salesTime";
+import { describeError } from "../../util/salesError";
+import { useDeal } from "../api/useMeddpiccData";
+import {
+  describeMoveStageError,
+  useApproveDeal,
+  useIncludeCalls,
+  useMoveStage,
+  type MoveStageFailure,
+} from "../api/useMeddpiccMutations";
+import type { ApproveResult, DealDetail, DealField, FieldValue, LetterKey } from "../types";
+import {
+  EMPTY_DRAFT,
+  buildApproveRequest,
+  hasSomethingToApprove,
+  initialRoleMatches,
+  unmatchedRoles,
+  type ApprovalDraft,
+} from "../util/approval";
+import { formatAmount, formatSalesforceDate, letterLabel } from "../util/meddpiccFormat";
+import DealFieldRow from "./DealFieldRow";
+import MeddpiccCircles from "./MeddpiccCircles";
+import StageChip from "./StageChip";
+
+/**
+ * The deal panel: a right-hand drawer for one Opportunity's MEDDPICC.
+ *
+ * Opened from a deal row or from a meeting row. `opportunityId` null means
+ * closed. The body is keyed by the deal, so switching deals starts from a
+ * clean draft rather than carrying one deal's edits into the next.
+ */
+export default function DealPanel({
+  opportunityId,
+  initialLetter = null,
+  onClose,
+}: {
+  opportunityId: string | null;
+  /** Open already filtered to one Letter — a circle was clicked to get here. */
+  initialLetter?: LetterKey | null;
+  onClose: () => void;
+}) {
+  return (
+    <Drawer
+      open={opportunityId !== null}
+      anchor="right"
+      onClose={onClose}
+      slotProps={{ paper: { sx: { width: { xs: "100%", md: 680 }, display: "flex", flexDirection: "column" } } }}
+    >
+      {opportunityId !== null && (
+        <DealPanelContent
+          key={`${opportunityId}:${initialLetter ?? ""}`}
+          opportunityId={opportunityId}
+          initialLetter={initialLetter}
+          onClose={onClose}
+        />
+      )}
+    </Drawer>
+  );
+}
+
+function DealPanelContent({
+  opportunityId,
+  initialLetter,
+  onClose,
+}: {
+  opportunityId: string;
+  initialLetter: LetterKey | null;
+  onClose: () => void;
+}) {
+  const query = useDeal(opportunityId);
+
+  if (query.isPending) {
+    return (
+      <PanelFrame title="Loading deal…" onClose={onClose}>
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center", p: 3 }}>
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">
+            Loading MEDDPICC…
+          </Typography>
+        </Stack>
+      </PanelFrame>
+    );
+  }
+
+  if (query.isError) {
+    return (
+      <PanelFrame title="Deal" onClose={onClose}>
+        <Box sx={{ p: 3 }}>
+          <ErrorNotice onRetry={() => void query.refetch()} error={query.error}>
+            Couldn&apos;t load this deal.
+          </ErrorNotice>
+        </Box>
+      </PanelFrame>
+    );
+  }
+
+  return <DealPanelBody detail={query.data} initialLetter={initialLetter} onClose={onClose} />;
+}
+
+function PanelFrame({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between", p: 2.5, pb: 1 }}>
+        <Typography sx={{ fontSize: 17, fontWeight: 700 }}>{title}</Typography>
+        <IconButton size="small" aria-label="Close deal panel" onClick={onClose}>
+          <XIcon size={18} />
+        </IconButton>
+      </Stack>
+      {children}
+    </>
+  );
+}
+
+/** Gates in gates.json order, as the fields carry them. */
+function gatesInOrder(fields: readonly DealField[]): string[] {
+  return [...new Set(fields.map((field) => field.gate))];
+}
+
+function DealPanelBody({
+  detail,
+  initialLetter,
+  onClose,
+}: {
+  detail: DealDetail;
+  initialLetter: LetterKey | null;
+  onClose: () => void;
+}) {
+  const { deal, fields, canEdit } = detail;
+  const { showSuccess } = useNotifications();
+  const approve = useApproveDeal(deal.opportunityId);
+  const moveStage = useMoveStage(deal.opportunityId);
+  const includeCalls = useIncludeCalls(deal.opportunityId);
+
+  const [letter, setLetter] = useState<LetterKey | null>(initialLetter);
+  const [edits, setEdits] = useState<ApprovalDraft["edits"]>(EMPTY_DRAFT.edits);
+  // Only the AM's own picks. The suggested Contact is layered underneath at
+  // render time rather than copied in, so a refetched deal with a new
+  // suggestion is honoured without an effect to resync it.
+  const [roleChoices, setRoleChoices] = useState<Record<string, string>>({});
+  const [approveResult, setApproveResult] = useState<ApproveResult | null>(null);
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [moveFailure, setMoveFailure] = useState<MoveStageFailure | null>(null);
+  const [includeError, setIncludeError] = useState<string | null>(null);
+
+  const draft: ApprovalDraft = {
+    edits,
+    roleMatches: { ...initialRoleMatches(fields), ...roleChoices },
+  };
+  const unmatched = unmatchedRoles(fields, draft);
+  const somethingToApprove = hasSomethingToApprove(fields, draft);
+  const readOnly = !canEdit;
+
+  const labelOf = (key: string) => fields.find((f) => f.key === key)?.label ?? key;
+
+  const setEdit = (key: string, value: FieldValue) => setEdits((prev) => ({ ...prev, [key]: value }));
+  const undoEdit = (key: string) =>
+    setEdits((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  const matchRole = (key: string, contactId: string | null) => {
+    if (contactId === null) {
+      // "Not known": a clear, and no match alongside it.
+      setEdit(key, null);
+      setRoleChoices((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+    undoEdit(key);
+    setRoleChoices((prev) => ({ ...prev, [key]: contactId }));
+  };
+
+  const approveAll = async () => {
+    setApproveError(null);
+    setApproveResult(null);
+    try {
+      const result = await approve.mutateAsync(buildApproveRequest(fields, draft));
+      setApproveResult(result);
+      if (!result.error) {
+        setEdits({});
+        setRoleChoices({});
+        showSuccess(
+          result.written.length
+            ? `Written to Salesforce: ${result.written.map(labelOf).join(", ")}.`
+            : "Approved. Nothing needed writing to Salesforce.",
+        );
+      }
+    } catch (error: unknown) {
+      setApproveError(describeError(error));
+    }
+  };
+
+  const moveToNext = async () => {
+    if (!detail.nextStage) return;
+    setMoveFailure(null);
+    try {
+      const result = await moveStage.mutateAsync(detail.nextStage);
+      showSuccess(`Moved to ${result.stage}.`);
+    } catch (error: unknown) {
+      setMoveFailure(describeMoveStageError(error));
+    }
+  };
+
+  const include = async (meetingIds: number[]) => {
+    setIncludeError(null);
+    try {
+      await includeCalls.mutateAsync(meetingIds);
+      showSuccess(meetingIds.length === 1 ? "Call included." : `${meetingIds.length} calls included.`);
+    } catch (error: unknown) {
+      setIncludeError(describeError(error));
+    }
+  };
+
+  const gates = gatesInOrder(fields);
+  const currentGateFields = fields.filter((field) => field.gate === detail.currentStage);
+  const otherGates = gates.filter((gate) => gate !== detail.currentStage);
+
+  const approveHint = readOnly
+    ? "Only the Opportunity owner, a call host or a Sales admin can approve."
+    : unmatched.length > 0
+      ? `Pick the matching contact for ${unmatched.map((f) => f.label.toLowerCase()).join(", ")}, or mark it not known.`
+      : !somethingToApprove
+        ? "Nothing is waiting for approval."
+        : null;
+
+  const renderField = (field: DealField) => (
+    <DealFieldRow
+      key={field.key}
+      field={field}
+      draft={draft}
+      readOnly={readOnly}
+      salesforceUrl={detail.salesforceUrl}
+      onEdit={setEdit}
+      onUndo={undoEdit}
+      onRoleMatch={matchRole}
+    />
+  );
+
+  return (
+    <>
+      {/* ---- Header ------------------------------------------------------ */}
+      <Box sx={{ p: 2.5, pb: 1.5, borderBottom: 1, borderColor: "divider" }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", justifyContent: "space-between" }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="h2" sx={{ fontSize: 17, fontWeight: 700, overflowWrap: "anywhere" }}>
+              {deal.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {deal.accountName}
+              {" · "}
+              {formatAmount(deal.amount, deal.currencyIsoCode)}
+              {" · closes "}
+              {formatSalesforceDate(deal.closeDate)}
+            </Typography>
+          </Box>
+          <IconButton size="small" aria-label="Close deal panel" onClick={onClose}>
+            <XIcon size={18} />
+          </IconButton>
+        </Stack>
+
+        <Stack direction="row" spacing={1.5} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1, mt: 1.25 }}>
+          <StageChip stage={deal.stage} />
+          <MeddpiccCircles
+            variant="dealState"
+            values={deal.dealState}
+            size="medium"
+            selected={letter}
+            onLetterClick={(key) => setLetter((current) => (current === key ? null : key))}
+            label={`MEDDPICC for ${deal.name}. Pick a letter to show its fields.`}
+          />
+          <Button
+            size="small"
+            href={detail.salesforceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            endIcon={<ExternalLinkIcon size={14} />}
+            sx={{ ml: "auto" }}
+          >
+            Open in Salesforce
+          </Button>
+        </Stack>
+      </Box>
+
+      {/* ---- Body -------------------------------------------------------- */}
+      <Box sx={{ flex: 1, overflowY: "auto", px: 2.5, py: 1.5 }}>
+        <Stack spacing={1.5}>
+          {readOnly && (
+            <Alert severity="info">
+              You can view this deal. Only its owner, a call host or a Sales admin can approve, include calls or
+              move its stage.
+            </Alert>
+          )}
+
+          {detail.unassignedCalls.length > 0 && (
+            <Alert
+              severity="info"
+              action={
+                !readOnly && detail.unassignedCalls.length > 1 ? (
+                  <Button
+                    size="small"
+                    color="inherit"
+                    disabled={includeCalls.isPending}
+                    onClick={() => void include(detail.unassignedCalls.map((c) => c.meetingId))}
+                  >
+                    Include all
+                  </Button>
+                ) : undefined
+              }
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {detail.unassignedCalls.length === 1
+                  ? `An earlier call with ${deal.accountName} isn't linked to this deal.`
+                  : `${detail.unassignedCalls.length} earlier calls with ${deal.accountName} aren't linked to this deal.`}
+              </Typography>
+              <Stack component="ul" spacing={0.5} sx={{ listStyle: "none", p: 0, m: 0, mt: 0.75 }}>
+                {detail.unassignedCalls.map((call) => (
+                  <Stack
+                    component="li"
+                    key={call.meetingId}
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "center", flexWrap: "wrap" }}
+                  >
+                    <Typography variant="body2">
+                      {call.title} · {formatDateTime(call.start)}
+                      {call.letters.length > 0 && ` · covers ${call.letters.map(letterLabel).join(", ")}`}
+                    </Typography>
+                    {!readOnly && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        disabled={includeCalls.isPending}
+                        onClick={() => void include([call.meetingId])}
+                        aria-label={`Include ${call.title}`}
+                      >
+                        Include
+                      </Button>
+                    )}
+                  </Stack>
+                ))}
+              </Stack>
+            </Alert>
+          )}
+          {includeError && <Alert severity="error">{includeError}</Alert>}
+
+          {letter ? (
+            <Box>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 0.5 }}>
+                <Typography variant="subtitle2">{letterLabel(letter)} across every Gate</Typography>
+                <Chip label="Show all" size="small" onClick={() => setLetter(null)} onDelete={() => setLetter(null)} />
+              </Stack>
+              {gates.map((gate) => {
+                const inGate = fields.filter((field) => field.gate === gate && field.letters.includes(letter));
+                if (inGate.length === 0) return null;
+                return (
+                  <Box key={gate} sx={{ mb: 1 }}>
+                    <Typography variant="overline" color="text.secondary">
+                      {gate}
+                    </Typography>
+                    {inGate.map(renderField)}
+                  </Box>
+                );
+              })}
+              {fields.every((field) => !field.letters.includes(letter)) && (
+                <Typography variant="body2" color="text.secondary">
+                  No Gate field feeds {letterLabel(letter)}.
+                </Typography>
+              )}
+            </Box>
+          ) : (
+            <>
+              {currentGateFields.length > 0 ? (
+                <Box>
+                  <Typography variant="subtitle2">To leave {detail.currentStage}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {detail.gateComplete
+                      ? "Every field this Gate needs is in Salesforce."
+                      : `${detail.incomplete.length} of ${currentGateFields.length} still needed.`}
+                  </Typography>
+                  {currentGateFields.map(renderField)}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  {deal.isClosed ? "This deal is closed." : `${detail.currentStage} has no Gate fields.`}
+                </Typography>
+              )}
+
+              {otherGates.map((gate) => {
+                const inGate = fields.filter((field) => field.gate === gate);
+                const pending = inGate.filter((field) => field.proposal?.pending).length;
+                return (
+                  <Accordion
+                    key={gate}
+                    disableGutters
+                    variant="outlined"
+                    // Other Gates are reference; their fields mount only when opened.
+                    slotProps={{ transition: { unmountOnExit: true } }}
+                    sx={{ "&:before": { display: "none" } }}
+                  >
+                    <AccordionSummary expandIcon={<ChevronDownIcon size={16} />}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {gate} Gate
+                      </Typography>
+                      {pending > 0 && (
+                        <Typography variant="caption" color="warning.dark" sx={{ ml: 1, alignSelf: "center" }}>
+                          {pending} AI {pending === 1 ? "proposal" : "proposals"}
+                        </Typography>
+                      )}
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ pt: 0 }}>{inGate.map(renderField)}</AccordionDetails>
+                  </Accordion>
+                );
+              })}
+            </>
+          )}
+
+          {detail.askNext.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2">Ask next</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Still open for this Gate, with nothing heard yet.
+              </Typography>
+              <Stack component="ol" spacing={0.75} sx={{ pl: 2.5, m: 0, mt: 0.75 }}>
+                {detail.askNext.map((item) => (
+                  <Typography component="li" variant="body2" key={item.fieldKey}>
+                    {item.question}{" "}
+                    <Typography component="span" variant="caption" color="text.secondary">
+                      ({labelOf(item.fieldKey)})
+                    </Typography>
+                  </Typography>
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {detail.productsDiscussed.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2">Products discussed</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                A hint from the calls. Never written to Salesforce, and not the product line items.
+              </Typography>
+              <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75, mt: 0.75 }}>
+                {detail.productsDiscussed.map((product) => (
+                  <Chip key={product} label={product} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            </Box>
+          )}
+
+          {detail.calls.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2">Calls ({detail.calls.length})</Typography>
+              <Stack spacing={0.75} sx={{ mt: 0.75 }}>
+                {detail.calls.map((call) => (
+                  <Stack
+                    key={call.meetingId}
+                    direction="row"
+                    spacing={1.5}
+                    sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", rowGap: 0.5 }}
+                  >
+                    <Typography variant="body2" sx={{ minWidth: 0 }}>
+                      {call.title}
+                      <Typography component="span" variant="caption" color="text.secondary">
+                        {" · "}
+                        {formatDateTime(call.start)}
+                      </Typography>
+                    </Typography>
+                    <MeddpiccCircles variant="coverage" values={call.coverage} label={`Coverage for ${call.title}`} />
+                  </Stack>
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Stack>
+      </Box>
+
+      {/* ---- Footer: the two actions ----------------------------------------- */}
+      <Box sx={{ borderTop: 1, borderColor: "divider", px: 2.5, py: 1.5 }}>
+        <Stack spacing={1}>
+          {approveError && <Alert severity="error">{approveError}</Alert>}
+          {approveResult?.error && (
+            <Alert severity="error">
+              Salesforce refused the update: {approveResult.error.message}
+              {approveResult.error.fields && approveResult.error.fields.length > 0 && (
+                <> ({approveResult.error.fields.map(labelOf).join(", ")})</>
+              )}
+            </Alert>
+          )}
+          {approveResult && !approveResult.error && approveResult.skipped.length > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              Not written: {approveResult.skipped.map((s) => `${labelOf(s.fieldKey)} (${s.reason})`).join(", ")}.
+            </Typography>
+          )}
+
+          {moveFailure?.kind === "incomplete" && (
+            <Alert severity="warning">
+              {moveFailure.message}
+              {moveFailure.incomplete.length > 0 && <> Still needed: {moveFailure.incomplete.map(labelOf).join(", ")}.</>}
+            </Alert>
+          )}
+          {moveFailure?.kind === "refused" && (
+            <Alert
+              severity="error"
+              action={
+                <Button
+                  size="small"
+                  color="inherit"
+                  href={moveFailure.salesforceUrl ?? detail.salesforceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  endIcon={<ExternalLinkIcon size={14} />}
+                >
+                  Open in Salesforce
+                </Button>
+              }
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Salesforce didn&apos;t change the stage.
+              </Typography>
+              <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
+                {moveFailure.message}
+              </Typography>
+            </Alert>
+          )}
+          {moveFailure?.kind === "other" && <Alert severity="error">{moveFailure.message}</Alert>}
+
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap", rowGap: 1 }}>
+            <Tooltip title={approveHint ?? ""} arrow>
+              {/* The span keeps the tooltip working on a disabled button. */}
+              <Box component="span" sx={{ display: "inline-flex" }}>
+                <Button
+                  variant="contained"
+                  disabled={approveHint !== null || approve.isPending}
+                  onClick={() => void approveAll()}
+                  startIcon={approve.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}
+                >
+                  Approve all{deal.pendingCount > 0 ? ` (${deal.pendingCount})` : ""}
+                </Button>
+              </Box>
+            </Tooltip>
+
+            {detail.gateComplete && detail.nextStage && canEdit && (
+              <Button
+                variant="outlined"
+                disabled={moveStage.isPending}
+                onClick={() => void moveToNext()}
+                endIcon={moveStage.isPending ? <CircularProgress size={14} /> : <ArrowRightIcon size={14} />}
+              >
+                Move to {detail.nextStage}
+              </Button>
+            )}
+
+            {detail.lastApproval && (
+              <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                Last approved by {detail.lastApproval.by}, {formatDateTime(detail.lastApproval.at)}
+              </Typography>
+            )}
+          </Stack>
+
+          {approveHint && !readOnly && (
+            <Typography variant="caption" color="text.secondary" role="status">
+              {approveHint}
+            </Typography>
+          )}
+        </Stack>
+      </Box>
+
+    </>
+  );
+}

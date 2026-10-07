@@ -211,7 +211,7 @@ export interface CcCategoryMonthAmount {
   amount: number;
 }
 
-/** cardHolderCompliance.ts:16-25. */
+/** One card holder's pending credit card backlog, with ageing buckets. */
 export interface CcCardHolderCompliance {
   employeeEmail: string;
   cardHolderName: string;
@@ -223,6 +223,25 @@ export interface CcCardHolderCompliance {
   bucket8To14: number;
   bucket15To30: number;
   bucket30Plus: number;
+}
+
+/**
+ * The same pending backlog as `CcCardHolderCompliance`, rolled up under one
+ * reporting manager. An empty `managerEmail` ("Unassigned") holds card holders
+ * the HRIS has no manager for.
+ */
+export interface CcManagerCompliance {
+  managerEmail: string;
+  managerName: string;
+  reportCount: number;
+  transactionCount: number;
+  outstandingAmount: number;
+  avgPendingDays: number;
+  bucket0To7: number;
+  bucket8To14: number;
+  bucket15To30: number;
+  bucket30Plus: number;
+  reports: CcCardHolderCompliance[];
 }
 
 

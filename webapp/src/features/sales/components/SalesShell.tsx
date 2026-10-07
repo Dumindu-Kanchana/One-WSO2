@@ -46,6 +46,7 @@ export default function SalesShell({
   subtitle,
   configured,
   configKey,
+  configLabel = "the meet-app backend URL",
   forbidden,
   children,
 }: {
@@ -53,6 +54,8 @@ export default function SalesShell({
   subtitle?: string;
   configured: boolean;
   configKey: string;
+  /** What configKey points at, for the not-connected message. */
+  configLabel?: string;
   /** True when the backend has refused this caller outright (403). */
   forbidden?: boolean;
   children: ReactNode;
@@ -67,7 +70,7 @@ export default function SalesShell({
         <PerspectiveHeader title={title} subtitle={subtitle} />
         <Alert severity="info" sx={{ mt: 1.5 }}>
           Sales isn&apos;t connected yet. Set <code>{configKey}</code> in{" "}
-          <code>public/config.js</code> (the meet-app backend URL) and reload.
+          <code>public/config.js</code> ({configLabel}) and reload.
         </Alert>
       </Box>
     );

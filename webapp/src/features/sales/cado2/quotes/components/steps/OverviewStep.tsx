@@ -16,7 +16,7 @@
 
 import { useCallback, useState, type JSX, type ReactNode } from "react";
 import { Controller, useFormContext, useWatch } from "react-hook-form";
-import { Box, Chip, DatePickers, MenuItem, Stack, TextField, Typography } from "@wso2/oxygen-ui";
+import { Alert, AlertTitle, Box, Chip, DatePickers, MenuItem, Stack, TextField, Typography } from "@wso2/oxygen-ui";
 import {
   useAccountContacts,
   useAccountOpportunities,
@@ -96,9 +96,18 @@ function Section({
 const DEAL_KIND_LABEL = { FIRST_SALE: "First Sale", RENEWAL: "Renewal", EXPANSION: "Expansion" } as const;
 
 /** Stage ②: what Salesforce has for the chosen account (the deal details belong to each opportunity). */
-function accountFindings(place: string, opportunities: number, contacts: number): Finding[] {
+function accountFindings(
+  account: { place: string; salesRegion: string; subRegion: string },
+  opportunities: number,
+  contacts: number,
+): Finding[] {
+  // No "Account" line: the chosen account is shown just above, more prominently.
   return [
-    { key: "account", label: "Account", value: place || "Found" },
+    ...(account.place ? [{ key: "location", label: "Location", value: account.place }] : []),
+    // Required to quote (D59).
+    { key: "region", label: "Sales region", value: account.salesRegion || "Not set in Salesforce", warning: !account.salesRegion },
+    // Informational: never blocks.
+    { key: "subRegion", label: "Sub-region", value: account.subRegion || "Not set in Salesforce" },
     {
       key: "opportunities",
       label: "Opportunities",
@@ -178,6 +187,8 @@ export default function OverviewStep({ locked }: OverviewStepProps): JSX.Element
   const startIssue = useFieldIssue("subscriptionStartDate");
 
   const accountAddress = useWatch({ control, name: "accountAddress" });
+  const accountSalesRegion = useWatch({ control, name: "accountSalesRegion" });
+  const accountSubRegion = useWatch({ control, name: "accountSubRegion" });
 
   const chooseAccount = (a: Account | null) => {
     setValue("accountId", a?.id ?? "", { shouldDirty: true });
@@ -185,6 +196,8 @@ export default function OverviewStep({ locked }: OverviewStepProps): JSX.Element
     setValue("accountAddress", a?.billingAddress ?? null, {
       shouldDirty: true,
     });
+    setValue("accountSalesRegion", a?.salesRegion ?? "", { shouldDirty: true });
+    setValue("accountSubRegion", a?.subRegion ?? "", { shouldDirty: true });
     // A different account invalidates everything taken from the old one.
     for (const f of ["opportunityId", "opportunityName"] as const) setValue(f, "", { shouldDirty: true });
     setValue("dealType", null, { shouldDirty: true });
@@ -236,8 +249,10 @@ export default function OverviewStep({ locked }: OverviewStepProps): JSX.Element
 
   const previousOptions = (opportunities.data ?? []).filter((o) => o.id !== opportunityId);
 
-  const accountName = getValues("accountName");
-  const opportunityName = getValues("opportunityName");
+  // Watched, not read once: picking an account re-renders on its id before
+  // the name is set, and a one-off read would show the old (empty) name.
+  const accountName = useWatch({ control, name: "accountName" });
+  const opportunityName = useWatch({ control, name: "opportunityName" });
 
   return (
     <Stack spacing={2.5}>
@@ -266,12 +281,26 @@ export default function OverviewStep({ locked }: OverviewStepProps): JSX.Element
             title="Found in Salesforce for this account"
             loading={opportunities.isPending || contacts.isPending}
             findings={accountFindings(
-              [accountAddress?.city, accountAddress?.country].filter(Boolean).join(", "),
+              {
+                place: [accountAddress?.city, accountAddress?.country].filter(Boolean).join(", "),
+                salesRegion: accountSalesRegion,
+                subRegion: accountSubRegion,
+              },
               (opportunities.data ?? []).length,
               (contacts.data ?? []).length,
             )}
             animate={!locked}
           />
+        ) : null}
+
+        {/* Approvals will route on the region (2026-10-07): the quote can't go on without it. */}
+        {accountId && !accountSalesRegion ? (
+          <Alert severity="error" role="alert">
+            <AlertTitle>This account has no sales region in Salesforce</AlertTitle>
+            CadO2 needs the account&apos;s Sales Region (<code>Sales_Regions__c</code>) to route approvals. Ask your
+            Salesforce admin to set it on the account, then choose the account again
+            {locked ? " (or save the draft to refresh it)" : ""}.
+          </Alert>
         ) : null}
 
         {accountId && (locked || !opportunities.isPending) ? (

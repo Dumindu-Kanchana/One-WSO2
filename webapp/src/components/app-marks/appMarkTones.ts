@@ -76,6 +76,10 @@ export const APP_MARK_TONES: Record<string, AppMarkTones> = {
   // toward white, detail the hue at 82%. Measured 3.45:1 and 5.07:1 for lead,
   // 4.88:1 and 3.58:1 for detail, against the light and dark tiles.
   sales: { field: "#EEA5EC", lead: "#DD4BDA", detail: "#B53EB3" },
+  // Engineering. Same rule — field 50% toward white, detail at 82%. Measured
+  // 3.46:1 and 5.04:1 for lead, 4.89:1 and 3.57:1 for detail, against the
+  // light and dark tiles.
+  engineering: { field: "#ECB588", lead: "#D96B12", detail: "#B2580F" },
 };
 
 /**

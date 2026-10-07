@@ -15,33 +15,7 @@
 // under the License.
 
 import { Card, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@wso2/oxygen-ui";
-import { CELL_SX, HEAD_SX } from "./opdDashboardTableSx";
-
-/** A section of the dashboard: a titled panel, as the source draws each block. */
-export function OpdDashboardPanel({
-  title,
-  aside,
-  children,
-}: {
-  title: string;
-  /** Sits beside the title in lighter type — the source's limit note. */
-  aside?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card variant="outlined" sx={{ p: 2, mt: 2 }}>
-      <Typography sx={{ fontSize: 14.5, fontWeight: 600, mb: 1 }}>
-        {title}
-        {aside && (
-          <Typography component="span" sx={{ fontSize: 13, fontWeight: 400, color: "text.secondary", ml: 1 }}>
-            {aside}
-          </Typography>
-        )}
-      </Typography>
-      {children}
-    </Card>
-  );
-}
+import { CELL_SX, HEAD_SX } from "../../components/dashboardTableSx";
 
 /** One of the four figures across the top. `StatCard.tsx`. */
 export function OpdStatCard({ title, value }: { title: string; value: string }) {

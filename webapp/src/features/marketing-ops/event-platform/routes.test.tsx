@@ -43,10 +43,63 @@ vi.mock("@features/marketing-ops/event-platform/api/events", () => ({
   useListEvents: () => ({ data: [], isLoading: false }),
 }));
 
+// The routes are under test here, not the screens. The finished screens
+// need a QueryClient and more of the API than the mocks above, so they are
+// swapped for the placeholder the visits below wait for.
+vi.mock("./pages/EventsDashboardPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Events" phase={3} /> };
+});
+vi.mock("./pages/SpeakerLibraryPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Speaker library" phase={3} /> };
+});
+vi.mock("./pages/EventSpeakersPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Speakers" phase={3} /> };
+});
+vi.mock("./pages/RoomsPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Rooms" phase={4} /> };
+});
+vi.mock("./pages/ActivitiesPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Activities" phase={4} /> };
+});
+vi.mock("./pages/EventExportPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Export" phase={7} /> };
+});
+
+// The finished agenda editor needs a QueryClient and a sign-in; these tests are
+// about which leaf a URL reaches, so it renders as the placeholder it replaced.
+vi.mock("./pages/SessionEditorPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Agenda" phase={5} /> };
+});
+
+// The shop screens need a QueryClient and a sign-in too; only the route each
+// shop URL reaches is under test.
+vi.mock("./pages/ShopInventoryPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Shop inventory" phase={6} /> };
+});
+vi.mock("./pages/ShopOrdersPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Shop orders" phase={6} /> };
+});
+
 const gate = vi.hoisted(() => ({ value: {} as MarketingOpsGate }));
 vi.mock("@features/marketing-ops/api/useMarketingOpsGate", () => ({
   useMarketingOpsGate: () => gate.value,
 }));
+
+// The finished Settings screen needs a QueryClient and a signed-in session; the routes are
+// under test here, so it is swapped for the placeholder the visits wait for.
+vi.mock("./pages/EventSettingsPage", async () => {
+  const { default: ComingSoon } = await import("./components/ComingSoon");
+  return { default: () => <ComingSoon screen="Settings" phase={4} /> };
+});
 
 function gateAllowing(...ids: string[]): MarketingOpsGate {
   return {

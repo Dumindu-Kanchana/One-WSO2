@@ -99,6 +99,10 @@ export interface SheetLine {
 
 export interface QuoteSheet {
   readonly accountName: string;
+  /** Salesforce sales region, e.g. "APAC"; "" when none. */
+  readonly salesRegion: string;
+  /** Salesforce sub-region, e.g. "South Asia"; "" when none. */
+  readonly subRegion: string;
   readonly opportunityName: string;
   readonly dealType: DealType | null;
   readonly partner: { readonly name: string; readonly role: string | null } | null;
@@ -173,6 +177,8 @@ export function sheetFromVersion(res: DraftResponse): QuoteSheet {
   const le = v.legalEntity;
   return {
     accountName: v.accountName ?? "",
+    salesRegion: v.accountSalesRegion ?? "",
+    subRegion: v.accountSubRegion ?? "",
     opportunityName: v.opportunityName ?? "",
     dealType: v.dealType,
     partner: v.partner?.name ? { name: v.partner.name, role: v.partner.role } : null,
@@ -251,6 +257,8 @@ export function sheetFromForm(
   const contacts = [v.billingContact, v.securityContact].map((c, i) => formContact(ROLES[i], c));
   return {
     accountName: v.accountName,
+    salesRegion: v.accountSalesRegion,
+    subRegion: v.accountSubRegion,
     opportunityName: v.opportunityName,
     dealType: v.dealType,
     partner: v.dealType === "PARTNER" && v.partner?.name ? { name: v.partner.name, role: v.partner.role ?? null } : null,

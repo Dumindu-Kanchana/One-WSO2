@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import {
   Alert,
   Box,
   Card,
+  Collapse,
   IconButton,
   MenuItem,
   Select,
@@ -35,13 +36,15 @@ import {
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { ArrowUpRightIcon } from "@wso2/oxygen-ui-icons-react";
+import { ArrowUpRightIcon, ChevronDownIcon, ChevronUpIcon, CopyIcon } from "@wso2/oxygen-ui-icons-react";
 import { isCcBackendConfigured } from "@config/apiConfig";
+import { useNotifications } from "@context/notifications/NotificationsContext";
 import FinanceShell from "../../components/FinanceShell";
 import { describeError } from "../../util/financeError";
 import { wholeAmount } from "../../util/financeFormat";
 import {
   useCcCardHolderCompliance,
+  useCcManagerCompliance,
   useCcSubmittedByCategory,
   useCcTransactionSummary,
   useCcUserInfo,
@@ -50,6 +53,7 @@ import {
   ccHasAccess,
   type CcAgeBucketAmount,
   type CcCardHolderCompliance,
+  type CcManagerCompliance,
 } from "../ccTypes";
 import {
   CC_BREAKDOWN_MONTHS,
@@ -58,6 +62,7 @@ import {
   asOfDate,
   breakdownDateRange,
   buildBreakdown,
+  buildManagerReminderMessage,
   reportingWindowLabel,
   summaryDateFrom,
   type CcGranularity,
@@ -102,13 +107,15 @@ export default function CcDashboardPage({ headerActions }: { headerActions?: Rea
 function DashboardBody() {
   const navigate = useNavigate();
   const userInfo = useCcUserInfo();
-  const isAdminEligible =
-    ccHasAccess(userInfo.data, "lead") || ccHasAccess(userInfo.data, "finance");
   const isFinanceUser = ccHasAccess(userInfo.data, "finance");
   const isLeadUser = ccHasAccess(userInfo.data, "lead");
+  const isAdminEligible = isLeadUser || isFinanceUser;
 
   const [period, setPeriod] = useState<CcSummaryPeriod>("allTime");
   const [granularity, setGranularity] = useState<CcGranularity>("monthly");
+  // Admin view's "Group by" toggle on the compliance table — cardHolderCompliance
+  // and manager-compliance-summary are the same backlog, rolled up two ways.
+  const [complianceGroupBy, setComplianceGroupBy] = useState<"cardHolder" | "manager">("cardHolder");
   // index.tsx:79-83 — the view you land on follows the role you hold: finance
   // opens on the company-wide picture, a lead on their own queue, everyone else
   // on their own cards.
@@ -147,6 +154,10 @@ function DashboardBody() {
     dateFrom,
     ownedCardsOnly,
     showCompliance,
+  );
+  const managerCompliance = useCcManagerCompliance(
+    dateFrom,
+    showCompliance && complianceGroupBy === "manager",
   );
 
   const breakdown = useMemo(
@@ -306,7 +317,14 @@ function DashboardBody() {
         </Box>
       )}
 
-      {showCompliance && <ComplianceTable query={compliance} />}
+      {showCompliance && (
+        <ComplianceTable
+          query={compliance}
+          managerQuery={managerCompliance}
+          groupBy={complianceGroupBy}
+          onGroupByChange={setComplianceGroupBy}
+        />
+      )}
 
       <CategoryTable
         breakdown={breakdown}
@@ -371,6 +389,7 @@ function HeadCell({
         letterSpacing: "0.05em",
         color: "text.secondary",
         whiteSpace: "nowrap",
+        px: 1,
       }}
     >
       {children}
@@ -397,6 +416,7 @@ function Cell({
         fontVariantNumeric: "tabular-nums",
         fontWeight: bold ? 700 : 400,
         color: alert ? "error.main" : undefined,
+        px: 1,
       }}
     >
       {children}
@@ -530,6 +550,9 @@ function PendingByAge({
 
 function ComplianceTable({
   query,
+  managerQuery,
+  groupBy,
+  onGroupByChange,
 }: {
   query: {
     data?: CcCardHolderCompliance[];
@@ -537,12 +560,41 @@ function ComplianceTable({
     isError: boolean;
     error?: unknown;
   };
+  managerQuery: {
+    data?: CcManagerCompliance[];
+    isLoading: boolean;
+    isError: boolean;
+    error?: unknown;
+  };
+  groupBy: "cardHolder" | "manager";
+  onGroupByChange: (groupBy: "cardHolder" | "manager") => void;
 }) {
   const items = query.data ?? [];
   return (
     <Panel>
-      <PanelTitle>Cardholders Details</PanelTitle>
-      {query.isLoading ? (
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        spacing={1.5}
+        sx={{ flexWrap: "wrap", rowGap: 1 }}
+      >
+        <PanelTitle>Cardholders Details</PanelTitle>
+        <Select
+          size="small"
+          value={groupBy}
+          inputProps={{ "aria-label": "Group by" }}
+          onChange={(e) => onGroupByChange(e.target.value as "cardHolder" | "manager")}
+          sx={{ minWidth: 220 }}
+        >
+          <MenuItem value="cardHolder">Group by: Card Holder</MenuItem>
+          <MenuItem value="manager">Group by: Reporting Manager</MenuItem>
+        </Select>
+      </Stack>
+
+      {groupBy === "manager" ? (
+        <ManagerComplianceTable query={managerQuery} />
+      ) : query.isLoading ? (
         <Note>Loading card holder compliance summary...</Note>
       ) : query.isError ? (
         <Note error>
@@ -597,6 +649,168 @@ function ComplianceTable({
         </Box>
       )}
     </Panel>
+  );
+}
+
+/**
+ * "Group by: Reporting Manager" — the same backlog as the card-holder table,
+ * rolled up under each report's manager, one row per manager that expands to
+ * their individual reports. An unassigned manager (HRIS has no manager on
+ * record for that card holder) still gets a row, labelled "Unassigned".
+ */
+function ManagerComplianceTable({
+  query,
+}: {
+  query: {
+    data?: CcManagerCompliance[];
+    isLoading: boolean;
+    isError: boolean;
+    error?: unknown;
+  };
+}) {
+  const items = query.data ?? [];
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggle = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  const { showSuccess, showError } = useNotifications();
+
+  const copyReminder = async (manager: CcManagerCompliance) => {
+    try {
+      await navigator.clipboard.writeText(buildManagerReminderMessage(manager, CURRENCY));
+      showSuccess("Reminder copied to clipboard!");
+    } catch {
+      showError("Unable to copy the reminder — try again.");
+    }
+  };
+
+  if (query.isLoading) return <Note>Loading manager compliance summary...</Note>;
+  if (query.isError) {
+    return (
+      <Note error>
+        Unable to load the manager compliance summary — try refreshing the page.
+      </Note>
+    );
+  }
+  if (items.length === 0) {
+    return <Note>No pending transactions for any reporting manager in this range.</Note>;
+  }
+
+  return (
+    <Box sx={{ overflowX: "auto" }}>
+      <Table size="small" sx={{ mt: 2 }}>
+        <TableHead>
+          <TableRow>
+            <HeadCell>{""}</HeadCell>
+            <HeadCell>REPORTING MANAGER</HeadCell>
+            <HeadCell align="right">REPORTS</HeadCell>
+            <HeadCell align="right">OUTSTANDING ({CURRENCY})</HeadCell>
+            <HeadCell align="right">TXNS</HeadCell>
+            <HeadCell align="right">AVG DAYS</HeadCell>
+            <HeadCell align="right">0-7D</HeadCell>
+            <HeadCell align="right">8-14D</HeadCell>
+            <HeadCell align="right">15-30D</HeadCell>
+            <HeadCell align="right">30+D</HeadCell>
+            <HeadCell>{""}</HeadCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {items.map((manager) => {
+            const key = manager.managerEmail || "unassigned";
+            const isOpen = !!expanded[key];
+            const isUnassigned = manager.managerEmail === "";
+            return (
+              <Fragment key={key}>
+                <TableRow hover>
+                  <Cell>
+                    <IconButton
+                      size="small"
+                      aria-label={isOpen ? "Collapse reports" : "Expand reports"}
+                      onClick={() => toggle(key)}
+                    >
+                      {isOpen ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
+                    </IconButton>
+                  </Cell>
+                  <Cell bold>{manager.managerName || "Unassigned"}</Cell>
+                  <Cell align="right">{manager.reportCount}</Cell>
+                  <Cell align="right">{wholeAmount(manager.outstandingAmount)}</Cell>
+                  <Cell align="right">{manager.transactionCount}</Cell>
+                  <Cell align="right">{manager.avgPendingDays.toFixed(1)}</Cell>
+                  <Cell align="right">{manager.bucket0To7}</Cell>
+                  <Cell align="right">{manager.bucket8To14}</Cell>
+                  <Cell align="right" alert={manager.bucket15To30 > 0}>
+                    {manager.bucket15To30}
+                  </Cell>
+                  <Cell align="right" alert={manager.bucket30Plus > 0}>
+                    {manager.bucket30Plus}
+                  </Cell>
+                  <Cell align="right">
+                    <Tooltip title={isUnassigned ? "No reporting manager to remind" : "Copy a reminder for this manager"}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          aria-label="Copy reminder"
+                          disabled={isUnassigned}
+                          onClick={() => void copyReminder(manager)}
+                          sx={{ p: 0.5 }}
+                        >
+                          <CopyIcon size={14} />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Cell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={11} sx={{ p: 0, border: 0 }}>
+                    <Collapse in={isOpen} unmountOnExit>
+                      <Table size="small" sx={{ mb: 1.5, ml: 5, width: "calc(100% - 40px)" }}>
+                        <TableHead>
+                          <TableRow>
+                            <HeadCell>CARD HOLDER</HeadCell>
+                            <HeadCell align="right">OUTSTANDING ({CURRENCY})</HeadCell>
+                            <HeadCell align="right">TXNS</HeadCell>
+                            <HeadCell align="right">AVG DAYS</HeadCell>
+                            <HeadCell align="right">0-7D</HeadCell>
+                            <HeadCell align="right">8-14D</HeadCell>
+                            <HeadCell align="right">15-30D</HeadCell>
+                            <HeadCell align="right">30+D</HeadCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {manager.reports.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={8} sx={{ color: "text.secondary" }}>
+                                No card holders report to this manager.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {manager.reports.map((report) => (
+                            <TableRow key={report.employeeEmail}>
+                              <Cell>{report.cardHolderName || report.employeeEmail}</Cell>
+                              <Cell align="right">{wholeAmount(report.outstandingAmount)}</Cell>
+                              <Cell align="right">{report.transactionCount}</Cell>
+                              <Cell align="right">
+                                {report.avgDaysToSubmit !== null ? report.avgDaysToSubmit.toFixed(1) : "-"}
+                              </Cell>
+                              <Cell align="right">{report.bucket0To7}</Cell>
+                              <Cell align="right">{report.bucket8To14}</Cell>
+                              <Cell align="right" alert={report.bucket15To30 > 0}>
+                                {report.bucket15To30}
+                              </Cell>
+                              <Cell align="right" alert={report.bucket30Plus > 0}>
+                                {report.bucket30Plus}
+                              </Cell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </Collapse>
+                  </TableCell>
+                </TableRow>
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Box>
   );
 }
 

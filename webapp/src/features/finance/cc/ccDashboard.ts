@@ -16,7 +16,8 @@
  * under the License.
  */
 
-import type { CcCategoryMonthAmount } from "./ccTypes";
+import { wholeAmount } from "../util/financeFormat";
+import type { CcCategoryMonthAmount, CcManagerCompliance } from "./ccTypes";
 
 // The dashboard's date arithmetic and bucketing, as pure functions —
 // transcribed from view/dashboard/utils.ts.
@@ -171,4 +172,27 @@ export function buildBreakdown(
     monthTotals,
     grandTotal: monthTotals.reduce((s, a) => s + a, 0),
   };
+}
+
+/**
+ * Reminder text for a reporting manager about their direct reports' unsubmitted
+ * credit card transactions, copied by the manager-compliance table's
+ * "Copy reminder" button.
+ */
+export function buildManagerReminderMessage(manager: CcManagerCompliance, currency: string): string {
+  // A manager with no name on record still gets a greeting, not "Hi ,".
+  const firstName = manager.managerName.split(" ")[0] || "there";
+  const count = manager.reports.length;
+  const reportLines = manager.reports.map(
+    (report) =>
+      `- ${report.cardHolderName || report.employeeEmail}: ` +
+      `${report.transactionCount} ${report.transactionCount === 1 ? "item" : "items"}, ` +
+      `${currency} ${wholeAmount(report.outstandingAmount)}`,
+  );
+  return [
+    `Hi ${firstName}, ${count} of your direct reports ${count === 1 ? "has" : "have"} `
+      + "unsubmitted credit card transactions:",
+    ...reportLines,
+    "Please remind them to submit their claims promptly.",
+  ].join("\n");
 }

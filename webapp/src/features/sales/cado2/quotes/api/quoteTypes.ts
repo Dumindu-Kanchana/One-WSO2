@@ -62,6 +62,10 @@ export interface Account {
   readonly id: string;
   readonly name: string | null;
   readonly billingAddress: Address | null;
+  /** Salesforce Sales_Regions__c, e.g. "APAC". Required to quote. */
+  readonly salesRegion: string | null;
+  /** Salesforce Sub_Region__c, e.g. "South Asia". Optional. */
+  readonly subRegion: string | null;
 }
 
 export interface Partner {
@@ -371,6 +375,9 @@ export interface VersionView {
   readonly status: VersionStatus;
   readonly pricingRulesVersion: string;
   readonly accountName: string | null;
+  /** The account's sales region and sub-region, as of the last save; frozen at submit. */
+  readonly accountSalesRegion: string | null;
+  readonly accountSubRegion: string | null;
   readonly opportunityName: string | null;
   readonly dealType: DealType | null;
   readonly partner: {

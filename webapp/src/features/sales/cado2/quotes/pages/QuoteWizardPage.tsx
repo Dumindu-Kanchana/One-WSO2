@@ -381,6 +381,9 @@ export default function QuoteWizardPage(): JSX.Element {
   const submitError = unhandled(submit.error);
   const busy = save.isPending || submit.isPending;
   const hasIdentity = Boolean(values.accountId && values.opportunityId);
+  // No quote starts for an account without a sales region (2026-10-07); an
+  // existing draft can still be saved, but not submitted.
+  const canSave = hasIdentity && (Boolean(saved) || Boolean(values.accountSalesRegion));
   const nextVersion = saved?.version.versionNumber ?? 1;
   const blockedByIssues = !isDirty && issues.length > 0;
   const version = saved?.version;
@@ -416,7 +419,7 @@ export default function QuoteWizardPage(): JSX.Element {
                     </Button>
                   ) : null}
                   {editable ? (
-                    <Button variant="contained" onClick={() => void onSave()} disabled={busy || !hasIdentity}>
+                    <Button variant="contained" onClick={() => void onSave()} disabled={busy || !canSave}>
                       {save.isPending ? "Saving…" : "Save draft"}
                     </Button>
                   ) : null}

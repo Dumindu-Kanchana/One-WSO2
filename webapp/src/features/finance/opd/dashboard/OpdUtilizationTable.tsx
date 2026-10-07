@@ -26,7 +26,7 @@ import {
   Typography,
 } from "@wso2/oxygen-ui";
 import { money } from "../../util/financeFormat";
-import { CELL_SX, HEAD_SX } from "./opdDashboardTableSx";
+import { CELL_SX, HEAD_SX } from "../../components/dashboardTableSx";
 import {
   utilizationName,
   utilizationPercent,

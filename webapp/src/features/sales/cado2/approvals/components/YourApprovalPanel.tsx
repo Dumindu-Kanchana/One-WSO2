@@ -26,9 +26,10 @@ import {
   FileTextIcon,
   ReceiptIcon,
   ShieldCheckIcon,
+  TagIcon,
   TrendingDownIcon,
 } from "@wso2/oxygen-ui-icons-react";
-import type { ApprovalStep } from "@features/sales/cado2/approvals/api/approvalTypes";
+import type { ApprovalOutcome, ApprovalStep } from "@features/sales/cado2/approvals/api/approvalTypes";
 import { deskSummary, reasonRows, type ReasonKind, type ReasonRow } from "@features/sales/cado2/approvals/model/myApprovals";
 
 interface YourApprovalPanelProps {
@@ -38,7 +39,14 @@ interface YourApprovalPanelProps {
   readonly actionable: readonly ApprovalStep[];
   /** After a decision: what was recorded, e.g. "Approved as CRO." */
   readonly note: string | null;
+  /** Deal Desk: the lines whose category the rep chose, to verify (repCategoryPoints). */
+  readonly repCategories?: readonly ReasonRow[];
+  /** Opens the confirmation for a decision on one of the viewer's steps. */
+  readonly onDecide: (outcome: ApprovalOutcome, step: ApprovalStep) => void;
 }
+
+/** Where the header's "Your approval" link scrolls to. */
+export const YOUR_APPROVAL_ANCHOR = "cado2-your-approval";
 
 const ICON: Record<ReasonKind, ReactNode> = {
   discount: <BadgePercentIcon size={16} />,
@@ -47,6 +55,7 @@ const ICON: Record<ReasonKind, ReactNode> = {
   term: <CalendarClockIcon size={16} />,
   downsell: <TrendingDownIcon size={16} />,
   payment: <ReceiptIcon size={16} />,
+  category: <TagIcon size={16} />,
   other: <ShieldCheckIcon size={16} />,
 };
 
@@ -123,8 +132,17 @@ function ShortList({ rows, label }: { readonly rows: readonly ReasonRow[]; reado
 }
 
 /** Deal Desk: everything non-standard about the quote, once each, with the approvals it needs. */
-function DeskReview({ steps, step }: { readonly steps: readonly ApprovalStep[]; readonly step: ApprovalStep }): JSX.Element {
-  const points = deskSummary(steps, step);
+function DeskReview({
+  steps,
+  step,
+  repCategories,
+}: {
+  readonly steps: readonly ApprovalStep[];
+  readonly step: ApprovalStep;
+  readonly repCategories: readonly ReasonRow[];
+}): JSX.Element {
+  // What Deal Desk verifies themselves first, then what later approvers will check.
+  const points = [...repCategories, ...deskSummary(steps, step)];
   if (!points.length) {
     // No points to show doesn't mean nobody approves after Deal Desk.
     const more = steps.some((s) => s.role !== step.role && (s.status === "WAITING" || s.status === "PENDING"));
@@ -161,10 +179,16 @@ function OwnReasons({ step }: { readonly step: ApprovalStep }): JSX.Element {
  * Kept short, so the quote stays in view. Nothing when there is neither a
  * turn nor a note.
  */
-export default function YourApprovalPanel({ steps, actionable, note }: YourApprovalPanelProps): JSX.Element | null {
+export default function YourApprovalPanel({
+  steps,
+  actionable,
+  note,
+  repCategories = [],
+  onDecide,
+}: YourApprovalPanelProps): JSX.Element | null {
   if (!note && actionable.length === 0) return null;
   return (
-    <Stack spacing={1.5}>
+    <Stack spacing={1.5} id={YOUR_APPROVAL_ANCHOR} sx={{ scrollMarginTop: 16 }}>
       {note ? (
         <Alert severity="success" role="status">
           {note}
@@ -187,7 +211,19 @@ export default function YourApprovalPanel({ steps, actionable, note }: YourAppro
               </Typography>
               <Chip size="small" color="primary" label={s.roleLabel} />
             </Stack>
-            {deskReview ? <DeskReview steps={steps} step={s} /> : <OwnReasons step={s} />}
+            {deskReview ? <DeskReview steps={steps} step={s} repCategories={repCategories} /> : <OwnReasons step={s} />}
+            {/* The decision sits with its reasons; the card already names the role. */}
+            <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2, flexWrap: "wrap", rowGap: 1 }}>
+              <Button variant="contained" color="success" onClick={() => onDecide("approve", s)}>
+                Approve
+              </Button>
+              <Button variant="outlined" onClick={() => onDecide("request-changes", s)}>
+                Request changes
+              </Button>
+              <Button variant="outlined" color="error" onClick={() => onDecide("reject", s)}>
+                Reject
+              </Button>
+            </Stack>
           </Paper>
         );
       })}

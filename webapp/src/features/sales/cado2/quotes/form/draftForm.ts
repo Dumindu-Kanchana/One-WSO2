@@ -88,6 +88,10 @@ export interface DraftFormValues {
   accountId: string;
   accountName: string;
   accountAddress: Address | null;
+  /** From Salesforce: required to quote (approvals will route on it). "" = none. */
+  accountSalesRegion: string;
+  /** From Salesforce; optional. "" = none. */
+  accountSubRegion: string;
   opportunityId: string;
   opportunityName: string;
   dealType: DealType | null;
@@ -159,6 +163,8 @@ export function emptyDraftForm(): DraftFormValues {
     accountId: "",
     accountName: "",
     accountAddress: null,
+    accountSalesRegion: "",
+    accountSubRegion: "",
     opportunityId: "",
     opportunityName: "",
     dealType: null,
@@ -326,6 +332,8 @@ export function fromVersion(res: DraftResponse): DraftFormValues {
     ...emptyDraftForm(),
     accountId: res.quote.sfAccountId,
     accountName: v.accountName ?? "",
+    accountSalesRegion: v.accountSalesRegion ?? "",
+    accountSubRegion: v.accountSubRegion ?? "",
     opportunityId: res.quote.sfOpportunityId,
     opportunityName: v.opportunityName ?? "",
     dealType: v.dealType,

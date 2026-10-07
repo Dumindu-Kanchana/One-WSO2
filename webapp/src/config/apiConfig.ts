@@ -520,6 +520,9 @@ export const ccServiceUrls = {
   transactionSummary: `${ccBackendUrl}/transactions/new-transaction-summary`,
   submittedByCategory: `${ccBackendUrl}/transactions/submitted-transaction-summary`,
   cardHolderCompliance: `${ccBackendUrl}/transactions/card-holder-compliance-summary`,
+  // Admin view's "Group by: Reporting Manager" — the same backlog rolled up
+  // under each report's manager. Finance only, enforced server-side.
+  managerCompliance: `${ccBackendUrl}/transactions/manager-compliance-summary`,
   // Lead view: every lead's approval backlog, and one lead's team within it.
   leadApprovalSummary: `${ccBackendUrl}/transactions/lead-approval-summary`,
   leadTeamCardHolders: `${ccBackendUrl}/transactions/lead-team-card-holder-summary`,
@@ -566,6 +569,13 @@ export const expenseServiceUrls = {
     `${expenseBackendUrl}/claims/${encodeURIComponent(email)}/transactions/receipts/file`,
   receiptFile: (fileName: string) =>
     `${expenseBackendUrl}/claims/transactions/receipts/file/${encodeURIComponent(fileName)}`,
+  // The dashboard's two reference lists + its one report. `/expense-types`
+  // here is a DIFFERENT resource from `expenseTypes()` above — that one is
+  // `/user-configurations/expense-types`, scoped by travel job; this is the
+  // plain, unscoped list the dashboard's category filter and CSV need.
+  subsidiaries: `${expenseBackendUrl}/subsidiaries`,
+  dashboardExpenseTypes: `${expenseBackendUrl}/expense-types`,
+  claimsReport: `${expenseBackendUrl}/claims-report`,
 };
 
 // Finance master data — ONE_WSO2_FINANCE_MASTER_DATA_BACKEND_URL.
@@ -2046,3 +2056,59 @@ export const misArrServiceUrls = {
   // cache key. Takes `accountId` and `endDate`, and nothing else.
   opportunities: `${misArrBackendUrl}/opportunities`,
 };
+
+// ---------------------------------------------------------------------------
+// MEDDPICC backend (digiops-sales echo-backend). A separate service from the
+// meet-app backend above: it reads the same meetings, analyses their
+// transcripts and proposes the Opportunity's MEDDPICC Gate fields, which an
+// AM approves before they are written to Salesforce. See the MEDDPICC
+// contract, §3.6, for every route below.
+//
+// Blank means "not connected", as for every other key in this file: Deals
+// shows the not-connected state and Meetings leaves the MEDDPICC column out.
+export const echoBackendUrl: string = (window.config?.ONE_WSO2_ECHO_BACKEND_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
+
+export function isEchoBackendConfigured(): boolean {
+  return Boolean(echoBackendUrl);
+}
+
+export const echoServiceUrls = {
+  // The Gate definitions, with picklist options from the live Salesforce describe.
+  gates: `${echoBackendUrl}/gates`,
+  // Coverage for many meetings in one call — the meetings table asks for its visible page.
+  meetingCoverage: `${echoBackendUrl}/meetings/coverage`,
+  // Queues a new extraction run for one meeting. 202, no body worth reading.
+  reanalyse: (meetingId: number): string => `${echoBackendUrl}/meetings/${meetingId}/reanalyse`,
+  deals: `${echoBackendUrl}/deals`,
+  deal: (opportunityId: string): string =>
+    `${echoBackendUrl}/deals/${encodeURIComponent(opportunityId)}`,
+  approve: (opportunityId: string): string =>
+    `${echoBackendUrl}/deals/${encodeURIComponent(opportunityId)}/approve`,
+  moveStage: (opportunityId: string): string =>
+    `${echoBackendUrl}/deals/${encodeURIComponent(opportunityId)}/move-stage`,
+  includeCalls: (opportunityId: string): string =>
+    `${echoBackendUrl}/deals/${encodeURIComponent(opportunityId)}/include-calls`,
+};
+
+/**
+ * The deal list URL with only the filters that are set.
+ *
+ * `hideClosed` is always sent, because the backend's default is not this
+ * screen's to assume.
+ */
+export function buildDealsUrl(params: {
+  search?: string | null;
+  owner?: string | null;
+  stage?: string | null;
+  hideClosed: boolean;
+}): string {
+  const qs = new URLSearchParams();
+  if (params.search?.trim()) qs.set("search", params.search.trim());
+  if (params.owner?.trim()) qs.set("owner", params.owner.trim());
+  if (params.stage?.trim()) qs.set("stage", params.stage.trim());
+  qs.set("hideClosed", String(params.hideClosed));
+  return `${echoServiceUrls.deals}?${qs.toString()}`;
+}
