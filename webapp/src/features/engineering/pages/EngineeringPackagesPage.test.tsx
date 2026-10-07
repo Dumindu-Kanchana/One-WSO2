@@ -122,7 +122,7 @@ const sixPackages = {
     { packageName: "is-ui", periodDownloads: 20, totalDownloads: 200, versionCount: 1 },
   ],
 };
-const byActivity = ["is-core", "is-cli", "is-agent", "is-sdk", "is-ui", "is-docs"];
+const namesByActivity = ["is-core", "is-cli", "is-agent", "is-sdk", "is-ui", "is-docs"];
 
 // Each Package's pulls over two September days (a line needs two points).
 const sixSeries = {
@@ -464,7 +464,7 @@ describe("Packages chart card", () => {
     const listbox = await screen.findByRole("listbox");
     // Most active first, as the table lists them.
     const options = within(listbox).getAllByRole("option");
-    expect(options.map((option) => option.textContent)).toEqual(byActivity);
+    expect(options.map((option) => option.textContent)).toEqual(namesByActivity);
     expect(within(options[0]).getByRole("checkbox")).toBeChecked();
     expect(within(options[5]).getByRole("checkbox")).not.toBeChecked();
 

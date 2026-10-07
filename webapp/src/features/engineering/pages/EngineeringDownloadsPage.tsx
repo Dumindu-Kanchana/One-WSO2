@@ -49,8 +49,8 @@ import { INTERVAL_LABEL } from "../constants/intervalLabels";
 import { usePagination } from "../hooks/usePagination";
 import type { ChartSeries } from "../utils/chartTypes";
 import {
+  applyFilterChange,
   buildDateMatrix,
-  mergeParams,
   parseFilters,
   periodSummary,
   productNameById,
@@ -107,19 +107,8 @@ function DownloadsScreen(): JSX.Element {
         ? "bar"
         : "line";
 
-  const onChange = (updates: FilterUpdate) => {
-    const next = new URLSearchParams(params);
-    // The screen shows a default range before those dates are in the address.
-    // Write them on the first change so a shared link does not drift to another day.
-    if (!params.get("from")) next.set("from", from);
-    if (!params.get("to")) next.set("to", to);
-    // A cleared date field keeps its date: an empty From or To would otherwise
-    // fall back to the default range behind the reader's back.
-    const kept = Object.fromEntries(
-      Object.entries(updates).filter(([key, value]) => !((key === "from" || key === "to") && !value)),
-    );
-    setParams(mergeParams(next, kept), { replace: true });
-  };
+  const onChange = (updates: FilterUpdate) =>
+    setParams(applyFilterChange(params, { from, to }, updates), { replace: true });
 
   return (
     <Box>

@@ -61,7 +61,7 @@ import SkeletonRows from "../components/SkeletonRows";
 import TablePager from "../components/TablePager";
 import { usePagination } from "../hooks/usePagination";
 import type { ChartSeries } from "../utils/chartTypes";
-import { mergeParams, parseFilters } from "../utils/filters";
+import { applyFilterChange, mergeParams, parseFilters } from "../utils/filters";
 import { formatCompact, productLabel } from "../utils/format";
 
 // How many of the most active Packages the chart starts with, so a Product
@@ -73,8 +73,8 @@ const DEFAULT_VISIBLE_PACKAGES = 5;
 // Cumulative reads a different figure from Daily and Monthly: the all-time
 // total (a running stock, as of the latest Scraper Sync) rather than the
 // period downloads (a flow over the range). Day and month share the figure on
-// purpose — summing daily pulls over a range equals summing monthly ones over
-// the same range — so only Cumulative switches the source field, as on the
+// purpose — summing a range's daily Package downloads equals summing its
+// monthly ones — so only Cumulative switches the source field, as on the
 // standalone.
 function downloadsOf(
   item: { periodDownloads: number; totalDownloads: number },
@@ -220,21 +220,8 @@ function PackagesScreen(): JSX.Element {
     [seriesItems, chartPackages],
   );
 
-  const onChange = (updates: FilterUpdate) => {
-    const next = new URLSearchParams(params);
-    // The screen shows a default range and Product before they are in the
-    // address. Write them on the first change so a shared link does not drift
-    // to another day or another Product.
-    if (!params.get("from")) next.set("from", from);
-    if (!params.get("to")) next.set("to", to);
-    if (repoId != null && !params.get("repo")) next.set("repo", String(repoId));
-    // A cleared date field keeps its date: an empty From or To would otherwise
-    // fall back to the default range behind the reader's back.
-    const kept = Object.fromEntries(
-      Object.entries(updates).filter(([key, value]) => !((key === "from" || key === "to") && !value)),
-    );
-    setParams(mergeParams(next, kept), { replace: true });
-  };
+  const onChange = (updates: FilterUpdate) =>
+    setParams(applyFilterChange(params, { from, to, repo: repoId }, updates), { replace: true });
 
   return (
     <Box>

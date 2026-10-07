@@ -103,6 +103,27 @@ export function mergeParams(
   return next;
 }
 
+// The address after a change from the filter bar. A screen shows a default
+// range — and, where it has one, a Product — before they are in the address,
+// so they are written in with the first change and a shared link does not
+// drift to another day or another Product. A cleared From or To keeps its
+// date: an empty one would otherwise fall back to the default range behind the
+// reader's back. Every other empty value removes its key, as mergeParams does.
+export function applyFilterChange(
+  current: URLSearchParams,
+  shown: { from: string; to: string; repo?: number | null },
+  updates: Record<string, ParamValue>,
+): URLSearchParams {
+  const next = new URLSearchParams(current);
+  if (!current.get("from")) next.set("from", shown.from);
+  if (!current.get("to")) next.set("to", shown.to);
+  if (shown.repo != null && !current.get("repo")) next.set("repo", String(shown.repo));
+  const kept = Object.fromEntries(
+    Object.entries(updates).filter(([key, value]) => !((key === "from" || key === "to") && !value)),
+  );
+  return mergeParams(next, kept);
+}
+
 export function productNameById(
   repos: ReadonlyArray<Pick<TrackedRepository, "id" | "repoName" | "productName">>,
 ): Map<number, string> {

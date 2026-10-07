@@ -59,7 +59,7 @@ import TableHeaderSearch from "../components/TableHeaderSearch";
 import TablePager from "../components/TablePager";
 import { usePagination } from "../hooks/usePagination";
 import type { ChartSeries } from "../utils/chartTypes";
-import { mergeParams, parseFilters } from "../utils/filters";
+import { applyFilterChange, mergeParams, parseFilters } from "../utils/filters";
 import { formatBytes, formatCompact, productLabel } from "../utils/format";
 
 // How many of the most recent Versions the chart starts with, so a Product
@@ -220,21 +220,8 @@ function VersionsScreen(): JSX.Element {
     [series, selectedVersions],
   );
 
-  const onChange = (updates: FilterUpdate) => {
-    const next = new URLSearchParams(params);
-    // The screen shows a default range and Product before they are in the
-    // address. Write them on the first change so a shared link does not drift
-    // to another day or another Product.
-    if (!params.get("from")) next.set("from", from);
-    if (!params.get("to")) next.set("to", to);
-    if (repoId != null && !params.get("repo")) next.set("repo", String(repoId));
-    // A cleared date field keeps its date: an empty From or To would otherwise
-    // fall back to the default range behind the reader's back.
-    const kept = Object.fromEntries(
-      Object.entries(updates).filter(([key, value]) => !((key === "from" || key === "to") && !value)),
-    );
-    setParams(mergeParams(next, kept), { replace: true });
-  };
+  const onChange = (updates: FilterUpdate) =>
+    setParams(applyFilterChange(params, { from, to, repo: repoId }, updates), { replace: true });
 
   const toggleVersion = (tag: string) => setVersion((current) => (current === tag ? null : tag));
 

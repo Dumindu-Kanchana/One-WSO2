@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChartSeries } from "./chartTypes";
 import {
+  applyFilterChange,
   buildDateMatrix,
   calendarDay,
   defaultRange,
@@ -116,6 +117,52 @@ describe("mergeParams", () => {
     const current = new URLSearchParams("a=1");
     mergeParams(current, { a: null, b: "2" });
     expect(current.toString()).toBe("a=1");
+  });
+});
+
+describe("applyFilterChange", () => {
+  const shown = { from: "2026-08-31", to: "2026-09-30", repo: 3 };
+
+  it("writes the shown range and Product into the address with the first change", () => {
+    const next = applyFilterChange(new URLSearchParams(), shown, { interval: "month" });
+    expect(next.get("interval")).toBe("month");
+    expect(next.get("from")).toBe("2026-08-31");
+    expect(next.get("to")).toBe("2026-09-30");
+    expect(next.get("repo")).toBe("3");
+  });
+
+  it("keeps the range and Product the address already names", () => {
+    const current = new URLSearchParams("from=2026-01-01&to=2026-06-30&repo=1");
+    const next = applyFilterChange(current, shown, { interval: "cumulative" });
+    expect(next.get("from")).toBe("2026-01-01");
+    expect(next.get("to")).toBe("2026-06-30");
+    expect(next.get("repo")).toBe("1");
+  });
+
+  it("writes no Product for a screen without one", () => {
+    const next = applyFilterChange(new URLSearchParams(), { from: "2026-08-31", to: "2026-09-30" }, { interval: "month" });
+    expect(next.get("repo")).toBeNull();
+    expect(next.get("from")).toBe("2026-08-31");
+  });
+
+  it("keeps a date when its field is cleared, and changes it when it is set", () => {
+    const current = new URLSearchParams("from=2026-09-01&to=2026-09-30");
+    expect(applyFilterChange(current, shown, { to: "" }).get("to")).toBe("2026-09-30");
+    expect(applyFilterChange(current, shown, { to: null }).get("to")).toBe("2026-09-30");
+    expect(applyFilterChange(current, shown, { from: "2026-01-01" }).get("from")).toBe("2026-01-01");
+  });
+
+  it("removes any other key given an empty value, as mergeParams does", () => {
+    const current = new URLSearchParams("from=2026-09-01&to=2026-09-30&repos=1,2&chart=bar");
+    const next = applyFilterChange(current, shown, { repos: [], chart: null });
+    expect(next.get("repos")).toBeNull();
+    expect(next.get("chart")).toBeNull();
+  });
+
+  it("leaves the current params untouched", () => {
+    const current = new URLSearchParams("interval=day");
+    applyFilterChange(current, shown, { interval: "month" });
+    expect(current.toString()).toBe("interval=day");
   });
 });
 
