@@ -25,8 +25,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Fab,
-  IconButton,
   Skeleton,
   Table,
   TableBody,
@@ -36,7 +34,7 @@ import {
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { EyeIcon, PlusIcon } from "@wso2/oxygen-ui-icons-react";
+import { PlusIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
@@ -44,7 +42,8 @@ import { employeeDisplayName } from "@features/leave/util/employeeName";
 import { useReviewers, useRequestReviewers } from "../api/usePar360";
 import { useParEmployeeReviews } from "../api/useLeadHistory";
 import Par360RequestDialog from "./Par360RequestDialog";
-import ParStatusChip from "./ParStatusChip";
+import ParEmptyState from "./ParEmptyState";
+import { Par360StatusChip } from "./ParChips";
 import { ParCommentView } from "./ParContent";
 import { decodeParComment } from "../util/parComment";
 import { isDeadlinePassed } from "../util/parDeadline";
@@ -52,7 +51,7 @@ import type { ParCycle } from "../api/types";
 
 // par-app's Review.tsx "360 Reviews" tab: every reviewer requested for this
 // employee, with a "View Feedback" action once SHARED/REJECTED, and a
-// Request FAB reusing Par360RequestDialog aimed at this employee's reviewer
+// Request button reusing Par360RequestDialog aimed at this employee's reviewer
 // list instead of the caller's own.
 export default function ParLead360ReviewsTab({
   cycle,
@@ -102,79 +101,78 @@ export default function ParLead360ReviewsTab({
     : undefined;
 
   return (
-    <Box sx={{ position: "relative", height: "55vh", overflow: "auto", pt: 0.5 }}>
-      <Table stickyHeader>
-        <TableHead>
-          <TableRow>
-            <TableCell sx={{ fontWeight: "bold", color: "grey", width: "40%" }}>Name</TableCell>
-            <TableCell sx={{ fontWeight: "bold", color: "grey", width: "20%" }}>Status</TableCell>
-            <TableCell sx={{ fontWeight: "bold", color: "grey", width: "30%" }}>Requested by</TableCell>
-            <TableCell sx={{ width: "10%" }} />
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {(reviewers.data ?? []).length === 0 ? (
+    <Box sx={{ pt: 0.5 }}>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+        <Tooltip title={requestBlocked ? "Action not available" : ""} arrow>
+          <span>
+            <Button
+              variant="contained"
+              startIcon={<PlusIcon size={16} />}
+              disabled={requestBlocked}
+              onClick={() => setRequestDialogOpen(true)}
+            >
+              Request 360° Feedback
+            </Button>
+          </span>
+        </Tooltip>
+      </Box>
+
+      {/* Same table treatment as Provide 360° → Voluntary Feedback. */}
+      {(reviewers.data ?? []).length === 0 ? (
+        <ParEmptyState text="No requests available" />
+      ) : (
+        <Table size="small">
+          <TableHead>
             <TableRow>
-              <TableCell colSpan={4} align="center" sx={{ border: "none" }}>
-                <Typography color="text.secondary">No requests available</Typography>
-              </TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Requested by</TableCell>
+              <TableCell />
             </TableRow>
-          ) : (
-            (reviewers.data ?? []).map((reviewer) => (
-              <TableRow key={reviewer.reviewerEmail} hover>
-                <TableCell sx={{ py: 1 }}>
-                  <Box display="flex" alignItems="center">
+          </TableHead>
+          <TableBody>
+            {(reviewers.data ?? []).map((reviewer) => (
+              <TableRow key={reviewer.reviewerEmail}>
+                <TableCell>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                     <Avatar
                       src={thumbnailByEmail.get(reviewer.reviewerEmail) || undefined}
                       slotProps={{ img: { referrerPolicy: "no-referrer" } }}
-                      sx={{ mr: 2, height: 60, width: 60 }}
+                      sx={{ width: "2.2rem", height: "2.2rem", borderRadius: 3 }}
                     />
                     <Box>
-                      <Typography variant="h5">
+                      <Typography variant="body2">
                         {nameByEmail.get(reviewer.reviewerEmail) || reviewer.reviewerEmail}
                       </Typography>
-                      <Typography display="block" color="text.secondary" sx={{ mt: -0.5 }}>
+                      <Typography variant="caption" color="text.secondary">
                         {reviewer.reviewerEmail}
                       </Typography>
                     </Box>
                   </Box>
                 </TableCell>
-                <TableCell sx={{ py: 1 }}>
-                  <ParStatusChip content={reviewer.reviewStatus} />
+                <TableCell>
+                  <Par360StatusChip status={reviewer.reviewStatus} />
                 </TableCell>
-                <TableCell sx={{ py: 1 }}>
+                <TableCell>
                   {reviewer.isLeadRequested && leadEmail && (
-                    <Chip size="small" color="info" label={leadEmail} sx={{ mr: 0.5 }} />
+                    <Chip size="small" variant="outlined" color="info" label={leadEmail} sx={{ mr: 0.5 }} />
                   )}
-                  {reviewer.isEmployeeRequested && <Chip size="small" color="error" label={employeeEmail} />}
+                  {reviewer.isEmployeeRequested && (
+                    <Chip size="small" variant="outlined" color="error" label={employeeEmail} />
+                  )}
                 </TableCell>
-                <TableCell sx={{ py: 1 }}>
+                <TableCell align="right">
                   {(reviewer.reviewStatus === "SHARED" || reviewer.reviewStatus === "REJECTED") && (
-                    <Tooltip title="View Feedback" arrow>
-                      <IconButton
-                        onClick={() => setViewingReviewerEmail(reviewer.reviewerEmail)}
-                        sx={{ color: "primary.main", "&:hover": { bgcolor: "primary.main", color: "white" } }}
-                      >
-                        <EyeIcon size={18} />
-                      </IconButton>
-                    </Tooltip>
+                    <Button size="small" onClick={() => setViewingReviewerEmail(reviewer.reviewerEmail)}>
+                      View
+                    </Button>
                   )}
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-
-      <Box sx={{ position: "absolute", bottom: 8, right: 24 }}>
-        <Tooltip title={requestBlocked ? "Action not available" : "Request"} arrow>
-          <span>
-            <Fab color="primary" disabled={requestBlocked} onClick={() => setRequestDialogOpen(true)}>
-              <PlusIcon />
-            </Fab>
-          </span>
-        </Tooltip>
-      </Box>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
       <Par360RequestDialog
         open={requestDialogOpen}
@@ -200,13 +198,13 @@ export default function ParLead360ReviewsTab({
                 <Avatar
                   src={(viewingReviewerEmail && thumbnailByEmail.get(viewingReviewerEmail)) || undefined}
                   slotProps={{ img: { referrerPolicy: "no-referrer" } }}
-                  sx={{ width: 100, height: 100, mr: 3 }}
+                  sx={{ width: "2.2rem", height: "2.2rem", borderRadius: 3, mr: 1.5 }}
                 />
                 <Box>
-                  <Typography variant="h5" sx={{ mb: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {(viewingReviewerEmail && nameByEmail.get(viewingReviewerEmail)) || viewingReviewerEmail}
                   </Typography>
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary">
                     {viewingReviewerEmail}
                   </Typography>
                 </Box>
