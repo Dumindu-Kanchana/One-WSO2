@@ -18,12 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Box,
   Card,
-  FormControl,
   Grid,
-  InputLabel,
-  MenuItem,
-  Select,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -32,7 +27,7 @@ import {
   TableRow,
   Typography,
 } from "@wso2/oxygen-ui";
-import { type JSX, useId, useState } from "react";
+import { type JSX, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
@@ -46,8 +41,11 @@ import DateHeaderFilter from "../components/DateHeaderFilter";
 import DownloadStatsShell from "../components/DownloadStatsShell";
 import ErrorState from "../components/ErrorState";
 import FilterBar, { type FilterUpdate } from "../components/FilterBar";
+import IntervalSelect from "../components/IntervalSelect";
 import SeriesChart from "../components/SeriesChart";
+import SkeletonRows from "../components/SkeletonRows";
 import { StatCard } from "../components/StatCard";
+import { INTERVAL_LABEL } from "../constants/intervalLabels";
 import { ROWS_PER_PAGE_OPTIONS } from "../constants/tableConstants";
 import { usePagination } from "../hooks/usePagination";
 import type { ChartSeries } from "../utils/chartTypes";
@@ -61,18 +59,6 @@ import {
   type PeriodSummary,
 } from "../utils/filters";
 import { formatCompact, formatDate, formatMonthYear } from "../utils/format";
-
-// The View select's choices, in the standalone's order and words (CONTEXT.md,
-// "Interval": labelled View on this screen). The same word titles the chart
-// card and the table.
-const INTERVAL_LABEL: Record<ReleaseDownloadGrain, string> = {
-  day: "Daily",
-  month: "Monthly",
-  cumulative: "Cumulative",
-};
-
-// Skeleton rows while the table waits, as many as the standalone's tables draw.
-const SKELETON_ROWS = 5;
 
 export default function EngineeringDownloadsPage(): JSX.Element {
   return (
@@ -91,7 +77,6 @@ function DownloadsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const viewLabelId = useId();
 
   const filters = parseFilters(params);
   const { from, to, interval, repos } = filters;
@@ -144,23 +129,13 @@ function DownloadsScreen(): JSX.Element {
         onChange={onChange}
         filterSlot={
           <Grid size={{ xs: 12, sm: 6, md: 2 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel id={viewLabelId}>View</InputLabel>
-              <Select
-                labelId={viewLabelId}
-                label="View"
-                value={interval}
-                // The interval's own default chart type takes over, as the
-                // standalone's local choice resets.
-                onChange={(event) => onChange({ interval: event.target.value, chart: null })}
-              >
-                {Object.entries(INTERVAL_LABEL).map(([value, label]) => (
-                  <MenuItem key={value} value={value}>
-                    {label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <IntervalSelect
+              label="View"
+              value={interval}
+              // The interval's own default chart type takes over, as the
+              // standalone's local choice resets.
+              onChange={(chosen) => onChange({ interval: chosen, chart: null })}
+            />
           </Grid>
         }
       />
@@ -289,11 +264,7 @@ function DownloadsTable({
         {INTERVAL_LABEL[interval]} downloads table
       </Typography>
       {isLoading ? (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          {Array.from({ length: SKELETON_ROWS }).map((_, i) => (
-            <Skeleton key={i} variant="rounded" height={36} />
-          ))}
-        </Box>
+        <SkeletonRows />
       ) : isError ? (
         <ErrorState error={error} onRetry={onRetry} minHeight={160} />
       ) : matrix.dates.length === 0 ? (
