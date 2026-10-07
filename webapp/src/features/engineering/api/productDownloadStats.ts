@@ -176,6 +176,8 @@ export interface VersionSeriesResponse {
 
 export interface ReleaseFile {
   assetName: string;
+  /** Bytes; null when GitHub reported no size for the Asset. */
+  assetSize: number | null;
   downloadCount: number;
   releaseTag: string;
 }
@@ -195,11 +197,14 @@ export function getVersionSeries(
   );
 }
 
+// The Assets of one Version, or of every Version of the Product when none is
+// named: the API filters to a `version` only when the parameter is sent.
 export function getReleaseFiles(
   accessToken: string,
-  query: { repoId: number; from: string; to: string; version: string },
+  query: { repoId: number; from: string; to: string; version: string | null },
 ): Promise<ReleaseFilesResponse> {
-  const params = new URLSearchParams({ from: query.from, to: query.to, version: query.version });
+  const params = new URLSearchParams({ from: query.from, to: query.to });
+  if (query.version) params.set("version", query.version);
   return authedGet(
     `${credentialedBase()}/api/v1/stats/assets/${query.repoId}?${params}`,
     accessToken,
