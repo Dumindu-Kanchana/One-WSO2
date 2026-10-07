@@ -95,3 +95,16 @@ export function formatDateTime(value: string | null | undefined): string {
 export function productLabel(productName: string | null | undefined, repoName: string): string {
   return productName && productName.trim() !== "" ? productName : repoName;
 }
+
+// How a Sync's status reads on Admin. An unknown status stays as the API sent
+// it, so a new one still shows rather than disappearing into a blank chip.
+const JOB_STATUS_LABEL: Record<string, string> = {
+  SUCCESS: "Success",
+  PARTIAL_FAILURE: "Partial failure",
+  FAILED: "Failed",
+  STARTED: "Started",
+};
+
+export function jobStatusLabel(status: string): string {
+  return JOB_STATUS_LABEL[status] ?? status;
+}

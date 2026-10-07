@@ -22,6 +22,7 @@ import {
   formatDateTime,
   formatMonthYear,
   formatNumber,
+  jobStatusLabel,
   productLabel,
 } from "./format";
 
@@ -125,5 +126,15 @@ describe("productLabel", () => {
     expect(productLabel(null, "product-apim")).toBe("product-apim");
     expect(productLabel("", "product-apim")).toBe("product-apim");
     expect(productLabel("   ", "product-apim")).toBe("product-apim");
+  });
+});
+
+describe("jobStatusLabel", () => {
+  it("names the sync statuses and keeps an unknown one", () => {
+    expect(jobStatusLabel("FAILED")).toBe("Failed");
+    expect(jobStatusLabel("PARTIAL_FAILURE")).toBe("Partial failure");
+    expect(jobStatusLabel("SUCCESS")).toBe("Success");
+    expect(jobStatusLabel("STARTED")).toBe("Started");
+    expect(jobStatusLabel("QUEUED")).toBe("QUEUED");
   });
 });

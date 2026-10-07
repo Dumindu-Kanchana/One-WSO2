@@ -328,11 +328,13 @@ export interface NewTrackedRepository {
   trackPackages: boolean;
 }
 
+// A PATCH body. Each field is optional: the API leaves out a field it is not
+// given, so a switch can send the one field it changes.
 export interface TrackedRepositoryUpdate {
-  productName: string | null;
-  assetPrefixes: string[];
-  isActive: boolean;
-  trackPackages: boolean;
+  productName?: string | null;
+  assetPrefixes?: string[];
+  isActive?: boolean;
+  trackPackages?: boolean;
 }
 
 export interface SyncJobLog {
