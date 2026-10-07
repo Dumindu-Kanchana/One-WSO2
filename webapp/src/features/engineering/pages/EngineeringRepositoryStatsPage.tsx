@@ -335,8 +335,10 @@ function sumOf<P extends { date: string }>(
 
 // The table under the chart: every listed Product's Stars, Forks, Watchers,
 // Open Issues, Clones and Unique Cloners. Total reads the latest GitHub counts
-// and the clones over the range; Monthly and Daily read the changes on the
+// and the clones over the range. Monthly and Daily read the changes on the
 // chosen month or day from the daily series, which are asked for only then.
+// With that picker cleared they read the latest GitHub counts again, and the
+// clone columns still sum the range.
 // The search narrows the rows and their pages; a Product change through the
 // picker narrows them too, without forgetting the search.
 function CurrentStatsCard({
@@ -354,7 +356,7 @@ function CurrentStatsCard({
   const [mode, setMode] = useState<TableMode>("total");
   const [pickedDate, setPickedDate] = useState("");
   const [search, setSearch] = useState("");
-  // A cleared picker reads as the whole range.
+  // No chosen day or month: Total, or Daily or Monthly with the picker cleared.
   const date: TableDate | null =
     mode !== "total" && pickedDate !== "" ? { mode, value: pickedDate } : null;
 

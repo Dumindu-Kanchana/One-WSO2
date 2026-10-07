@@ -633,6 +633,28 @@ describe("Current stats", () => {
     ]);
   });
 
+  it("reads the latest GitHub counts when the day picker is cleared, and still sums clones over the range", async () => {
+    connected();
+    stubApi();
+    const user = userEvent.setup();
+
+    renderStats(septemberRange);
+    await screen.findByRole("columnheader", { name: "Stars" });
+    const table = card("Current stats");
+
+    await user.click(within(table).getByRole("button", { name: "Daily" }));
+    await waitFor(() =>
+      expect(rowsOf(table)).toEqual([
+        ["API Manager", "0", "0", "0", "0", "0", "0"],
+        ["Identity Server", "0", "0", "0", "0", "0", "0"],
+      ]),
+    );
+
+    fireEvent.change(within(table).getByLabelText("Day"), { target: { value: "" } });
+    expect(within(table).getByLabelText("Day")).toHaveValue("");
+    expect(rowsOf(table)).toEqual(TOTAL_ROWS);
+  });
+
   it("resets the picker to the range's end whenever the mode changes, and drops it for Total", async () => {
     connected();
     stubApi();
