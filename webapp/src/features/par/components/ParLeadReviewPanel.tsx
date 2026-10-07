@@ -599,17 +599,19 @@ export default function ParLeadReviewPanel({
         </Grid>
       )}
 
-      <Grid size={12}>
-        {reviews.isLoading ? (
-          <Skeleton variant="rectangular" height={72} sx={{ borderRadius: 1.5 }} />
-        ) : reviews.isError ? (
-          <ErrorNotice error={reviews.error} onRetry={() => reviews.refetch()} retrying={reviews.isFetching}>
-            Couldn't load 360° feedback.
-          </ErrorNotice>
-        ) : (
-          <ParHistoryReviewSection reviews={reviews.data ?? []} />
-        )}
-      </Grid>
+      {!(reviews.isSuccess && reviews.data.length === 0) && (
+        <Grid size={12}>
+          {reviews.isLoading ? (
+            <Skeleton variant="rectangular" height={72} sx={{ borderRadius: 1.5 }} />
+          ) : reviews.isError ? (
+            <ErrorNotice error={reviews.error} onRetry={() => reviews.refetch()} retrying={reviews.isFetching}>
+              Couldn't load 360° feedback.
+            </ErrorNotice>
+          ) : (
+            <ParHistoryReviewSection reviews={reviews.data ?? []} />
+          )}
+        </Grid>
+      )}
 
       <Dialog open={confirming} onClose={() => setConfirming(false)} maxWidth="md" fullWidth>
         <DialogTitle>Share Lead's Feedback?</DialogTitle>
