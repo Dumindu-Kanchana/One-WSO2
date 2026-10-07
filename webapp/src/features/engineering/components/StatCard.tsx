@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { alpha, Box, Card, Skeleton, Tooltip, Typography, useTheme } from "@wso2/oxygen-ui";
+import { Box, Card, Skeleton, Tooltip, Typography } from "@wso2/oxygen-ui";
 import { Info } from "@wso2/oxygen-ui-icons-react";
 import { type JSX, type ReactNode } from "react";
 import { activateOnEnterOrSpace } from "../utils/activation";
@@ -48,8 +48,10 @@ export function StatCard({
   isLoading,
   isError,
 }: StatCardProps): JSX.Element {
-  const theme = useTheme();
-  const palette = theme.palette[iconColor];
+  // The colour scheme is applied through CSS variables, not the JS palette,
+  // which stays on the light scheme. `main` (not `light`) is the ink: `light`
+  // is a wash and disappears on a light card.
+  const ink = `var(--oxygen-palette-${iconColor}-main)`;
 
   return (
     <Card
@@ -67,8 +69,8 @@ export function StatCard({
           cursor: "pointer",
           transition: "box-shadow 0.2s ease, background-color 0.2s ease",
           "&:hover": {
-            bgcolor: alpha(palette.light ?? palette.main, 0.06),
-            boxShadow: `0 0 0 1px ${alpha(palette.light ?? palette.main, 0.4)}, 0 4px 12px ${alpha(palette.main, 0.15)}`,
+            bgcolor: `color-mix(in srgb, ${ink} 8%, transparent)`,
+            boxShadow: `0 0 0 1px color-mix(in srgb, ${ink} 40%, transparent), 0 4px 12px color-mix(in srgb, ${ink} 15%, transparent)`,
           },
         }),
       }}
@@ -86,8 +88,8 @@ export function StatCard({
             sx={{
               p: 1,
               borderRadius: "50%",
-              bgcolor: alpha(palette.light ?? palette.main, 0.1),
-              color: palette.light ?? palette.main,
+              bgcolor: `color-mix(in srgb, ${ink} 12%, transparent)`,
+              color: ink,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

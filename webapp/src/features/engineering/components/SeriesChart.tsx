@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { Box, Skeleton } from "@wso2/oxygen-ui";
+import { Box, Skeleton, useColorScheme } from "@wso2/oxygen-ui";
 import {
   Bar,
   BarChart,
@@ -89,8 +89,17 @@ export default function SeriesChart({
   onRetry,
   xTickFormat,
 }: SeriesChartProps): JSX.Element {
+  // The JS palette stays on the light scheme; the colour scheme is applied
+  // through CSS variables. Reading palette.mode would paint dark-mode charts
+  // with light-mode ink.
+  const { mode, systemMode } = useColorScheme();
+  const resolved = mode === "dark" || mode === "light" ? mode : systemMode;
+  const chartMode = resolved === "dark" ? "dark" : "light";
   const xFormatter = xTickFormat === "short" ? shortDate : undefined;
   const data = useMemo(() => mergeSeries(series), [series]);
+  const strokeOf = (name: string) => colorForName(name, chartMode);
+  const tick = { fill: "var(--oxygen-palette-text-secondary)", fontSize: 12 };
+  const axis = "var(--oxygen-palette-divider)";
 
   if (isLoading) {
     return <Skeleton variant="rounded" width="100%" height={height} />;
@@ -131,24 +140,24 @@ export default function SeriesChart({
         {variant === "bar" ? (
           <BarChart data={data} {...sharedProps}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="date" type="category" tickMargin={8} minTickGap={24} tickFormatter={xFormatter} />
-            <YAxis tickFormatter={(v: number) => formatCompact(v)} width={48} allowDecimals={false} />
+            <XAxis dataKey="date" type="category" tickMargin={8} minTickGap={24} tickFormatter={xFormatter} tick={tick} stroke={axis} />
+            <YAxis tickFormatter={(v: number) => formatCompact(v)} width={48} allowDecimals={false} tick={tick} stroke={axis} />
             {series.map((s) => (
-              <Bar key={s.key} dataKey={s.key} name={s.name} fill={colorForName(s.name)} />
+              <Bar key={s.key} dataKey={s.key} name={s.name} fill={strokeOf(s.name)} />
             ))}
           </BarChart>
         ) : (
           <LineChart data={data} {...sharedProps}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="date" type="category" tickMargin={8} minTickGap={24} tickFormatter={xFormatter} />
-            <YAxis tickFormatter={(v: number) => formatCompact(v)} width={48} allowDecimals={false} />
+            <XAxis dataKey="date" type="category" tickMargin={8} minTickGap={24} tickFormatter={xFormatter} tick={tick} stroke={axis} />
+            <YAxis tickFormatter={(v: number) => formatCompact(v)} width={48} allowDecimals={false} tick={tick} stroke={axis} />
             {series.map((s) => (
               <Line
                 key={s.key}
                 type="monotone"
                 dataKey={s.key}
                 name={s.name}
-                stroke={colorForName(s.name)}
+                stroke={strokeOf(s.name)}
                 dot={false}
                 strokeWidth={2}
                 connectNulls

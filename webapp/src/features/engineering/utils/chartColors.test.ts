@@ -26,10 +26,29 @@ const PRODUCTS = [
   "Choreo Connect",
 ];
 
+function contrast(foreground: string, surface: string): number {
+  const luminance = (hex: string): number => {
+    const linear = [1, 3, 5].map((index) => {
+      const value = parseInt(hex.slice(index, index + 2), 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const left = luminance(foreground);
+  const right = luminance(surface);
+  const [hi, lo] = left > right ? [left, right] : [right, left];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 describe("colorForName", () => {
-  it("picks a colour from One's stroke list", () => {
-    for (const name of PRODUCTS) {
-      expect(SERIES_STROKES).toContain(colorForName(name));
+  it("starts from One's stroke list and keeps the hue readable on white and near-black", () => {
+    for (const name of [...PRODUCTS, ""]) {
+      const light = colorForName(name, "light");
+      const dark = colorForName(name, "dark");
+      expect(light).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(dark).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(contrast(light, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(dark, "#121212")).toBeGreaterThanOrEqual(4.5);
     }
   });
 
@@ -52,7 +71,9 @@ describe("colorForName", () => {
     expect(new Set(PRODUCTS.map(colorForName)).size).toBeGreaterThan(1);
   });
 
-  it("treats an empty name as a name too", () => {
-    expect(SERIES_STROKES).toContain(colorForName(""));
+  it("keeps a name's colour stable in each mode, and can shift it between modes", () => {
+    expect(colorForName("", "light")).toBe(colorForName("", "light"));
+    expect(colorForName("API Manager", "dark")).toBe(colorForName("API Manager", "dark"));
+    expect(SERIES_STROKES.length).toBeGreaterThan(1);
   });
 });

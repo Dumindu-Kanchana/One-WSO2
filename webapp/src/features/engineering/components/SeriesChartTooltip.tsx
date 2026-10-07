@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { useColorScheme } from "@wso2/oxygen-ui";
 import type { ChartTooltip } from "@wso2/oxygen-ui-charts-react";
 import type { ComponentProps, JSX, ReactElement, ReactNode } from "react";
 import { colorForName } from "../utils/chartColors";
@@ -30,13 +31,17 @@ export type TooltipContentProps =
     : never;
 
 // The series chart's tooltip: every series at the hovered date, largest value
-// first, each with its colour dot and compact figure. Styled with One's theme
-// variables so it follows the light and dark themes.
+// first, each with its colour dot and compact figure. Paper, ink and the rule
+// come from the active theme, so the same tooltip reads in every theme and
+// in both modes.
 export default function SeriesChartTooltip({
   active,
   payload,
   label,
 }: TooltipContentProps): JSX.Element | null {
+  const { mode, systemMode } = useColorScheme();
+  const resolved = mode === "dark" || mode === "light" ? mode : systemMode;
+  const chartMode = resolved === "dark" ? "dark" : "light";
   if (!active || !payload || payload.length === 0) return null;
 
   const entries = payload as Array<{
@@ -52,21 +57,21 @@ export default function SeriesChartTooltip({
   return (
     <div
       style={{
-        background: "var(--oxygen-palette-background-paper, #1e2432)",
-        border: "1px solid var(--oxygen-palette-divider, rgba(255,255,255,0.12))",
+        background: "var(--oxygen-palette-background-paper, Canvas)",
+        border: "1px solid var(--oxygen-palette-divider, CanvasText)",
         borderRadius: 8,
         padding: "10px 14px",
         fontSize: 13,
         lineHeight: "1.6",
         maxWidth: 280,
-        boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        boxShadow: "0 4px 16px color-mix(in srgb, CanvasText 25%, transparent)",
       }}
     >
       <p
         style={{
           margin: "0 0 6px",
           fontWeight: 600,
-          color: "var(--oxygen-palette-text-secondary, rgba(255,255,255,0.6))",
+          color: "var(--oxygen-palette-text-secondary, CanvasText)",
           fontSize: 12,
         }}
       >
@@ -88,7 +93,7 @@ export default function SeriesChartTooltip({
               height: 10,
               borderRadius: "50%",
               flexShrink: 0,
-              background: entry.color ?? colorForName(entry.name ?? ""),
+              background: entry.color ?? colorForName(entry.name ?? "", chartMode),
             }}
           />
           <span
@@ -97,7 +102,7 @@ export default function SeriesChartTooltip({
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              color: "var(--oxygen-palette-text-primary, #fff)",
+              color: "var(--oxygen-palette-text-primary, CanvasText)",
             }}
           >
             {entry.name}
@@ -105,7 +110,7 @@ export default function SeriesChartTooltip({
           <span
             style={{
               fontWeight: 600,
-              color: "var(--oxygen-palette-text-primary, #fff)",
+              color: "var(--oxygen-palette-text-primary, CanvasText)",
               marginLeft: 8,
             }}
           >
