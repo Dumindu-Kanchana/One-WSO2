@@ -30,7 +30,7 @@ interface TableHeaderSearchProps {
   onChange: (value: string) => void;
 }
 
-// A column header with the standalone's inline search (ADR 0002): a
+// A column header with an inline search: a
 // magnifier that reveals a small "Filter…" field and a clear button; Escape
 // clears the field and closes it. Versions searches its Version column with
 // it and Repository Stats its Product column. The field is closed on mount,

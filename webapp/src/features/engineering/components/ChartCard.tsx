@@ -45,8 +45,7 @@ interface ChartCardProps {
   children: ((variant: ChartVariant) => ReactNode) | ReactNode;
 }
 
-// A titled card around a chart, with the standalone's line/bar icon toggle in
-// its header (ADR 0002).
+// A titled card around a chart, with a line/bar icon toggle in its header.
 export default function ChartCard({
   title,
   subtitle,

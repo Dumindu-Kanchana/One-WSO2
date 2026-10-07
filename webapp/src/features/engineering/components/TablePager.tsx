@@ -19,9 +19,8 @@ import { type JSX } from "react";
 import { ROWS_PER_PAGE_OPTIONS } from "../constants/tableConstants";
 import type { ClientPagination } from "../hooks/usePagination";
 
-// The pages control under every Download Stats table, as the standalone
-// draws it (ADR 0002): the rows-per-page choices and first and last buttons,
-// fed by usePagination.
+// The pages control under every Download Stats table: the rows-per-page
+// choices and first and last buttons, fed by usePagination.
 export default function TablePager({
   pagination,
 }: {

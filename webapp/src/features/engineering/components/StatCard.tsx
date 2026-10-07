@@ -34,8 +34,7 @@ export interface StatCardProps {
   isError?: boolean;
 }
 
-// A single KPI tile with loading skeleton and error fallback, in the
-// standalone's shape (ADR 0002). A whole-tile click rather than a text button,
+// A single KPI tile with loading skeleton and error fallback. A whole-tile click rather than a text button,
 // so the figure keeps its own case and the tile reads as the link it is.
 export function StatCard({
   label,

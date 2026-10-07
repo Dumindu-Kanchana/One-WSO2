@@ -115,7 +115,7 @@ function connected(): void {
   } as Window["config"];
 }
 
-// The standalone's Overview on staging, 7 Oct 2026, in miniature. Products
+// Overview on staging, 7 Oct 2026, in miniature. Products
 // Tracked is 1,234 rather than 10 so a compact "1.2K" would be caught.
 const apiManager = {
   repoId: 1,
@@ -216,7 +216,7 @@ function topProductsCard(): HTMLElement {
 // screen, because a probe cannot prove that a screen with three queries
 // sends none of them.
 describe("Engineering Overview", () => {
-  it("shows the five headline tiles with the standalone's icons, figures and trend chip", async () => {
+  it("shows the five headline tiles with their icons, figures and trend chip", async () => {
     connected();
     const fetchMock = stubApi();
 
@@ -270,7 +270,7 @@ describe("Engineering Overview", () => {
     expect(yesterday.querySelector("svg.lucide-trending-up")).toBeNull();
   });
 
-  it("explains the tiles that explain themselves on the standalone, in tooltips", async () => {
+  it("explains yesterday, this month, the total and the clones in tooltips", async () => {
     connected();
     stubApi();
     const user = userEvent.setup();
@@ -361,7 +361,7 @@ describe("Engineering Overview", () => {
     expect(await screen.findByText("Identity Server")).toBeInTheDocument();
     expect(screen.getAllByText("API Manager")).toHaveLength(2);
     expect(screen.queryByText("product-is")).not.toBeInTheDocument();
-    // Short dates on the X axis, as the standalone writes them.
+    // Short dates on the X axis, "Jun 28" rather than the ISO date.
     expect(screen.getByText("Sep 27")).toBeInTheDocument();
     expect(screen.queryByText("2026-09-27")).not.toBeInTheDocument();
 
@@ -528,7 +528,7 @@ describe("Engineering Overview", () => {
     expect(callsTo(fetchMock, "/stats/summary")).toBe(1);
   });
 
-  it("falls back to the standalone's sentence when a failure carries no message", async () => {
+  it("falls back to the default sentence when a failure carries no message", async () => {
     connected();
     stubApi({ daily: () => new Response("<html>Bad gateway</html>", { status: 502 }) });
 

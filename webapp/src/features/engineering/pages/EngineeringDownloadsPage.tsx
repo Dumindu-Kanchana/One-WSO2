@@ -68,7 +68,7 @@ export default function EngineeringDownloadsPage(): JSX.Element {
 }
 
 // Inside the shell, so it is mounted — and asks — only once the shell has let
-// the reader through. The standalone's Downloads (ADR 0002): the filter bar,
+// the reader through. Downloads: the filter bar,
 // the chart card titled by interval, four period tiles, and the date × product
 // table. Filters, Products and the chart type live in the address so a shared
 // link reproduces the view.
@@ -97,7 +97,7 @@ function DownloadsScreen(): JSX.Element {
 
   // The chart type is kept in the address (spec: One's invisible behaviours
   // stay) and applies to Daily alone: Monthly draws bars and Cumulative lines,
-  // whatever the address says, as on the standalone.
+  // whatever the address says.
   const variant: ChartVariant =
     interval === "day"
       ? params.get("chart") === "bar"
@@ -120,8 +120,7 @@ function DownloadsScreen(): JSX.Element {
             <IntervalSelect
               label="View"
               value={interval}
-              // The interval's own default chart type takes over, as the
-              // standalone's local choice resets.
+              // The interval's own default chart type takes over when View changes.
               onChange={(chosen) => onChange({ interval: chosen, chart: null })}
             />
           </Grid>
@@ -158,7 +157,7 @@ function DownloadsScreen(): JSX.Element {
 
           {/* Keyed by interval so a change of View remounts the table: the
               chosen date (a day's form is not a month's) and the page start
-              over, as the standalone clears its picker. */}
+              over. */}
           <DownloadsTable
             key={interval}
             interval={interval}
@@ -215,13 +214,13 @@ function PeriodTiles({
 }
 
 // The date × product table: one row per date, newest first, one column per
-// Product and a bold Total. A Product with no point on a date reads 0, as on
-// the standalone. Daily and Cumulative dates are calendar days; Monthly keeps
-// the API's own month label. The Date header's calendar narrows the rows to
-// one date; the pages are the standalone's.
+// Product and a bold Total. A Product with no point on a date reads 0. Daily
+// and Cumulative dates are calendar days; Monthly keeps the API's own month
+// label. The Date header's calendar narrows the rows to one date, and the
+// table is paged.
 //
-// While the series loads the table shows skeleton rows, and when it fails the
-// error with Retry, rather than the standalone's "No data" sentence for both:
+// While the series loads the table shows skeleton rows, and when it fails an
+// error with Retry. An empty range is the only case that says there is no data:
 // a failed request is never presented as nothing to show
 // (docs/conventions.md, "Data fetching").
 function DownloadsTable({

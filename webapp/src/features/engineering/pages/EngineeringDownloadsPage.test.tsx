@@ -371,7 +371,7 @@ describe("Downloads chart card", () => {
     ["day", "Daily downloads by product"],
     ["month", "Monthly downloads by product"],
     ["cumulative", "Cumulative downloads by product"],
-  ])("is titled by the %s interval with the standalone's subtitle", async (interval, title) => {
+  ])("is titled by the %s interval with its subtitle", async (interval, title) => {
     connected();
     stubApi({ daily: () => json(interval === "month" ? monthly : juneDaily) });
 
@@ -759,7 +759,7 @@ describe("Downloads states", () => {
     expect(requestsTo(fetchMock, "/stats/daily")).toHaveLength(2);
   });
 
-  it("falls back to the standalone's sentence when a failure carries no message", async () => {
+  it("falls back to the default sentence when a failure carries no message", async () => {
     connected();
     stubApi({ daily: () => new Response("<html>Bad gateway</html>", { status: 502 }) });
 

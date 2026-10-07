@@ -74,8 +74,7 @@ const DEFAULT_VISIBLE_PACKAGES = 5;
 // total (a running stock, as of the latest Scraper Sync) rather than the
 // period downloads (a flow over the range). Day and month share the figure on
 // purpose — summing a range's daily Package downloads equals summing its
-// monthly ones — so only Cumulative switches the source field, as on the
-// standalone.
+// monthly ones — so only Cumulative switches the source field.
 function downloadsOf(
   item: { periodDownloads: number; totalDownloads: number },
   interval: ReleaseDownloadGrain,
@@ -86,7 +85,7 @@ function downloadsOf(
 // Most active first: by period downloads, then all-time total, then name — the
 // API's own order, applied again here so the table, the chart's starting
 // Packages and the Versions panel's opening Package all agree on it. Cumulative
-// keeps this order under its all-time figures, as the standalone does.
+// keeps this order under its all-time figures.
 function byActivity(a: PackageBreakdownItem, b: PackageBreakdownItem): number {
   if (a.periodDownloads !== b.periodDownloads) return b.periodDownloads - a.periodDownloads;
   if (a.totalDownloads !== b.totalDownloads) return b.totalDownloads - a.totalDownloads;
@@ -102,7 +101,7 @@ function toChart(series: readonly PackageSeriesItem[]): ChartSeries[] {
 }
 
 // A Package version is shown by its Tags, falling back to its id when it was
-// never tagged, as on the standalone.
+// never tagged.
 function versionTags(version: PackageVersionItem): string {
   return version.tags || `#${version.versionId}`;
 }
@@ -116,7 +115,7 @@ export default function EngineeringPackagesPage(): JSX.Element {
 }
 
 // Inside the shell, so it is mounted — and asks — only once the shell has let
-// the reader through. The standalone's Packages (ADR 0002): the filter bar
+// the reader through. Packages: the filter bar
 // with the Product and Chart packages selects, the chart card, and the
 // Packages and Versions cards side by side. Product, dates and Interval live
 // in the address so a shared link reproduces the view; the chart's Packages
@@ -295,8 +294,8 @@ function PackagesScreen(): JSX.Element {
       {rangeInverted ? (
         <Typography>From is after To.</Typography>
       ) : products.isError ? (
-        // The standalone draws its empty chart here; One never presents a
-        // failed request as nothing to show (docs/conventions.md).
+        // A failed request is never presented as nothing to show
+        // (docs/conventions.md).
         <ErrorState error={products.error} onRetry={() => void products.refetch()} />
       ) : products.isSuccess && offered.length === 0 ? (
         <EmptyState title="No product has package downloads" />

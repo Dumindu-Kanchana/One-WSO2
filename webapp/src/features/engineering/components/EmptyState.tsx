@@ -25,7 +25,7 @@ interface EmptyStateProps {
 }
 
 // The "no data" placeholder every Download Stats list and chart shows instead
-// of a silent blank, in the standalone's shape (ADR 0002).
+// of a silent blank.
 export default function EmptyState({
   title,
   description,

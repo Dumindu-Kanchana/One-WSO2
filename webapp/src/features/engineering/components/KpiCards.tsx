@@ -31,8 +31,8 @@ interface KpiCardsProps {
   isError?: boolean;
 }
 
-// The five Overview tiles, in the standalone's order, icons, disc colours and
-// tooltips (ADR 0002). Yesterday's downloads is the headline, with its change
+// The five Overview tiles, in this order, with these icons, disc colours and
+// tooltips. Yesterday's downloads is the headline, with its change
 // against the day before as the trend chip. Three tiles open Downloads; the
 // disc colours are palette tokens, so they take One's theme.
 export default function KpiCards({ summary, isLoading, isError }: KpiCardsProps): JSX.Element {
@@ -102,9 +102,9 @@ export default function KpiCards({ summary, isLoading, isError }: KpiCardsProps)
   );
 }
 
-// Downloads for the as-of day alone. The standalone sends `from` only, which
-// its Downloads reads as "from that day until today"; One names both ends so
-// the screen opens on the one day the tile counts.
+// Downloads for the as-of day alone. Naming only the start would read as
+// "from that day until today"; both ends are named so the screen opens on
+// the one day the tile counts.
 function dayDownloadsPath(asOfDate: string | null | undefined): string | undefined {
   const day = calendarDay(asOfDate);
   if (!day) return undefined;

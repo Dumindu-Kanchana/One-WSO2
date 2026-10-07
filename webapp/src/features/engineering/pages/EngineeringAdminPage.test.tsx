@@ -416,7 +416,7 @@ describe("Admin access", () => {
 });
 
 describe("Tracked repositories", () => {
-  it("lists every tracked repository, including inactive ones, in the standalone's columns", async () => {
+  it("lists every tracked repository, including inactive ones, with prefixes, status and actions", async () => {
     openAdmin();
     expect(await screen.findByRole("cell", { name: "API Manager" })).toBeInTheDocument();
 
@@ -486,7 +486,7 @@ describe("Tracked repositories", () => {
     const enableDialog = screen.getByRole("dialog", { name: "Enable package tracking?" });
     expect(
       within(enableDialog).getByText(
-        'Start tracking packages for "API Manager"? web scraper will begin covering it on the next cron-job.',
+        'Start tracking packages for "API Manager"? The web scraper will include it from the next scheduled run.',
       ),
     ).toBeInTheDocument();
     const enable = within(enableDialog).getByRole("button", { name: "Enable" });
@@ -501,7 +501,7 @@ describe("Tracked repositories", () => {
     const disableDialog = screen.getByRole("dialog", { name: "Disable package tracking?" });
     expect(
       within(disableDialog).getByText(
-        'Stop tracking packages for "product-is"? web scraper will no longer cover it from the next cron-job onward.',
+        'Stop tracking packages for "product-is"? The web scraper will skip it from the next scheduled run.',
       ),
     ).toBeInTheDocument();
     expect(within(disableDialog).getByRole("button", { name: "Disable" })).toHaveClass("MuiButton-containedError");
@@ -634,7 +634,7 @@ describe("Tracked repositories", () => {
 });
 
 describe("Add and edit form", () => {
-  it("reads the standalone's titles, labels and helpers, and fixes org and repo on edit", async () => {
+  it("reads the form's titles, labels and helpers, and fixes org and repo on edit", async () => {
     const user = userEvent.setup();
     openAdmin();
     await screen.findByRole("cell", { name: "API Manager" });

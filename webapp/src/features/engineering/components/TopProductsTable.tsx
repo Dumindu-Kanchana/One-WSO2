@@ -46,7 +46,7 @@ interface TopProductsTableProps {
 }
 
 // The Overview's shortcut list: the six Products with the most release
-// downloads, each row opening Downloads for that Product (ADR 0002). A
+// downloads, each row opening Downloads for that Product. A
 // whole-row click with keyboard support rather than a text button, so a
 // Product's name renders in its own case.
 export default function TopProductsTable({

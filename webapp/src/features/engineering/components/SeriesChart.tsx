@@ -59,8 +59,7 @@ function shortDate(iso: string): string {
 }
 
 // One row per date, one column per series key. A date a series has no point
-// on is simply absent from its row; the line connects across it (connectNulls),
-// as the standalone draws it.
+// on is simply absent from its row; the line connects across it (connectNulls).
 function mergeSeries(series: ChartSeries[]): Array<Record<string, string | number>> {
   const byDate = new Map<string, Record<string, string | number>>();
   for (const s of series) {
@@ -74,7 +73,7 @@ function mergeSeries(series: ChartSeries[]): Array<Record<string, string | numbe
 }
 
 // The one chart every Download Stats screen draws, on the Oxygen charts
-// wrapper One already depends on, in the standalone's shape (ADR 0002): line
+// wrapper One already depends on: line
 // or bar, dashed horizontal gridlines, compact Y figures, optional short dates,
 // legend, the sorted tooltip, and its own skeleton, empty and error states.
 // Every series is coloured by name through colorForName, never by position.

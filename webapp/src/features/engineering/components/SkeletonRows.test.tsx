@@ -19,7 +19,7 @@ import { render } from "@testing-library/react";
 import SkeletonRows from "./SkeletonRows";
 
 describe("SkeletonRows", () => {
-  it("draws five rows by default, as the standalone's tables do", () => {
+  it("draws five rows by default", () => {
     const { container } = render(<SkeletonRows />);
     expect(container.querySelectorAll(".MuiSkeleton-root")).toHaveLength(5);
   });

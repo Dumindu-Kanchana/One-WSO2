@@ -15,8 +15,8 @@
 // under the License.
 
 // One's chart strokes. Distinct so two series are not the same line; the list
-// repeats only once it is exhausted. The standalone's palette and its map of
-// pinned product names are deliberately not copied (spec: colours are One's).
+// repeats only once it is exhausted. A name hashes to one of these hues, then
+// the lightness shifts so the colour stays readable in light and in dark.
 export const SERIES_STROKES = [
   "#3E6FA3",
   "#4FA39B",

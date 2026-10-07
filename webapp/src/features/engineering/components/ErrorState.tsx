@@ -25,7 +25,7 @@ interface ErrorStateProps {
   /**
    * The caught error. When the response carried its own message, that is the
    * detail line (One's convention, docs/conventions.md "Presenting errors");
-   * otherwise the standalone's sentence is. Never rendered raw.
+   * otherwise the default sentence is. Never rendered raw.
    */
   error?: unknown;
   onRetry?: () => void;
@@ -34,8 +34,8 @@ interface ErrorStateProps {
 
 const FALLBACK = "We couldn't load this data. Please try again.";
 
-// Inline error placeholder for a failed card/chart/table fetch, in the
-// standalone's shape: centred title, one line of detail, Retry (ADR 0002).
+// Inline error placeholder for a failed card/chart/table fetch: centred
+// title, one line of detail, Retry.
 export default function ErrorState({
   title = "Something went wrong",
   description,

@@ -612,7 +612,7 @@ describe("Versions table", () => {
     expect(within(table).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("sums a Version's Cumulative points as its total, as the standalone does, and shares on those sums", async () => {
+  it("sums a Version's Cumulative points as its total, and shares on those sums", async () => {
     connected();
     stubApi({
       series: () =>

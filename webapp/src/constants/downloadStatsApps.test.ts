@@ -77,9 +77,9 @@ describe("the Download Stats registry", () => {
     expect(Object.values(downloadStatsPaths).sort()).toEqual(items.map((item) => item.path).sort());
   });
 
-  // The shell reads the title and the standalone's one-line description off
-  // the same entry the rail reads its label from, so the two cannot drift.
-  it("carries the standalone's description for every screen", () => {
+  // The shell reads the title and the one-line description off the same entry
+  // the rail reads its label from, so the two cannot drift.
+  it("carries a description for every screen", () => {
     expect(DOWNLOAD_STATS_SCREENS.overview.desc).toBe(
       "Download activity and repository stats across all WSO2 products.",
     );

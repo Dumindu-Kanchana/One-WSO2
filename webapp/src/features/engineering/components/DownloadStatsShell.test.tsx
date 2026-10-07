@@ -88,7 +88,7 @@ const denial = () => screen.queryByText(/don't have access to admin/i);
 const ADMIN_DESCRIPTION = "Manage tracked repositories and review DB sync and scraper job history.";
 
 describe("a screen anyone may open", () => {
-  it("renders, with its title and the standalone's description above it", () => {
+  it("renders, with its title and description above it", () => {
     configure();
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -124,7 +124,7 @@ describe("a screen anyone may open", () => {
       "Repository Stats",
       "Stars, forks, watchers, open issues, and clone traffic over time for each tracked repository.",
     ],
-  ])("opens %s titled %s with the standalone's sentence beneath", (key, title, description) => {
+  ])("opens %s titled %s with its sentence beneath", (key, title, description) => {
     configure();
     vi.stubGlobal("fetch", vi.fn());
     show(key);

@@ -15,8 +15,7 @@
 // under the License.
 
 // Registry of the Download Stats screens, surfaced inside the Engineering
-// perspective. Ported from the standalone GitHub Product Download Stats
-// Dashboard; the glossary for it is the "Engineering: Download Stats" section
+// perspective. The glossary for it is the "Engineering: Download Stats" section
 // of the root CONTEXT.md.
 //
 // ---- why its own file, like misApps.ts -------------------------------------
@@ -71,8 +70,7 @@ export const ENGINEERING_ADMIN_ITEM_ID = "engineering-download-stats-admin";
 /**
  * The six screens. Each entry is a rail row, a route and a header: the rail
  * reads `label` and `path`, and the app shell reads `label` as the screen's
- * title and `desc` as the one-line description beneath it — the standalone's
- * own sentence, verbatim (ADR 0002). One entry, so the rail and the header
+ * title and `desc` as the one-line description beneath it. One entry, so the rail and the header
  * cannot name a screen two different ways.
  */
 export const DOWNLOAD_STATS_SCREENS: Readonly<Record<DownloadStatsScreen, MenuAppItem>> = {

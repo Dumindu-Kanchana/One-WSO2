@@ -16,7 +16,7 @@
 
 import type { ReleaseDownloadGrain } from "../api/productDownloadStats";
 
-// The Interval's choices, in the standalone's order and words (CONTEXT.md,
+// The Interval's choices, in this order and these words (CONTEXT.md,
 // "Interval": labelled View on Downloads, Interval elsewhere). Downloads also
 // titles its chart card and table with these words.
 export const INTERVAL_LABEL: Record<ReleaseDownloadGrain, string> = {

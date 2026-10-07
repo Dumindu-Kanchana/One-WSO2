@@ -459,7 +459,7 @@ describe("Repository Stats chart card", () => {
     ["openIssues", "Open Issues"],
     ["clones", "Total Clones"],
     ["uniqueCloners", "Unique Cloners"],
-  ])("is titled by the %s Stat with the standalone's subtitle", async (stat, label) => {
+  ])("is titled by the %s Stat with its subtitle", async (stat, label) => {
     connected();
     stubApi();
 
@@ -494,7 +494,7 @@ describe("Repository Stats chart card", () => {
 
     expect(container.querySelectorAll(".recharts-bar")).toHaveLength(1);
     expect(container.querySelector("path.recharts-line-curve")).toBeNull();
-    // The chart type stays the reader's, for this visit, as on the standalone.
+    // The chart type stays the reader's, for this visit, and is not written into the address.
     expect(screen.getByTestId("where")).not.toHaveTextContent("chart=");
   });
 
@@ -840,7 +840,7 @@ describe("Repository Stats states", () => {
     expect(requestsTo(fetchMock, "/stats/metric")).toHaveLength(2);
   });
 
-  it("falls back to the standalone's sentence when a failure carries no message", async () => {
+  it("falls back to the default sentence when a failure carries no message", async () => {
     connected();
     stubApi({ metric: () => new Response("<html>Bad gateway</html>", { status: 502 }) });
 

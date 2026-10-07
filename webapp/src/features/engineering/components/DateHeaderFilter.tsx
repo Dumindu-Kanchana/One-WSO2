@@ -29,8 +29,7 @@ interface DateHeaderFilterProps {
 }
 
 // A calendar icon for a table header that opens the browser's own date or
-// month picker and shows the chosen value as a removable chip beside it, as
-// the standalone's Date header does (ADR 0002). The input sits hidden under
+// month picker and shows the chosen value as a removable chip beside it. The input sits hidden under
 // the icon so the picker anchors there; the icon is what a person sees.
 export default function DateHeaderFilter({
   type,

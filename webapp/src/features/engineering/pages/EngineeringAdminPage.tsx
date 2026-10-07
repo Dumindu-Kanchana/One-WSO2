@@ -178,12 +178,12 @@ function confirmCopy(pending: PendingToggle): { title: string; body: string; act
     return pending.nextValue
       ? {
           title: "Enable package tracking?",
-          body: `Start tracking packages for "${name}"? web scraper will begin covering it on the next cron-job.`,
+          body: `Start tracking packages for "${name}"? The web scraper will include it from the next scheduled run.`,
           action: "Enable",
         }
       : {
           title: "Disable package tracking?",
-          body: `Stop tracking packages for "${name}"? web scraper will no longer cover it from the next cron-job onward.`,
+          body: `Stop tracking packages for "${name}"? The web scraper will skip it from the next scheduled run.`,
           action: "Disable",
         };
   }
@@ -263,9 +263,8 @@ function RepositoriesTable({
   };
   const applyConfirm = (): void => {
     if (!confirm || busy) return;
-    // The standalone waits a second before sending, so its button can show a
-    // spinner. One does not (spec: that wait is not reproduced); the button
-    // stays disabled for as long as the request itself takes.
+    // The button stays disabled for as long as the request takes, so a slow
+    // confirm cannot fire twice.
     const snapshot = confirm;
     if (snapshot.kind === "trackPackages") {
       update.mutate({ id: snapshot.repository.id, update: { trackPackages: snapshot.nextValue } });
@@ -558,9 +557,9 @@ function statusColor(status: string): "success" | "warning" | "error" | "info" |
 }
 
 // The picker yields a calendar day; the stored value is an RFC3339 instant.
-// The standalone keeps a row when that instant's UTC day starts with the
-// picked day, not when the local time falls on it. A reader west of UTC can
-// see the previous evening in the cell and still match the UTC day.
+// A row matches when that instant's UTC day starts with the picked day, not
+// when the local time falls on it. A reader west of UTC can see the previous
+// evening in the cell and still match the UTC day.
 function matchesDay(instant: string | null, day: string): boolean {
   if (day === "") return true;
   return instant?.startsWith(day) ?? false;

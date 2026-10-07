@@ -33,7 +33,7 @@ import {
 import EngineeringUnavailable from "./EngineeringUnavailable";
 
 // Shared page frame for every Download Stats screen: the perspective header
-// with the screen's title and the standalone's one-line description, and —
+// with the screen's title and its one-line description, and —
 // the reason this exists — ONE place that owns every degraded state, so no
 // screen has to remember them and none of them differs (MisShell is the
 // precedent). The ladder, in order:

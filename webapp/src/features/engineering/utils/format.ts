@@ -14,10 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// The Download Stats formatters, ported from the standalone dashboard's
-// utils/format.ts so both sites write the same figure the same way (ADR 0002).
-// Locales are the standalone's too: "en" for figures, "en-GB" for dates, so a
-// September date reads "Sept" on both sites, as ICU writes it for en-GB.
+// The Download Stats formatters. Figures use the "en" locale ("1.5K"). Dates
+// use "en-GB" in UTC, so a September date reads "Sept" and a reader west of
+// UTC does not see the previous calendar day.
 
 const compactFormatter = new Intl.NumberFormat("en", {
   notation: "compact",
@@ -65,8 +64,8 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 // Formats a month label (YYYY-MM) or a calendar date as short month and year
-// (e.g. "Mar 2025"), for the Monthly tiles. In "en-US", as the standalone's
-// Downloads writes it — so September is "Sep" here and "Sept" in formatDate.
+// (e.g. "Mar 2025"), for the Monthly tiles. "en-US" so September is "Sep"
+// here and "Sept" in formatDate.
 export function formatMonthYear(value: string | null | undefined): string {
   if (!value) return "—";
   const iso = value.length === 7 ? `${value}-01` : value;

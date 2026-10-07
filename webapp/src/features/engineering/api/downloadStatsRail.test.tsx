@@ -222,7 +222,7 @@ describe("the Engineering rail", () => {
     ]);
   });
 
-  // The standalone's sidebar gives every screen its own icon. A row that
+  // Every Download Stats screen has its own icon. A row that
   // declares one wears it; the label stays the row's text, so the collapsed
   // flyout still reads the name.
   it("gives the app row and every screen row an icon", async () => {

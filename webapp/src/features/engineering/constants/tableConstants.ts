@@ -15,6 +15,6 @@
 // under the License.
 
 // Default page size and the selectable options for the Download Stats tables,
-// the standalone's choices (ADR 0002).
+// ten, twenty-five, fifty and a hundred.
 export const DEFAULT_ROWS_PER_PAGE = 10;
 export const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];

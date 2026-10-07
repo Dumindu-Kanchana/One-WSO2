@@ -34,9 +34,9 @@ interface FilterBarProps {
   filterSlot?: ReactNode;
 }
 
-// The filter card every analytics screen opens with (ADR 0002): the product
+// The filter card every analytics screen opens with: the product
 // picker and a "Filters" button that folds the From and To dates and the
-// screen's own controls away. Open by default, as on the standalone.
+// screen's own controls away. Open by default.
 export default function FilterBar({
   filters,
   onChange,

@@ -26,8 +26,7 @@ interface SelectableRowProps {
 }
 
 // A table row the reader picks to open a detail panel on — a Version for its
-// Assets, a Package for its versions — as the standalone's rows are picked
-// (ADR 0002): a whole-row click with keyboard support rather than a text
+// Assets, a Package for its versions. A whole-row click with keyboard support rather than a text
 // button, so the name renders in its own case, highlighted while selected.
 export default function SelectableRow({
   selected,

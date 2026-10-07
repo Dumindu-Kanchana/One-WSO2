@@ -30,8 +30,8 @@ interface RepoMultiSelectProps {
 }
 
 // The product picker: a searchable multi-select of the active Products with
-// removable chips. Labelled "Repositories", as on the standalone (CONTEXT.md,
-// "Product"). An empty selection means every Product.
+// removable chips. Labelled "Repositories" (CONTEXT.md, "Product"). An empty
+// selection means every Product.
 export default function RepoMultiSelect({ value, onChange }: RepoMultiSelectProps): JSX.Element {
   const { data, isLoading } = useTrackedRepositories();
   const options: RepoOption[] = activeRepositories(data).map((r) => ({

@@ -42,13 +42,13 @@ describe("ErrorState", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("falls back to the standalone's sentence when the response carries no message", () => {
+  it("falls back to the default sentence when the response carries no message", () => {
     render(<ErrorState error={new HttpError("/x", 502, "<html>Bad gateway</html>")} />);
     expect(screen.getByText("We couldn't load this data. Please try again.")).toBeInTheDocument();
     expect(screen.queryByText(/Bad gateway/)).not.toBeInTheDocument();
   });
 
-  it("falls back to the standalone's sentence for a failure that is not an HTTP response", () => {
+  it("falls back to the default sentence for a failure that is not an HTTP response", () => {
     render(<ErrorState error={new TypeError("Failed to fetch")} />);
     expect(screen.getByText("We couldn't load this data. Please try again.")).toBeInTheDocument();
   });

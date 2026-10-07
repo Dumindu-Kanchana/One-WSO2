@@ -29,7 +29,7 @@ function rowsPerPageEvent(value: number): ChangeEvent<HTMLInputElement> {
 }
 
 describe("usePagination", () => {
-  it("offers the standalone's rows-per-page choices and starts on ten", () => {
+  it("offers ten, twenty-five, fifty and a hundred rows per page, and starts on ten", () => {
     expect(ROWS_PER_PAGE_OPTIONS).toEqual([10, 25, 50, 100]);
     expect(DEFAULT_ROWS_PER_PAGE).toBe(10);
   });

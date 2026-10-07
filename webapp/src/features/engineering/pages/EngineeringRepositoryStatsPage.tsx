@@ -177,7 +177,7 @@ export default function EngineeringRepositoryStatsPage(): JSX.Element {
 }
 
 // Inside the shell, so it is mounted — and asks — only once the shell has let
-// the reader through. The standalone's Repository Stats (ADR 0002): the filter
+// the reader through. Repository Stats: the filter
 // bar with the product picker and the Stat and Interval selects, the chart
 // card titled by the Stat, and the "Current stats" card. Products, dates, Stat
 // and Interval live in the address so a shared link reproduces the view; the
@@ -258,8 +258,8 @@ function RepositoryStatsScreen(): JSX.Element {
       {rangeInverted ? (
         <Typography>From is after To.</Typography>
       ) : repositories.isError ? (
-        // The standalone draws its empty chart here; One never presents a
-        // failed request as nothing to show (docs/conventions.md).
+        // A failed request is never presented as nothing to show
+        // (docs/conventions.md).
         <ErrorState error={repositories.error} onRetry={() => void repositories.refetch()} />
       ) : (
         <>
@@ -321,10 +321,8 @@ function pointsIn<P extends { date: string }>(points: readonly P[], date: TableD
 
 // A Product's figure summed from its series over the chosen day or month (or
 // the range). A Product with no point for the chosen day or month — or with
-// no series at all — reads 0, not a dash: the standalone reads it so, and the
-// spec wants its figures reproduced oddity and all (spec: "Figures and
-// states", story 71), so a disagreement always means a port error and never
-// a silent fix.
+// no series at all — reads 0, not a dash. The missing point is shown as zero
+// so the cell is a number, the same way every other cell in the row is.
 function sumOf<P extends { date: string }>(
   series: readonly { repoId: number; points: P[] }[] | undefined,
   repoId: number,
@@ -340,7 +338,7 @@ function sumOf<P extends { date: string }>(
 // and the clones over the range; Monthly and Daily read the changes on the
 // chosen month or day from the daily series, which are asked for only then.
 // The search narrows the rows and their pages; a Product change through the
-// picker narrows them too, without forgetting the search, as on the standalone.
+// picker narrows them too, without forgetting the search.
 function CurrentStatsCard({
   products,
   productsPending,
@@ -356,7 +354,7 @@ function CurrentStatsCard({
   const [mode, setMode] = useState<TableMode>("total");
   const [pickedDate, setPickedDate] = useState("");
   const [search, setSearch] = useState("");
-  // A cleared picker reads as the whole range, as on the standalone.
+  // A cleared picker reads as the whole range.
   const date: TableDate | null =
     mode !== "total" && pickedDate !== "" ? { mode, value: pickedDate } : null;
 

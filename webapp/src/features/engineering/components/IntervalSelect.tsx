@@ -20,7 +20,7 @@ import type { ReleaseDownloadGrain } from "../api/productDownloadStats";
 import { INTERVAL_LABEL } from "../constants/intervalLabels";
 
 interface IntervalSelectProps {
-  /** "View" on Downloads, "Interval" elsewhere, as on the standalone. */
+  /** "View" on Downloads, "Interval" elsewhere. */
   label: string;
   value: ReleaseDownloadGrain;
   onChange: (interval: ReleaseDownloadGrain) => void;

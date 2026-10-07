@@ -15,8 +15,7 @@
 // under the License.
 
 // The series, period-summary, date-matrix and address-filter utilities every
-// Download Stats screen reads, ported from the standalone dashboard's
-// features/stats/utils/filters.ts (ADR 0002). Pure: no React, no fetching.
+// Download Stats screen reads. Pure: no React, no fetching.
 
 import type {
   DailySeries,
@@ -30,8 +29,7 @@ import { productLabel } from "./format";
 export const DEFAULT_RANGE_DAYS = 30;
 
 // The filters every screen keeps in the address. Repository Stats reads its
-// Stat beside these, as the standalone does; Versions and Packages read their
-// Product the same way.
+// Stat beside these; Versions and Packages read their Product the same way.
 export interface StatsFilters {
   from: string;
   to: string;
@@ -154,8 +152,8 @@ export interface PeriodSummary {
 }
 
 // Aggregates the per-date totals (summed across series) into headline figures.
-// Highest and lowest are read from those sums, not from any one series, as on
-// the standalone; the first date keeps the title on a tie.
+// Highest and lowest are read from those sums, not from any one series; the
+// first date keeps the title on a tie.
 export function periodSummary(series: readonly ChartSeries[]): PeriodSummary {
   const byDate = new Map<string, number>();
   for (const s of series) {

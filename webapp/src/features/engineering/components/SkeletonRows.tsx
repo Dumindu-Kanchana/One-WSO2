@@ -17,7 +17,7 @@
 import { Box, Skeleton } from "@wso2/oxygen-ui";
 import { type JSX } from "react";
 
-// Skeleton rows while a table waits, as many as the standalone's tables draw.
+// Skeleton rows while a table waits. Five is the default.
 const DEFAULT_ROWS = 5;
 
 // What a Download Stats table shows in place of its rows while they load

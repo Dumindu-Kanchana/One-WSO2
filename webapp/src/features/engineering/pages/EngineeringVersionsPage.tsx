@@ -85,9 +85,8 @@ function versionName(item: VersionSeriesItem): string {
 
 // A Version's total is the sum of its points at every Interval — including
 // Cumulative, where the points are already running totals, so the figure
-// over-counts. The standalone adds them up the same way, and the spec wants
-// its figures reproduced oddity and all (spec: "Figures and states", story
-// 71), so a disagreement always means a port error and never a silent fix.
+// over-counts. The sum is still the figure shown, oddity and all, so the
+// number on screen is the sum of the points the API returned.
 function versionTotal(item: VersionSeriesItem): number {
   return item.points.reduce((sum, point) => sum + point.value, 0);
 }
@@ -104,8 +103,7 @@ function toRows(series: readonly VersionSeriesItem[]): VersionRow[] {
   }));
 }
 
-// The most recent Versions by Tag. Numeric-aware, so v1.10 is newer than
-// v1.9 (kept from the first port; the standalone compares tags as plain text).
+// The most recent Versions by Tag, numeric-aware, so v1.10 is newer than v1.9.
 function mostRecentTags(series: readonly VersionSeriesItem[], limit: number): string[] {
   return [...series]
     .sort((a, b) => b.releaseTag.localeCompare(a.releaseTag, undefined, { numeric: true }))
@@ -130,7 +128,7 @@ export default function EngineeringVersionsPage(): JSX.Element {
 }
 
 // Inside the shell, so it is mounted — and asks — only once the shell has let
-// the reader through. The standalone's Versions (ADR 0002): the filter bar
+// the reader through. Versions: the filter bar
 // with the Product and Version selects, the chart card, and the Versions and
 // Assets cards side by side. Product, dates and Interval live in the address
 // so a shared link reproduces the view; the chart's Versions and the Assets
@@ -297,8 +295,8 @@ function VersionsScreen(): JSX.Element {
       {rangeInverted ? (
         <Typography>From is after To.</Typography>
       ) : repositories.isError ? (
-        // The standalone draws its empty chart here; One never presents a
-        // failed request as nothing to show (docs/conventions.md).
+        // A failed request is never presented as nothing to show
+        // (docs/conventions.md).
         <ErrorState error={repositories.error} onRetry={() => void repositories.refetch()} />
       ) : repositories.isSuccess && products.length === 0 ? (
         <EmptyState title="No products are tracked" />

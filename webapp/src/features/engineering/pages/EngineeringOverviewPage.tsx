@@ -40,7 +40,7 @@ export default function EngineeringOverviewPage(): JSX.Element {
 }
 
 // Inside the shell, so it is mounted — and asks — only once the shell has let
-// the reader through. The standalone's Overview (ADR 0002): the five tiles,
+// the reader through. Overview: the five tiles,
 // then the daily chart beside the top products, two thirds to one third on a
 // wide window and stacked on a narrow one. Each part shows its own skeleton,
 // empty sentence or error, so a slow or failed request blanks only itself
