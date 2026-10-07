@@ -16,8 +16,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// UMT is behind a preview flag, so the registry depends on `window.config`
-// and has to be imported fresh per state rather than once at the top of the
+// Several perspectives and rail groups are behind preview flags, so the
+// registry depends on `window.config` and has to be imported fresh per state rather than once at the top of the
 // file.
 type Perspectives = typeof import("./perspectives");
 
@@ -137,39 +137,34 @@ describe("CadO2's rail entries", () => {
   });
 });
 
-describe("the UMT perspective", () => {
-  it("is absent from the registry when the preview flag is off", async () => {
-    const { PERSPECTIVES, FUNCTIONAL_PERSPECTIVES, reachablePerspectives } = await load({
-      umt: false,
-    });
-    expect(keys(PERSPECTIVES)).not.toContain("umt");
-    expect(keys(FUNCTIONAL_PERSPECTIVES)).not.toContain("umt");
-    expect(keys(reachablePerspectives())).not.toContain("umt");
-  });
+describe("UMT inside Engineering", () => {
+  const umtGroupOf = (perspectives: Perspectives) =>
+    perspectives.findPerspectiveByKey("engineering")?.sections?.find((s) => s.id === "engineering-umt");
 
-  it("is absent on an absent flag, not only on an explicit false", async () => {
-    // Production ships no entry at all; safety must not depend on remembering
-    // to write `false`.
-    const { PERSPECTIVES } = await load();
-    expect(keys(PERSPECTIVES)).not.toContain("umt");
-  });
-
-  it("is present, built and routable, when the preview flag is on", async () => {
-    const { PERSPECTIVES, reachablePerspectives, findPerspectiveByKey, findPerspectiveByPath } =
-      await load({ umt: true });
-    expect(keys(PERSPECTIVES)).toContain("umt");
-    expect(keys(reachablePerspectives())).toContain("umt");
-    expect(findPerspectiveByKey("umt")?.path).toBe("/umt");
-    expect(findPerspectiveByPath("/umt")?.key).toBe("umt");
-  });
-
-  it("does not disturb the other perspectives whatever the flag says", async () => {
-    for (const preview of [{}, { umt: true }]) {
+  it("is not a perspective of its own whatever the flags say", async () => {
+    for (const preview of [{}, { umt: true }, { engineering: true, umt: true }]) {
       const { PERSPECTIVES } = await load(preview);
-      expect(keys(PERSPECTIVES)).toEqual(
-        expect.arrayContaining(["people", "finance", "legal", "csm", "marketing", "me"]),
-      );
+      expect(keys(PERSPECTIVES)).not.toContain("umt");
     }
+  });
+
+  it("is a group in the Engineering rail when both flags are on", async () => {
+    const perspectives = await load({ engineering: true, umt: true });
+    const group = umtGroupOf(perspectives);
+    expect(group?.label).toBe("UMT");
+    expect(group?.children?.map((c) => [c.label, c.path])).toEqual([
+      ["Overview", "/engineering/umt"],
+      ["Updates", "/engineering/umt/updates"],
+      ["Product Management", "/engineering/umt/products"],
+      ["Release Chunks", "/engineering/umt/release-chunks"],
+      ["Statistics", "/engineering/umt/statistics"],
+    ]);
+    expect(perspectives.findPerspectiveByPath("/engineering/umt/updates/42")?.key).toBe("engineering");
+  });
+
+  it("is absent while its own flag is off or absent", async () => {
+    expect(umtGroupOf(await load({ engineering: true, umt: false }))).toBeUndefined();
+    expect(umtGroupOf(await load({ engineering: true }))).toBeUndefined();
   });
 
   // usePerspectiveVisibility falls through to sectionAllowed(s.requires, caps)
@@ -180,7 +175,7 @@ describe("the UMT perspective", () => {
   // useFinanceGate.test.tsx's "no longer carries the retired approval ids" for
   // the same shape of guard.
   it("keeps Product Management in the UMT admin gate set", async () => {
-    const { UMT_ADMIN_ITEM_IDS } = await load({ umt: true });
+    const { UMT_ADMIN_ITEM_IDS } = await load({ engineering: true, umt: true });
     expect(UMT_ADMIN_ITEM_IDS.has("umt-products")).toBe(true);
   });
 });
@@ -191,7 +186,7 @@ describe("perspectives whose landing forwards to the first rail item", () => {
   // sees "Nothing here for you yet", permanently, with no way to tell that
   // from a privilege problem.
   it("only ever sits on a perspective with a route and sections", async () => {
-    const { PERSPECTIVES } = await load({ umt: true });
+    const { PERSPECTIVES } = await load({ engineering: true, umt: true });
     const forwarding = PERSPECTIVES.filter((p) => p.forwardsToFirstItem);
     expect(forwarding.length).toBeGreaterThan(0);
     for (const p of forwarding) {
@@ -204,7 +199,7 @@ describe("perspectives whose landing forwards to the first rail item", () => {
   // so it keeps its Overview row. This fails if a later pass sweeps it up with
   // the rest.
   it("leaves Me alone", async () => {
-    const { PERSPECTIVES } = await load({ umt: true });
+    const { PERSPECTIVES } = await load({ engineering: true, umt: true });
     expect(PERSPECTIVES.find((p) => p.key === "me")?.forwardsToFirstItem).toBeUndefined();
   });
 
@@ -233,7 +228,7 @@ describe("perspectives whose landing forwards to the first rail item", () => {
     });
   });
 
-  // Engineering is the home of Product Download Stats. Same preview contract
+  // Engineering is the home of Product Download Stats and UMT. Same preview contract
   // as Infra: absent means off, so the waffle, favourites, and landing choices
   // — all of which read this registry — cannot offer it early.
   describe("the Engineering perspective", () => {

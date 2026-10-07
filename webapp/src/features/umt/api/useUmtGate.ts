@@ -17,6 +17,7 @@
 import type { VisibilityAnswer } from "@components/side-rail/visibilityFold";
 import { useEffect } from "react";
 import { describeError } from "@api/errors";
+import { isUmtBackendConfigured } from "@config/apiConfig";
 import { SIGNING_OUT_EVENT } from "@constants/appEvents";
 import { UMT_ROLE_ID, type UmtRole } from "./umtTypes";
 import { useUmtUserInfo } from "./useUmtUserInfo";
@@ -51,7 +52,7 @@ function umtRolesFromIds(roleIds: readonly number[] | undefined): Set<UmtRole> {
 }
 
 // Module-level, not React state: every top-level UMT page renders its own
-// UmtShell, so navigating between them (e.g. /umt -> /umt/updates) unmounts
+// UmtShell, so navigating between them (e.g. the dashboard -> Updates) unmounts
 // and remounts the whole useUmtGate -> useUmtUserInfo -> useAsgardeoSub
 // chain. useAsgardeoSub resolves the Asgardeo subject via local component
 // state, so a fresh mount briefly has no `sub`, which briefly changes
@@ -80,7 +81,7 @@ export function __resetUmtGateCacheForTests(): void {
 }
 
 // Translates UMT's numeric service roles into the named decisions consumed by
-// the shell and dashboard. Any recognised role grants entry to the perspective;
+// the shell and dashboard. Any recognised role grants entry to UMT;
 // `isAdmin` additionally gates product management and release-chunk creation.
 //
 // This deliberately does not read People capabilities. UMT owns a separate
@@ -140,7 +141,12 @@ export function useUmtGate(enabled = true): UmtGate {
     // subject resolves, but the authorization decision is still outstanding.
     // Only shown when there's truly no prior decision to fall back on — i.e.
     // the session's actual first load, not a remount of an already-known one.
-    isResolving: enabled && userInfo.isPending && !lastKnownRoles,
+    //
+    // And only while there is a backend to ask. Unconfigured, the query is
+    // disabled, and a disabled query is `isPending` for ever — so this would
+    // never clear, and `usePerspectiveVisibility` holds the Engineering rail
+    // until every gate has. useMisGate has the same guard.
+    isResolving: enabled && isUmtBackendConfigured() && userInfo.isPending && !lastKnownRoles,
     // Only surfaced when there's no cached answer to fall back on — a
     // background refetch failure with `data` still cached is absorbed above
     // instead of being reported as a request failure to the caller.

@@ -61,6 +61,7 @@ import {
   type UmtCreateUpdateFormValues,
   type UmtCreateUpdateType,
 } from "../lib/umtCreateUpdate";
+import { umtPaths } from "../lib/umtPaths";
 
 const { DatePicker, LocalizationProvider } = DatePickers;
 
@@ -217,7 +218,7 @@ export default function UmtCreateUpdateDialog({
       const newId = created[0]?.id;
       showSuccess("Update created successfully.");
       handleClose();
-      if (newId) navigate(`/umt/updates/${newId}`);
+      if (newId) navigate(umtPaths.update(newId));
     } catch (error) {
       setSubmitError(describeError(error));
       // Drop the snapshot as well as the dialog: `isFormFrozen` keys off
@@ -549,7 +550,7 @@ function UmtDuplicateUpdatesDialog({
           {updates.map((update) => (
             <Box key={update.id}>
               <Link
-                href={`/umt/updates/${update.id}`}
+                href={umtPaths.update(update.id)}
                 target="_blank"
                 rel="noopener noreferrer"
                 underline="hover"

@@ -238,22 +238,6 @@ export default function App() {
           <Route index element={<Navigate to={landingPath()} replace />} />
           {/* Me home — the full profile page including Connected apps. */}
           <Route path="me" element={<MyProfilePage />} />
-          {/* UmtShell owns its role gate. Behind the same preview flag as its
-              perspective entry — hiding only the rail/launcher tile would leave
-              the routes reachable by URL. */}
-          {isPreviewEnabled("umt") && (
-            <>
-              <Route path="umt" element={<UmtHomePage />} />
-              <Route path="umt/updates" element={<UmtUpdatesPage />} />
-              <Route path="umt/updates/:id" element={<UmtUpdateView />} />
-              {/* Admin-only: UmtProductsPage itself enforces this via UmtShell's
-                  requireAdmin, independent of the rail item's own visibility. */}
-              <Route path="umt/products" element={<UmtProductsPage />} />
-              <Route path="umt/release-chunks" element={<UmtReleaseChunksPage />} />
-              <Route path="umt/release-chunks/new" element={<UmtCreateReleaseChunkPage />} />
-              <Route path="umt/statistics" element={<UmtStatisticsPage />} />
-            </>
-          )}
           {/* Registered even while the engineering preview flag is off. The page
               says Engineering is not available; omitting the route would send a
               direct visit home with no answer. */}
@@ -263,6 +247,23 @@ export default function App() {
           <Route path="engineering/packages" element={<EngineeringPackagesPage />} />
           <Route path="engineering/repository-stats" element={<EngineeringRepositoryStatsPage />} />
           <Route path="engineering/admin" element={<EngineeringAdminPage />} />
+          {/* Engineering → UMT. UmtShell owns its role gate. Behind the same
+              preview flags as its rail group — hiding only the rail entries
+              would leave the routes reachable by URL. Nested under
+              /engineering/ so the Engineering rail renders around them. */}
+          {isPreviewEnabled("engineering") && isPreviewEnabled("umt") && (
+            <>
+              <Route path="engineering/umt" element={<UmtHomePage />} />
+              <Route path="engineering/umt/updates" element={<UmtUpdatesPage />} />
+              <Route path="engineering/umt/updates/:id" element={<UmtUpdateView />} />
+              {/* Admin-only: UmtProductsPage itself enforces this via UmtShell's
+                  requireAdmin, independent of the rail item's own visibility. */}
+              <Route path="engineering/umt/products" element={<UmtProductsPage />} />
+              <Route path="engineering/umt/release-chunks" element={<UmtReleaseChunksPage />} />
+              <Route path="engineering/umt/release-chunks/new" element={<UmtCreateReleaseChunkPage />} />
+              <Route path="engineering/umt/statistics" element={<UmtStatisticsPage />} />
+            </>
+          )}
           {isPreviewEnabled("infra") && (
             <>
               <Route path="infra" element={<InfraHomePage />} />

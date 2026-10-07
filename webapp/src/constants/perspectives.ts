@@ -22,7 +22,6 @@ import { isPreviewEnabled } from "@config/previewFeatures";
 import { CADO2_APPS } from "@constants/cado2Apps";
 import {
   AwardIcon,
-  Box as BoxIcon,
   BarChart3,
   BookOpenIcon,
   CheckCheckIcon,
@@ -33,12 +32,10 @@ import {
   LandmarkIcon,
   LifeBuoyIcon,
   LightbulbIcon,
-  LayoutDashboard,
-  LucideLayoutGrid,
+  RefreshCw,
   MegaphoneIcon,
   NetworkIcon,
   RadioIcon,
-  RefreshCcw,
   SatelliteDishIcon,
   ScaleIcon,
   ShieldIcon,
@@ -68,6 +65,7 @@ import { ME_APPS } from "@constants/meApps";
 import { ME_PAR_APPS } from "@constants/parApps";
 import { ME_PROMOTION_APPS } from "@constants/promotionApps";
 import { INFRA_APPS } from "@constants/infraApps";
+import { UMT_PATH, umtPaths } from "@features/umt/lib/umtPaths";
 
 export interface PerspectiveSection {
   id: string; // anchor id on the perspective's page (leaf sections)
@@ -479,17 +477,27 @@ const KNOWLEDGE_BASE_SECTIONS: PerspectiveSection[] = [
   { id: "knowledge-base-today-i-learned", label: "Today I Learned", icon: LightbulbIcon, path: "/knowledge-base" },
 ];
 
-const UMT_SECTIONS: PerspectiveSection[] = [
-  { id: "umt-updates", label: "Updates", icon: RefreshCcw, path: "/umt/updates" },
-  // Admin-only. `requires` speaks the people-app capability vocabulary, which
-  // UMT's own numeric roles have nothing to do with — this is filtered by
-  // UMT_ADMIN_ITEM_IDS below instead, the same way Finance/Leave/Subscriptions
-  // items are (see the comment above SUBSCRIPTION_ITEM_IDS).
-  { id: "umt-products", label: "Product Management", icon: BoxIcon, path: "/umt/products" },
-  { id: "umt-release-chunks", label: "Release Chunks", icon: LucideLayoutGrid, path: "/umt/release-chunks" },
-  { id: "umt-statistics", label: "Statistics", icon: BarChart3, path: "/umt/statistics" },
-];
-
+// UMT, an app inside the Engineering perspective (see `engineering` in
+// PERSPECTIVES below). A group like Product Download Stats beside it, with its
+// dashboard as the first row: Engineering forwards to its first item, so the
+// rail has no perspective-level Overview row that could stand in for it.
+const UMT_SECTION: PerspectiveSection = {
+  id: "engineering-umt",
+  label: "UMT",
+  icon: RefreshCw,
+  alwaysGroup: true,
+  children: [
+    { id: "engineering-umt-overview", label: "Overview", path: UMT_PATH },
+    { id: "umt-updates", label: "Updates", path: umtPaths.updates },
+    // Admin-only. `requires` speaks the people-app capability vocabulary, which
+    // UMT's own numeric roles have nothing to do with — this is filtered by
+    // UMT_ADMIN_ITEM_IDS below instead, the same way Finance/Leave/Subscriptions
+    // items are (see the comment above SUBSCRIPTION_ITEM_IDS).
+    { id: "umt-products", label: "Product Management", path: umtPaths.products },
+    { id: "umt-release-chunks", label: "Release Chunks", path: umtPaths.releaseChunks },
+    { id: "umt-statistics", label: "Statistics", path: umtPaths.statistics },
+  ],
+};
 
 /**
  * UMT rail ids whose visibility must be decided by UMT's own /update/user-info
@@ -738,12 +746,13 @@ export const PERSPECTIVES: readonly PerspectiveDef[] = [
         },
       ]
     : []),
-  // Product Download Stats is the first engineering tool. It is not under
-  // Infra Portal: Infra is GitHub administration, and this is release
-  // downloads, package downloads, and repository stats. The perspective stays
-  // hidden until the preview flag is on. The route stays registered either
-  // way, so a direct visit while the flag is off says Engineering is not
-  // available.
+  // Engineering holds Product Download Stats and UMT. Neither is under Infra
+  // Portal: Infra is GitHub administration, while these are release, package
+  // and repository stats, and the product update pipeline. The perspective
+  // stays hidden until the preview flag is on. Product Download Stats' routes
+  // stay registered either way, so a direct visit while the flag is off says
+  // Engineering is not available. UMT is behind its own flag as well, the
+  // same way Finance MIS is inside Finance.
   ...(isPreviewEnabled("engineering")
     ? [
         {
@@ -792,13 +801,14 @@ export const PERSPECTIVES: readonly PerspectiveDef[] = [
                 },
               ],
             },
+            ...(isPreviewEnabled("umt") ? [UMT_SECTION] : []),
           ],
         },
       ]
     : []),
   // Held behind a preview flag, whole perspective and all, until it's ready
   // for production. With the flag off the entry does not exist, so the waffle,
-  // landing options, and favourites stay clean. Same shape as UMT above.
+  // landing options, and favourites stay clean.
   ...(isPreviewEnabled("infra")
   ? [
       {
@@ -881,27 +891,6 @@ export const PERSPECTIVES: readonly PerspectiveDef[] = [
     path: "/me",
     sections: ME_SECTIONS,
   },
-  // UmtShell performs the service-owned role check for all UMT pages.
-  //
-  // Held behind a preview flag, whole perspective and all, until it's ready for
-  // production — not just `access: false`, because that would still leave a
-  // disabled "not available yet" tile in the waffle (see FUNCTIONAL_PERSPECTIVES
-  // below, which is unfiltered). Spread in exactly like FINANCE_PERSPECTIVE_APPS
-  // does for the expense app, so with the flag off the entry does not exist at
-  // all, and every surface that reads PERSPECTIVES stays clean.
-  ...(isPreviewEnabled("umt")
-    ? [
-        {
-          key: "umt",
-          label: "UMT",
-          icon: LayoutDashboard,
-          externallyGated: true,
-          access: true,
-          path: "/umt",
-          sections: UMT_SECTIONS,
-        },
-      ]
-    : []),
 ];
 
 /**
