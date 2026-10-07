@@ -489,10 +489,11 @@ const UMT_SECTION: PerspectiveSection = {
   children: [
     { id: "engineering-umt-overview", label: "Overview", path: UMT_PATH },
     { id: "umt-updates", label: "Updates", path: umtPaths.updates },
-    // Admin-only. `requires` speaks the people-app capability vocabulary, which
-    // UMT's own numeric roles have nothing to do with — this is filtered by
-    // UMT_ADMIN_ITEM_IDS below instead, the same way Finance/Leave/Subscriptions
-    // items are (see the comment above SUBSCRIPTION_ITEM_IDS).
+    // Admin-only. `requires` speaks One WSO2's own capabilities, which have
+    // nothing to do with the roles the UMT backend (ONE_WSO2_UMT_BACKEND_URL)
+    // assigns — so this is filtered by UMT_ADMIN_ITEM_IDS below instead, the
+    // same way Finance/Leave/Subscriptions items are (see the comment above
+    // SUBSCRIPTION_ITEM_IDS).
     { id: "umt-products", label: "Product Management", path: umtPaths.products },
     { id: "umt-release-chunks", label: "Release Chunks", path: umtPaths.releaseChunks },
     { id: "umt-statistics", label: "Statistics", path: umtPaths.statistics },
