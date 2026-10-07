@@ -222,18 +222,18 @@ describe("the Engineering rail", () => {
     ]);
   });
 
-  // The rail's rule, which MIS follows too: the app row wears the icon, and
-  // the screen rows beneath it are plain. An icon is a glyph with no name, so
-  // its presence is the one thing to look for.
-  it("puts the icon on the app row and none on the screen rows", async () => {
+  // The standalone's sidebar gives every screen its own icon. A row that
+  // declares one wears it; the label stays the row's text, so the collapsed
+  // flyout still reads the name.
+  it("gives the app row and every screen row an icon", async () => {
     const fetchMock = userInfo(true);
     vi.stubGlobal("fetch", fetchMock);
     showRail();
     expect(await screen.findByText("Admin")).toBeInTheDocument();
 
-    expect(rowOf("Download Stats").querySelector("svg")).not.toBeNull();
-    for (const label of [...OPEN_SCREENS, "Admin"]) {
-      expect(rowOf(label).querySelector("svg"), `${label} carries an icon`).toBeNull();
+    for (const label of ["Download Stats", ...OPEN_SCREENS, "Admin"]) {
+      expect(rowOf(label).querySelector("svg"), `${label} has no icon`).not.toBeNull();
+      expect(rowOf(label).textContent).toContain(label);
     }
   });
 

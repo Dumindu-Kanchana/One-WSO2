@@ -34,7 +34,14 @@
 // adapter makes the real decision. The other five screens are open to every
 // signed-in employee, so they carry none. Same convention as misApps.ts.
 
-import { DownloadIcon } from "@wso2/oxygen-ui-icons-react";
+import {
+  BoxesIcon,
+  DownloadIcon,
+  LayoutDashboardIcon,
+  PackageIcon,
+  SettingsIcon,
+  StarIcon,
+} from "@wso2/oxygen-ui-icons-react";
 import type { MenuApp, MenuAppItem } from "@constants/appMenu";
 
 /** Root of every Download Stats route: perspective / app. */
@@ -72,36 +79,42 @@ export const DOWNLOAD_STATS_SCREENS: Readonly<Record<DownloadStatsScreen, MenuAp
   overview: {
     id: "engineering-download-stats-overview",
     label: "Overview",
+    icon: LayoutDashboardIcon,
     desc: "Download activity and repository stats across all WSO2 products.",
     path: downloadStatsPaths.overview,
   },
   downloads: {
     id: "engineering-download-stats-downloads",
     label: "Downloads",
+    icon: DownloadIcon,
     desc: "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
     path: downloadStatsPaths.downloads,
   },
   versions: {
     id: "engineering-download-stats-versions",
     label: "Versions",
+    icon: PackageIcon,
     desc: "Per-release download breakdown and asset-level stats for each tracked product.",
     path: downloadStatsPaths.versions,
   },
   packages: {
     id: "engineering-download-stats-packages",
     label: "Packages",
+    icon: BoxesIcon,
     desc: "GitHub container package downloads per product — package totals and per-version breakdowns.",
     path: downloadStatsPaths.packages,
   },
   repositoryStats: {
     id: "engineering-download-stats-repository-stats",
     label: "Repository Stats",
+    icon: StarIcon,
     desc: "Stars, forks, watchers, open issues, and clone traffic over time for each tracked repository.",
     path: downloadStatsPaths.repositoryStats,
   },
   admin: {
     id: ENGINEERING_ADMIN_ITEM_ID,
     label: "Admin",
+    icon: SettingsIcon,
     desc: "Manage tracked repositories and review DB sync and scraper job history.",
     // RESTRICTED, nothing more — see the note at the top of the file.
     requires: ["admin"],

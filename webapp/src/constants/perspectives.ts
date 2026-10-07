@@ -108,6 +108,7 @@ function appsToSections(apps: readonly MenuApp[]): PerspectiveSection[] {
     children: app.items.map((it) => ({
       id: it.id,
       label: it.label,
+      icon: it.icon,
       requires: it.requires,
       path: it.path,
     })),

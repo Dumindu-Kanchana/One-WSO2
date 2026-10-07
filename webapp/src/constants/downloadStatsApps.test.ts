@@ -129,5 +129,9 @@ describe("the Download Stats registry", () => {
     expect(group?.alwaysGroup).toBe(true);
     expect(group?.icon).toBeDefined();
     expect(group?.children?.map((c) => c.label)).toEqual(items.map((item) => item.label));
+    expect(group?.children?.map((c) => c.icon)).toEqual(items.map((item) => item.icon));
+    for (const item of items) {
+      expect(item.icon, `${item.label} has no rail icon`).toBeDefined();
+    }
   });
 });
