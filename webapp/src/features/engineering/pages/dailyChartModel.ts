@@ -17,19 +17,16 @@
 import { utcDatesInclusive, type DailySeries } from "@features/engineering/api/productDownloadStats";
 import { SERIES_STROKES } from "../utils/chartColors";
 
-// The chart model the current screens draw with recharts directly, kept until
-// they are rebuilt on the kit's SeriesChart (../components/SeriesChart.tsx),
+// The chart model Repository Stats still draws with recharts directly, kept
+// until it is rebuilt on the kit's SeriesChart (../components/SeriesChart.tsx),
 // which colours a series by its name (colorForName) rather than by position.
+// It goes with that screen's rebuild; every other screen is on the kit.
 
 export interface DailyChartLine {
   repoId: number;
   dataKey: string;
   name: string;
   stroke: string;
-}
-
-export function seriesStroke(index: number): string {
-  return SERIES_STROKES[index % SERIES_STROKES.length];
 }
 
 export interface DailyChartModel {
@@ -52,7 +49,7 @@ export function dailyChartModel(
     repoId: item.repoId,
     dataKey: `repo-${item.repoId}`,
     name: names.get(item.repoId) ?? item.repoName,
-    stroke: seriesStroke(index),
+    stroke: SERIES_STROKES[index % SERIES_STROKES.length],
   }));
   const data = dates.map((date) => {
     const row: Record<string, string | number | null> = { date };
