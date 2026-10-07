@@ -87,6 +87,16 @@ export function sanitizeParHtml(html: string): string {
   return DOMPurify.sanitize(decodeHtmlEntities(html), SANITIZE_CONFIG);
 }
 
+/** Quill keeps a link typed without a scheme (`www.example.com`) as-is,
+ * which the browser then resolves relative to this app. */
+export function addLinkProtocol(html: string): string {
+  return html.replace(/href="(?![a-z][a-z0-9+.-]*:|[/#])/gi, 'href="https://');
+}
+
+export function withLinkProtocol(url: string): string {
+  return /^([a-z][a-z0-9+.-]*:|[/#])/i.test(url) ? url : `https://${url}`;
+}
+
 /** A Quill editor with nothing typed still returns markup (`<p><br></p>`,
  * not `""`), so `.trim() === ""` never catches an empty answer. Strips tags
  * and `&nbsp;` the same way par-app's own validation does

@@ -16,6 +16,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  addLinkProtocol,
+  withLinkProtocol,
   decodeParComment,
   encodeParComment,
   isEmptyHtml,
@@ -91,5 +93,23 @@ describe("spotting an empty answer", () => {
 
   it("treats a real answer as not empty", () => {
     expect(isEmptyHtml("<p>Met every goal.</p>")).toBe(false);
+  });
+});
+
+describe("addLinkProtocol", () => {
+  it("adds https:// to a link typed without a scheme", () => {
+    expect(addLinkProtocol('<a href="www.example.com">x</a>')).toBe('<a href="https://www.example.com">x</a>');
+  });
+
+  it("leaves links that already have a scheme alone", () => {
+    const html = '<a href="http://a.com">a</a><a href="mailto:b@c.com">b</a>';
+    expect(addLinkProtocol(html)).toBe(html);
+  });
+});
+
+describe("withLinkProtocol", () => {
+  it("adds https:// only when the URL has no scheme", () => {
+    expect(withLinkProtocol("www.example.com")).toBe("https://www.example.com");
+    expect(withLinkProtocol("http://example.com")).toBe("http://example.com");
   });
 });
