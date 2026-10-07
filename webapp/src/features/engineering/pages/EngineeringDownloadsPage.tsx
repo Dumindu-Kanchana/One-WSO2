@@ -23,7 +23,6 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TablePagination,
   TableRow,
   Typography,
 } from "@wso2/oxygen-ui";
@@ -45,8 +44,8 @@ import IntervalSelect from "../components/IntervalSelect";
 import SeriesChart from "../components/SeriesChart";
 import SkeletonRows from "../components/SkeletonRows";
 import { StatCard } from "../components/StatCard";
+import TablePager from "../components/TablePager";
 import { INTERVAL_LABEL } from "../constants/intervalLabels";
-import { ROWS_PER_PAGE_OPTIONS } from "../constants/tableConstants";
 import { usePagination } from "../hooks/usePagination";
 import type { ChartSeries } from "../utils/chartTypes";
 import {
@@ -313,17 +312,7 @@ function DownloadsTable({
               ))}
             </TableBody>
           </Table>
-          <TablePagination
-            component="div"
-            count={pagination.count}
-            page={pagination.page}
-            onPageChange={pagination.onPageChange}
-            rowsPerPage={pagination.rowsPerPage}
-            onRowsPerPageChange={pagination.onRowsPerPageChange}
-            rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
-            showFirstButton
-            showLastButton
-          />
+          <TablePager pagination={pagination} />
         </>
       )}
     </Card>

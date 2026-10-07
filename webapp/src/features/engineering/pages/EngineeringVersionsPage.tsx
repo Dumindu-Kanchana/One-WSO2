@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import {
   Box,
   Card,
@@ -30,7 +30,6 @@ import {
   TableBody,
   TableCell,
   TableHead,
-  TablePagination,
   TableRow,
   Tooltip,
   Typography,
@@ -57,7 +56,7 @@ import SelectableRow from "../components/SelectableRow";
 import SeriesChart from "../components/SeriesChart";
 import SkeletonRows from "../components/SkeletonRows";
 import TableHeaderSearch from "../components/TableHeaderSearch";
-import { ROWS_PER_PAGE_OPTIONS } from "../constants/tableConstants";
+import TablePager from "../components/TablePager";
 import { usePagination } from "../hooks/usePagination";
 import type { ChartSeries } from "../utils/chartTypes";
 import { mergeParams, parseFilters } from "../utils/filters";
@@ -161,11 +160,13 @@ function VersionsScreen(): JSX.Element {
     setParams(mergeParams(params, { repo: firstId }), { replace: true });
   }, [repositories.isSuccess, firstId, requestedIsActive, params, setParams]);
 
+  // Not asked until the Product is known, nor while the range is inverted.
   const versions = useQuery({
     queryKey: ["product-download-stats", "versions", base, repoId, from, to, interval],
-    enabled: repoId != null && !rangeInverted,
-    queryFn: async () =>
-      getVersionSeries(await getToken(), { repoId: repoId ?? 0, from, to, interval }),
+    queryFn:
+      repoId == null || rangeInverted
+        ? skipToken
+        : async () => getVersionSeries(await getToken(), { repoId, from, to, interval }),
   });
   const series = useMemo(() => versions.data?.series ?? [], [versions.data]);
   const rows = useMemo(() => toRows(series), [series]);
@@ -200,8 +201,10 @@ function VersionsScreen(): JSX.Element {
 
   const assets = useQuery({
     queryKey: ["product-download-stats", "assets", base, repoId, from, to, version],
-    enabled: repoSettled && !rangeInverted,
-    queryFn: async () => getReleaseFiles(await getToken(), { repoId: repoId ?? 0, from, to, version }),
+    queryFn:
+      repoId == null || !repoSettled || rangeInverted
+        ? skipToken
+        : async () => getReleaseFiles(await getToken(), { repoId, from, to, version }),
   });
 
   // Memoized on the series and the selection alone, so a table-only change
@@ -340,8 +343,9 @@ function VersionsScreen(): JSX.Element {
               mt: 2,
             }}
           >
-            {/* Keyed by Product so a search from one Product does not carry
-                over and hide another's rows. */}
+            {/* Both cards are keyed by Product, so a search from one Product
+                does not carry over and hide another's rows, and both start on
+                their first page. */}
             <VersionsCard
               key={`versions-${repoId}`}
               rows={rows}
@@ -464,17 +468,7 @@ function VersionsCard({
               )}
             </TableBody>
           </Table>
-          <TablePagination
-            component="div"
-            count={pagination.count}
-            page={pagination.page}
-            onPageChange={pagination.onPageChange}
-            rowsPerPage={pagination.rowsPerPage}
-            onRowsPerPageChange={pagination.onRowsPerPageChange}
-            rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
-            showFirstButton
-            showLastButton
-          />
+          <TablePager pagination={pagination} />
         </>
       )}
     </Card>
@@ -544,17 +538,7 @@ function AssetsCard({
               ))}
             </TableBody>
           </Table>
-          <TablePagination
-            component="div"
-            count={pagination.count}
-            page={pagination.page}
-            onPageChange={pagination.onPageChange}
-            rowsPerPage={pagination.rowsPerPage}
-            onRowsPerPageChange={pagination.onRowsPerPageChange}
-            rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
-            showFirstButton
-            showLastButton
-          />
+          <TablePager pagination={pagination} />
         </>
       )}
     </Card>
