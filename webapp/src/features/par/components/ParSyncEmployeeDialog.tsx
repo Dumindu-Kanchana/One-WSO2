@@ -32,25 +32,43 @@ import { describeError } from "@api/errors";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { useSyncEmployee } from "../api/useParMutations";
+import { useParLeadEmployees } from "../api/useLeadHistory";
 import type { ParCycle } from "../api/types";
-import type { MinimalEmployeeInfo } from "@features/leave/api/leaveTypes";
 
-// This app has no org-wide employee directory of its own, so the picker
-// reuses Leave's employee list — the same deviation other PAR views make.
+type SyncOption = { name: string; workEmail: string; thumbnail?: string };
+
+// This app has no org-wide employee directory of its own, so the admin
+// picker reuses Leave's employee list — the same deviation other PAR views
+// make. With `leadEmail` set (EmployeeSyncModal's `leadonly`), it lists only
+// that lead's own reports instead.
 export default function ParSyncEmployeeDialog({
   open,
   onClose,
   cycle,
+  leadEmail,
 }: {
   open: boolean;
   onClose: () => void;
   cycle: ParCycle;
+  leadEmail?: string;
 }) {
-  const employees = useLeaveEmployees(open);
+  const allEmployees = useLeaveEmployees(open && !leadEmail);
+  const leadEmployees = useParLeadEmployees(open ? leadEmail : undefined);
   const syncEmployee = useSyncEmployee(cycle.parCycleId);
   const { showSuccess, showError } = useNotifications();
 
-  const [selected, setSelected] = useState<MinimalEmployeeInfo | null>(null);
+  const options: SyncOption[] = leadEmail
+    ? (leadEmployees.data ?? [])
+        .filter((e) => e.workEmail !== leadEmail)
+        .map((e) => ({ name: e.employeeName, workEmail: e.workEmail, thumbnail: e.employeeThumbnail }))
+    : (allEmployees.data ?? []).map((e) => ({
+        name: `${e.firstName} ${e.lastName}`,
+        workEmail: e.workEmail,
+        thumbnail: e.employeeThumbnail,
+      }));
+  const optionsLoading = leadEmail ? leadEmployees.isLoading : allEmployees.isLoading;
+
+  const [selected, setSelected] = useState<SyncOption | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleClose = () => {
@@ -80,9 +98,9 @@ export default function ParSyncEmployeeDialog({
         <Divider />
         <DialogContent sx={{ pt: 3 }}>
           <Autocomplete
-            options={employees.data ?? []}
-            loading={employees.isLoading}
-            getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.workEmail})`}
+            options={options}
+            loading={optionsLoading}
+            getOptionLabel={(option) => `${option.name} (${option.workEmail})`}
             value={selected}
             onChange={(_e, value) => {
               if (value) setConfirmOpen(true);
@@ -98,11 +116,9 @@ export default function ParSyncEmployeeDialog({
               const { key, ...rest } = props as HTMLAttributes<HTMLLIElement> & { key?: Key };
               return (
                 <Box component="li" key={key} {...rest} sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <Avatar src={option.employeeThumbnail} sx={{ height: "2.2rem", width: "2.2rem" }} />
+                  <Avatar src={option.thumbnail} sx={{ height: "2.2rem", width: "2.2rem" }} />
                   <Box>
-                    <Typography variant="body2">
-                      {option.firstName} {option.lastName}
-                    </Typography>
+                    <Typography variant="body2">{option.name}</Typography>
                     <Typography variant="caption" color="text.secondary">
                       {option.workEmail}
                     </Typography>

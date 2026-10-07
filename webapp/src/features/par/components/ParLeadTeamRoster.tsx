@@ -41,6 +41,7 @@ import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { describeError } from "@api/errors";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
+import { useMeProfile } from "@features/my/api/useMeProfile";
 import { useParTeamDetails } from "../api/useLeadTeams";
 import { useSend360Reminder } from "../api/useLeadReminders";
 import { useLeadRatingUpdate } from "../api/useLeadRatingUpdate";
@@ -49,6 +50,7 @@ import { resolveGridSelectedIds } from "../util/parGridSelection";
 import ParCycleDatesStepper from "./ParCycleDatesStepper";
 import ParStatusChip from "./ParStatusChip";
 import ParCompletionKpiTile from "./ParCompletionKpiTile";
+import ParSyncEmployeeDialog from "./ParSyncEmployeeDialog";
 import type { ParCycle, ParRatingMinimal, ParTeamSummary } from "../api/types";
 
 // Shared "done" vocabulary across employee/lead/360 status fields (mirrors
@@ -88,9 +90,6 @@ function StageProgress({ row }: { row: ParRatingMinimal }) {
 }
 
 // Ports TeamSummary.tsx: one team's completion cards + member roster.
-// "Sync an Employee" (EmployeeSyncModal.tsx) isn't ported — source's own
-// comment calls it "Temporary dialog for this cycle", and it needs a
-// separate org-chart employee-search contract this port doesn't have yet.
 export default function ParLeadTeamRoster({
   cycle,
   team,
@@ -108,6 +107,7 @@ export default function ParLeadTeamRoster({
   const send360Reminder = useSend360Reminder();
   const ratingUpdate = useLeadRatingUpdate(cycle.parCycleId);
   const { showSuccess, showError } = useNotifications();
+  const profile = useMeProfile();
   // No org-wide employee directory of our own — reuses Leave's for avatars.
   const employees = useLeaveEmployees();
   const thumbnailByEmail = useMemo(
@@ -121,6 +121,7 @@ export default function ParLeadTeamRoster({
   const [reminderConfirmOpen, setReminderConfirmOpen] = useState(false);
   const [shareConfirmOpen, setShareConfirmOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [syncEmployeeOpen, setSyncEmployeeOpen] = useState(false);
 
   if (details.isLoading) {
     return <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 1.5 }} />;
@@ -363,6 +364,9 @@ export default function ParLeadTeamRoster({
           <Button variant="contained" onClick={() => setReminderConfirmOpen(true)}>
             Send 360° Reminder
           </Button>
+          <Button variant="contained" onClick={() => setSyncEmployeeOpen(true)}>
+            Sync an Employee
+          </Button>
         </Stack>
       </Stack>
 
@@ -480,6 +484,13 @@ export default function ParLeadTeamRoster({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ParSyncEmployeeDialog
+        open={syncEmployeeOpen}
+        onClose={() => setSyncEmployeeOpen(false)}
+        cycle={cycle}
+        leadEmail={profile.data?.userInfo.workEmail}
+      />
 
       {/* leadParBulkShare copy (config/constant.ts). Always the same
           message regardless of selection validity — the draft-only check

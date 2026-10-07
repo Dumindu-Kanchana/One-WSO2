@@ -161,6 +161,8 @@ export function useSyncEmployee(parCycleId: number | undefined) {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["par-admin-teams", parCycleId] });
       await qc.invalidateQueries({ queryKey: ["par-admin-participants", parCycleId] });
+      await qc.invalidateQueries({ queryKey: ["par-teams", parCycleId] });
+      await qc.invalidateQueries({ queryKey: ["par-team-details", parCycleId] });
     },
   });
 }
