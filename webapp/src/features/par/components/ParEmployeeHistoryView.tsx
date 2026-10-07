@@ -42,10 +42,10 @@ function InfoItem({ label, value, secondaryValue }: { label: string; value: stri
       >
         {label}
       </Typography>
-      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
         {value || "—"}
       </Typography>
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
         {secondaryValue || "—"}
       </Typography>
     </Grid>
@@ -164,14 +164,14 @@ export default function ParEmployeeHistoryView({
 
       {showRealDetails && rating.data && (
         <Stack spacing={2}>
-          <Card variant="outlined" sx={{ p: 2 }}>
-            <Grid container spacing={2} alignItems="center">
+          <Card variant="outlined" sx={{ px: 2, py: 1.25 }}>
+            <Grid container spacing={1.5} alignItems="center">
               <Grid size="auto">
                 <Avatar
                   variant="rounded"
                   src={thumbnailByEmail.get(employeeEmail)}
                   alt="Employee Thumbnail"
-                  sx={{ width: 100, height: 100 }}
+                  sx={{ width: "3rem", height: "3rem", borderRadius: 3 }}
                 />
               </Grid>
               <Grid size="grow">
