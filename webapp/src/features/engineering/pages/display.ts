@@ -14,28 +14,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
-
-export function formatCount(value: number): string {
-  return compact.format(value);
-}
-
-export function productLabel(productName: string | null, repoName: string): string {
-  return productName && productName.trim() !== "" ? productName : repoName;
-}
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// Collection jobs are instants, so the time is the viewer's local zone.
-// Download tables keep the API's calendar date, which is already a day.
-export function formatJobTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const pad = (n: number): string => String(n).padStart(2, "0");
-  const day = `${pad(date.getDate())} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
-  return `${day}, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+// Helpers the current screens still read while they wait to be rebuilt on the
+// kit (../utils/format.ts, ../utils/filters.ts). The compact figure, the
+// Product label and the local date-time moved there; what is left here has no
+// counterpart in the standalone and goes when its screen does.
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   SUCCESS: "Success",

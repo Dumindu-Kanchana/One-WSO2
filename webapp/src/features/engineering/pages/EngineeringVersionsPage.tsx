@@ -34,7 +34,6 @@ import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
-  dailyRange,
   getReleaseFiles,
   getRepositories,
   getVersionSeries,
@@ -43,7 +42,8 @@ import {
   type VersionSeriesItem,
 } from "@features/engineering/api/productDownloadStats";
 import DownloadStatsShell from "../components/DownloadStatsShell";
-import { formatCount, productLabel } from "./display";
+import { defaultRange } from "../utils/filters";
+import { formatCompact, productLabel } from "../utils/format";
 import { seriesStroke } from "./dailyChartModel";
 
 const CHART_LIMIT = 5;
@@ -90,7 +90,7 @@ function VersionsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const defaults = dailyRange();
+  const defaults = defaultRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
   const interval = readGrain(params.get("interval"));
@@ -285,7 +285,7 @@ function VersionsScreen(): JSX.Element {
                             {releaseName(item)}
                           </Button>
                         </ListingTable.Cell>
-                        <ListingTable.Cell align="right">{formatCount(releaseTotal(item, interval))}</ListingTable.Cell>
+                        <ListingTable.Cell align="right">{formatCompact(releaseTotal(item, interval))}</ListingTable.Cell>
                         <ListingTable.Cell align="right">
                           {shareLabel(releaseTotal(item, interval), whole)}
                         </ListingTable.Cell>
@@ -329,7 +329,7 @@ function VersionsScreen(): JSX.Element {
                           <ListingTable.Row key={`${file.releaseTag}-${file.assetName}`}>
                             <ListingTable.Cell>{file.assetName}</ListingTable.Cell>
                             <ListingTable.Cell align="right">
-                              {formatCount(file.downloadCount)}
+                              {formatCompact(file.downloadCount)}
                             </ListingTable.Cell>
                           </ListingTable.Row>
                         ))}

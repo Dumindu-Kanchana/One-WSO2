@@ -34,7 +34,6 @@ import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
-  dailyRange,
   getPackageBreakdown,
   getPackageProducts,
   getPackageSeries,
@@ -45,8 +44,9 @@ import {
   type ReleaseDownloadGrain,
 } from "@features/engineering/api/productDownloadStats";
 import DownloadStatsShell from "../components/DownloadStatsShell";
+import { defaultRange } from "../utils/filters";
+import { formatCompact, productLabel } from "../utils/format";
 import { seriesStroke } from "./dailyChartModel";
-import { formatCount, productLabel } from "./display";
 
 const CHART_LIMIT = 5;
 
@@ -81,7 +81,7 @@ function PackagesScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const defaults = dailyRange();
+  const defaults = defaultRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
   const interval = readGrain(params.get("interval"));
@@ -291,7 +291,7 @@ function PackagesScreen(): JSX.Element {
                           </Button>
                         </ListingTable.Cell>
                         <ListingTable.Cell align="right">
-                          {formatCount(downloadsOf(item, interval))}
+                          {formatCompact(downloadsOf(item, interval))}
                         </ListingTable.Cell>
                       </ListingTable.Row>
                     ))}
@@ -336,7 +336,7 @@ function PackagesScreen(): JSX.Element {
                           <ListingTable.Row key={version.versionId}>
                             <ListingTable.Cell>{version.tags ?? String(version.versionId)}</ListingTable.Cell>
                             <ListingTable.Cell align="right">
-                              {formatCount(downloadsOf(version, interval))}
+                              {formatCompact(downloadsOf(version, interval))}
                             </ListingTable.Cell>
                           </ListingTable.Row>
                         ))}

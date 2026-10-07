@@ -15,6 +15,7 @@
 // under the License.
 
 import { authedDelete, authedGet, authedPatch, authedPost } from "@api/http";
+import { defaultRange } from "../utils/filters";
 
 // Read at call time, not at import. The preview switch works the same way:
 // a test (and a config.js edit) has to be able to change the answer without
@@ -115,15 +116,6 @@ export function getSummary(accessToken: string): Promise<Summary> {
   return authedGet(`${credentialedBase()}/api/v1/stats/summary`, accessToken);
 }
 
-// Last 30 days through today, UTC.
-// The API already labels each point; this only chooses the window.
-export function dailyRange(now = new Date()): { from: string; to: string } {
-  const to = now.toISOString().slice(0, 10);
-  const fromDate = new Date(now);
-  fromDate.setUTCDate(fromDate.getUTCDate() - 30);
-  return { from: fromDate.toISOString().slice(0, 10), to };
-}
-
 /** Every UTC calendar date from `from` through `to`, inclusive. */
 export function utcDatesInclusive(from: string, to: string): string[] {
   const cursor = new Date(`${from}T00:00:00.000Z`);
@@ -137,8 +129,10 @@ export function utcDatesInclusive(from: string, to: string): string[] {
   return dates;
 }
 
+// The Overview's chart: every Product's daily release downloads over the
+// default window (the last 30 days through today, UTC — see defaultRange).
 export function getDaily(accessToken: string, now = new Date()): Promise<DailyResponse> {
-  const { from, to } = dailyRange(now);
+  const { from, to } = defaultRange(now);
   const params = new URLSearchParams({ from, to, interval: "day" });
   return authedGet(
     `${credentialedBase()}/api/v1/stats/daily?${params}`,

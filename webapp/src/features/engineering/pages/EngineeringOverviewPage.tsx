@@ -30,7 +30,6 @@ import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
-  dailyRange,
   getDaily,
   getRepositories,
   getSummary,
@@ -38,8 +37,10 @@ import {
   type DailySeries,
 } from "@features/engineering/api/productDownloadStats";
 import DownloadStatsShell from "../components/DownloadStatsShell";
+import { defaultRange } from "../utils/filters";
+import { formatCompact, productLabel } from "../utils/format";
 import { dailyChartModel } from "./dailyChartModel";
-import { activityDate, formatCount, productLabel } from "./display";
+import { activityDate } from "./display";
 
 export default function EngineeringOverviewPage(): JSX.Element {
   return (
@@ -105,22 +106,22 @@ function OverviewScreen(): JSX.Element {
       >
         <Figure
           label="Yesterday's Downloads"
-          value={formatCount(totals.todayDownloads)}
+          value={formatCompact(totals.todayDownloads)}
           trend={totals.todayDeltaPct}
           to={dayDownloadsPath(totals.asOfDate)}
         />
         <Figure
           label="This Month's Downloads"
-          value={formatCount(totals.monthDownloads)}
+          value={formatCompact(totals.monthDownloads)}
           to={monthDownloadsPath(totals.asOfDate)}
         />
         <Figure
           label="Total Downloads"
-          value={formatCount(totals.totalDownloads)}
+          value={formatCompact(totals.totalDownloads)}
           to={`${downloadStatsPaths.downloads}?interval=cumulative`}
         />
-        <Figure label="Products Tracked" value={formatCount(totals.trackedRepositories)} />
-        <Figure label="Clones (14d)" value={formatCount(totals.totalClonesLast14d)} />
+        <Figure label="Products Tracked" value={formatCompact(totals.trackedRepositories)} />
+        <Figure label="Clones (14d)" value={formatCompact(totals.totalClonesLast14d)} />
       </Box>
 
       <Card sx={{ p: 2, mb: 2 }}>
@@ -164,7 +165,7 @@ function OverviewScreen(): JSX.Element {
                       {productLabel(product.productName, product.repoName)}
                     </ListingTable.Cell>
                     <ListingTable.Cell align="right">
-                      {formatCount(product.totalDownloads)}
+                      {formatCompact(product.totalDownloads)}
                     </ListingTable.Cell>
                   </ListingTable.Row>
                 ))}
@@ -233,7 +234,7 @@ function DailyChart({
   series: DailySeries[];
   names: Map<number, string>;
 }): JSX.Element {
-  const { data, lines } = dailyChartModel(series, names, dailyRange());
+  const { data, lines } = dailyChartModel(series, names, defaultRange());
 
   return (
     <Box sx={{ width: "100%", height: 280, mt: 1 }}>

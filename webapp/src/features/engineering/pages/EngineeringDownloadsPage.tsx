@@ -34,15 +34,16 @@ import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
-  dailyRange,
   getReleaseDownloads,
   getRepositories,
   productDownloadStatsBackendUrl,
   type ReleaseDownloadGrain,
 } from "@features/engineering/api/productDownloadStats";
 import DownloadStatsShell from "../components/DownloadStatsShell";
+import { defaultRange } from "../utils/filters";
+import { formatCompact, productLabel } from "../utils/format";
 import { dailyChartModel } from "./dailyChartModel";
-import { formatCount, isIsolatedPoint, productLabel } from "./display";
+import { isIsolatedPoint } from "./display";
 
 function readGrain(value: string | null): ReleaseDownloadGrain {
   if (value === "month" || value === "cumulative") return value;
@@ -62,7 +63,7 @@ function DownloadsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const defaults = dailyRange();
+  const defaults = defaultRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
   const interval = readGrain(params.get("interval"));
@@ -212,7 +213,7 @@ function DownloadsScreen(): JSX.Element {
                             {names.get(item.repoId) ?? item.repoName}
                           </ListingTable.Cell>
                           <ListingTable.Cell>{point.date}</ListingTable.Cell>
-                          <ListingTable.Cell align="right">{formatCount(point.value)}</ListingTable.Cell>
+                          <ListingTable.Cell align="right">{formatCompact(point.value)}</ListingTable.Cell>
                         </ListingTable.Row>
                       )),
                     )}

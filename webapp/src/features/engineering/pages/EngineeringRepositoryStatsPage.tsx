@@ -34,7 +34,6 @@ import { useSearchParams } from "react-router";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
-  dailyRange,
   getCloneSeries,
   getMetricSeries,
   getRepositories,
@@ -46,8 +45,9 @@ import {
   type RepositorySnapshot,
 } from "@features/engineering/api/productDownloadStats";
 import DownloadStatsShell from "../components/DownloadStatsShell";
+import { defaultRange } from "../utils/filters";
+import { formatCompact, productLabel } from "../utils/format";
 import { dailyChartModel } from "./dailyChartModel";
-import { formatCount, productLabel } from "./display";
 
 type StatKey = RepositoryMeasure | "clones" | "uniqueCloners";
 type TableMode = "total" | "month" | "day";
@@ -161,7 +161,7 @@ function cloneFigure(
 }
 
 function showCount(value: number | null): string {
-  return value == null ? MISSING : formatCount(value);
+  return value == null ? MISSING : formatCompact(value);
 }
 
 // Clone history has no grain of its own. Month sums the days, and cumulative
@@ -215,7 +215,7 @@ function RepositoryStatsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const defaults = dailyRange();
+  const defaults = defaultRange();
   const from = params.get("from") || defaults.from;
   const to = params.get("to") || defaults.to;
   const interval = readGrain(params.get("interval"));
@@ -618,7 +618,7 @@ function StatsChart({
           {bars ? (
             <BarChart data={data}>
               <XAxis dataKey="date" />
-              <YAxis tickFormatter={(value: number) => formatCount(value)} />
+              <YAxis tickFormatter={(value: number) => formatCompact(value)} />
               <Tooltip />
               <Legend />
               {lines.map((line) => (
@@ -628,7 +628,7 @@ function StatsChart({
           ) : (
             <LineChart data={data}>
               <XAxis dataKey="date" />
-              <YAxis tickFormatter={(value: number) => formatCount(value)} />
+              <YAxis tickFormatter={(value: number) => formatCompact(value)} />
               <Tooltip />
               <Legend />
               {lines.map((line) => (

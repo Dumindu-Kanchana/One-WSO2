@@ -15,6 +15,11 @@
 // under the License.
 
 import { utcDatesInclusive, type DailySeries } from "@features/engineering/api/productDownloadStats";
+import { SERIES_STROKES } from "../utils/chartColors";
+
+// The chart model the current screens draw with recharts directly, kept until
+// they are rebuilt on the kit's SeriesChart (../components/SeriesChart.tsx),
+// which colours a series by its name (colorForName) rather than by position.
 
 export interface DailyChartLine {
   repoId: number;
@@ -22,20 +27,6 @@ export interface DailyChartLine {
   name: string;
   stroke: string;
 }
-
-// Distinct strokes so two products are not the same line. The list repeats
-// only after it is exhausted.
-export const SERIES_STROKES = [
-  "#3E6FA3",
-  "#4FA39B",
-  "#6FA96B",
-  "#E0A33E",
-  "#C9756B",
-  "#8C79B0",
-  "#5C7D99",
-  "#B7894C",
-  "#A98DA0",
-];
 
 export function seriesStroke(index: number): string {
   return SERIES_STROKES[index % SERIES_STROKES.length];

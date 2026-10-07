@@ -15,29 +15,13 @@
 // under the License.
 
 import { describe, expect, it } from "vitest";
-import { activityDate, formatJobTime, isIsolatedPoint, jobStatusLabel } from "./display";
+import { activityDate, isIsolatedPoint, jobStatusLabel } from "./display";
 
 describe("activityDate", () => {
   it("keeps a calendar date and drops anything else", () => {
     expect(activityDate("2026-09-28")).toBe("2026-09-28");
     expect(activityDate("28 Sep 2026")).toBeUndefined();
     expect(activityDate(null)).toBeUndefined();
-  });
-});
-
-describe("formatJobTime", () => {
-  it("renders the instant in the viewer's local zone", () => {
-    const local = new Date("2026-10-04T02:00:00Z");
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const expected = `${pad(local.getDate())} ${months[local.getMonth()]} ${local.getFullYear()}, ${pad(local.getHours())}:${pad(local.getMinutes())}`;
-    expect(formatJobTime("2026-10-04T02:00:00Z")).toBe(expected);
-  });
-
-  it("keeps an unreadable time and leaves a blank as a dash", () => {
-    expect(formatJobTime("not-a-time")).toBe("not-a-time");
-    expect(formatJobTime("")).toBe("—");
-    expect(formatJobTime(null)).toBe("—");
   });
 });
 

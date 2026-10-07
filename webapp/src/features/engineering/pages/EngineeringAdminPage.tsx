@@ -46,7 +46,8 @@ import {
   type TrackedRepositoryUpdate,
 } from "@features/engineering/api/productDownloadStats";
 import DownloadStatsShell from "../components/DownloadStatsShell";
-import { formatJobTime, jobStatusLabel, productLabel } from "./display";
+import { formatDateTime, productLabel } from "../utils/format";
+import { jobStatusLabel } from "./display";
 
 function refreshTrackedLists(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({
@@ -210,7 +211,7 @@ function AdminScreen({
                         <ListingTable.Cell>{jobStatusLabel(log.status)}</ListingTable.Cell>
                         <ListingTable.Cell align="right">{log.reposSynced}</ListingTable.Cell>
                         <ListingTable.Cell align="right">{log.reposFailed}</ListingTable.Cell>
-                        <ListingTable.Cell>{formatJobTime(log.startedAt)}</ListingTable.Cell>
+                        <ListingTable.Cell>{formatDateTime(log.startedAt)}</ListingTable.Cell>
                         <ListingTable.Cell>{log.errorMessage ?? ""}</ListingTable.Cell>
                       </ListingTable.Row>
                     ))}

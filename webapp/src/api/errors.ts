@@ -20,30 +20,38 @@
 
 import { HttpError } from "@api/http";
 
+// The message the server itself put in a failed response, when the body is
+// well-formed JSON carrying one — flat `{message}` or nested `{error: {message}}`
+// (some backends, e.g. UMT, nest it). Undefined for anything else: a non-HTTP
+// error, a non-JSON body, or a body with no message. Never the raw body. For a
+// placeholder that has its own sentence to fall back on (Download Stats'
+// ErrorState), this is the question to ask; describeError below answers for a
+// banner that must always say something.
+export function serverMessage(err: unknown): string | undefined {
+  if (!(err instanceof HttpError) || !err.responseBody) return undefined;
+  try {
+    const parsed = JSON.parse(err.responseBody) as {
+      message?: unknown;
+      error?: { message?: unknown };
+    };
+    if (parsed && typeof parsed.message === "string" && parsed.message.trim()) {
+      return parsed.message;
+    }
+    if (parsed?.error && typeof parsed.error.message === "string" && parsed.error.message.trim()) {
+      return parsed.error.message;
+    }
+  } catch {
+    // non-JSON body
+  }
+  return undefined;
+}
+
 // Translate a thrown value into a user-facing string. Prefers a well-formed
 // `{message: "..."}` body; never returns the raw responseBody (which can
 // carry stack traces / gateway HTML that shouldn't reach a UI banner).
 export function describeError(err: unknown): string {
   if (err instanceof HttpError) {
-    if (err.responseBody) {
-      try {
-        const parsed = JSON.parse(err.responseBody) as {
-          message?: unknown;
-          error?: { message?: unknown };
-        };
-        if (parsed && typeof parsed.message === "string" && parsed.message.trim()) {
-          return parsed.message;
-        }
-        // Some backends (e.g. UMT) nest the message under `error` instead of
-        // returning it flat.
-        if (parsed?.error && typeof parsed.error.message === "string" && parsed.error.message.trim()) {
-          return parsed.error.message;
-        }
-      } catch {
-        // non-JSON body — fall through
-      }
-    }
-    return `Something went wrong (HTTP ${err.status}).`;
+    return serverMessage(err) ?? `Something went wrong (HTTP ${err.status}).`;
   }
   if (err instanceof Error && err.message) return err.message;
   // Asgardeo's exception type is a plain class — no `extends Error`, no
