@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChartCard from "./ChartCard";
@@ -95,6 +95,24 @@ describe("ChartCard", () => {
       </ChartCard>,
     );
     expect(screen.getByText("drawn as line")).toBeInTheDocument();
+  });
+
+  it("tells the parent which chart type the person chose, so a screen can keep it in the address", async () => {
+    const user = userEvent.setup();
+    const onVariantChange = vi.fn();
+    render(
+      <ChartCard title="Daily downloads by product" showTypeToggle onVariantChange={onVariantChange}>
+        {(variant) => <div>drawn as {variant}</div>}
+      </ChartCard>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Bar chart" }));
+    expect(onVariantChange).toHaveBeenLastCalledWith("bar");
+    expect(screen.getByText("drawn as bar")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Line chart" }));
+    expect(onVariantChange).toHaveBeenLastCalledWith("line");
+    expect(onVariantChange).toHaveBeenCalledTimes(2);
   });
 
   it("renders plain children as they are", () => {

@@ -18,37 +18,61 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Box,
   Card,
-  CircularProgress,
-  ListingTable,
+  FormControl,
+  Grid,
+  InputLabel,
   MenuItem,
   Select,
-  Stack,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TablePagination,
+  TableRow,
   Typography,
 } from "@wso2/oxygen-ui";
-import { Bar, BarChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { JSX } from "react";
+import { type JSX, useId, useState } from "react";
 import { useSearchParams } from "react-router";
-import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
   getReleaseDownloads,
-  getRepositories,
   productDownloadStatsBackendUrl,
   type ReleaseDownloadGrain,
 } from "@features/engineering/api/productDownloadStats";
+import { useTrackedRepositories } from "../api/useTrackedRepositories";
+import ChartCard, { type ChartVariant } from "../components/ChartCard";
+import DateHeaderFilter from "../components/DateHeaderFilter";
 import DownloadStatsShell from "../components/DownloadStatsShell";
-import { defaultRange } from "../utils/filters";
-import { formatCompact, productLabel } from "../utils/format";
-import { dailyChartModel } from "./dailyChartModel";
-import { isIsolatedPoint } from "./display";
+import ErrorState from "../components/ErrorState";
+import FilterBar, { type FilterUpdate } from "../components/FilterBar";
+import SeriesChart from "../components/SeriesChart";
+import { StatCard } from "../components/StatCard";
+import { ROWS_PER_PAGE_OPTIONS } from "../constants/tableConstants";
+import { usePagination } from "../hooks/usePagination";
+import type { ChartSeries } from "../utils/chartTypes";
+import {
+  buildDateMatrix,
+  mergeParams,
+  parseFilters,
+  periodSummary,
+  productNameById,
+  toChartSeries,
+  type PeriodSummary,
+} from "../utils/filters";
+import { formatCompact, formatDate, formatMonthYear } from "../utils/format";
 
-function readGrain(value: string | null): ReleaseDownloadGrain {
-  if (value === "month" || value === "cumulative") return value;
-  return "day";
-}
+// The View select's choices, in the standalone's order and words (CONTEXT.md,
+// "Interval": labelled View on this screen). The same word titles the chart
+// card and the table.
+const INTERVAL_LABEL: Record<ReleaseDownloadGrain, string> = {
+  day: "Daily",
+  month: "Monthly",
+  cumulative: "Cumulative",
+};
+
+// Skeleton rows while the table waits, as many as the standalone's tables draw.
+const SKELETON_ROWS = 5;
 
 export default function EngineeringDownloadsPage(): JSX.Element {
   return (
@@ -58,243 +82,279 @@ export default function EngineeringDownloadsPage(): JSX.Element {
   );
 }
 
-/** Inside the shell, so it is mounted — and asks — only once the shell has let the reader through. */
+// Inside the shell, so it is mounted — and asks — only once the shell has let
+// the reader through. The standalone's Downloads (ADR 0002): the filter bar,
+// the chart card titled by interval, four period tiles, and the date × product
+// table. Filters, Products and the chart type live in the address so a shared
+// link reproduces the view.
 function DownloadsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const defaults = defaultRange();
-  const from = params.get("from") || defaults.from;
-  const to = params.get("to") || defaults.to;
-  const interval = readGrain(params.get("interval"));
-  const repos = (params.get("repos") ?? "")
-    .split(",")
-    .map((part) => Number(part))
-    .filter((id) => Number.isInteger(id) && id > 0);
-  const chart = params.get("chart") === "bar" ? "bar" : "line";
+  const viewLabelId = useId();
 
-  const repositories = useQuery({
-    queryKey: ["product-download-stats", "repositories", base],
-    queryFn: async () => getRepositories(await getToken()),
-  });
+  const filters = parseFilters(params);
+  const { from, to, interval, repos } = filters;
   const rangeInverted = from > to;
+
   const downloads = useQuery({
     queryKey: ["product-download-stats", "downloads", base, from, to, interval, repos.join(",")],
     enabled: !rangeInverted,
     queryFn: async () => getReleaseDownloads(await getToken(), { from, to, interval, repos }),
   });
-
-  const active = (repositories.data?.repositories ?? []).filter(
-    (repository) => repository.isActive !== false,
+  // Names the chart's series and the table's columns; the picker shares the
+  // same request.
+  const repositories = useTrackedRepositories();
+  const series = toChartSeries(
+    downloads.data?.series ?? [],
+    productNameById(repositories.data?.repositories ?? []),
   );
-  const names = new Map(
-    active.map((repository) => [repository.id, productLabel(repository.productName, repository.repoName)]),
-  );
+  const summary = periodSummary(series);
 
-  const replace = (updates: Record<string, string | null>) => {
+  // The chart type is kept in the address (spec: One's invisible behaviours
+  // stay) and applies to Daily alone: Monthly draws bars and Cumulative lines,
+  // whatever the address says, as on the standalone.
+  const variant: ChartVariant =
+    interval === "day"
+      ? params.get("chart") === "bar"
+        ? "bar"
+        : "line"
+      : interval === "month"
+        ? "bar"
+        : "line";
+
+  const onChange = (updates: FilterUpdate) => {
     const next = new URLSearchParams(params);
     // The screen shows a default range before those dates are in the address.
     // Write them on the first change so a shared link does not drift to another day.
     if (!params.get("from")) next.set("from", from);
     if (!params.get("to")) next.set("to", to);
-    for (const [key, value] of Object.entries(updates)) {
-      if ((key === "from" || key === "to") && (value == null || value === "")) continue;
-      if (value == null || value === "") next.delete(key);
-      else next.set(key, value);
-    }
-    setParams(next, { replace: true });
+    // A cleared date field keeps its date: an empty From or To would otherwise
+    // fall back to the default range behind the reader's back.
+    const kept = Object.fromEntries(
+      Object.entries(updates).filter(([key, value]) => !((key === "from" || key === "to") && !value)),
+    );
+    setParams(mergeParams(next, kept), { replace: true });
   };
 
   return (
     <Box>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2, flexWrap: "wrap" }}>
-        <TextField
-          label="From"
-          type="date"
-          size="small"
-          value={from}
-          onChange={(event) => replace({ from: event.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          label="To"
-          type="date"
-          size="small"
-          value={to}
-          onChange={(event) => replace({ to: event.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <Select
-          size="small"
-          inputProps={{ "aria-label": "Grain" }}
-          value={interval}
-          onChange={(event) => replace({ interval: event.target.value })}
-        >
-          <MenuItem value="day">Daily</MenuItem>
-          <MenuItem value="month">Monthly</MenuItem>
-          <MenuItem value="cumulative">Cumulative</MenuItem>
-        </Select>
-        <Select
-          size="small"
-          multiple
-          displayEmpty
-          inputProps={{ "aria-label": "Products" }}
-          value={repos.map(String)}
-          onChange={(event) => {
-            const value = event.target.value;
-            const selected = (typeof value === "string" ? value.split(",") : value).filter(Boolean);
-            replace({ repos: selected.length > 0 ? selected.join(",") : null });
-          }}
-          renderValue={(selected) =>
-            selected.length === 0 ? "All products" : `${selected.length} selected`
-          }
-        >
-          {active.map((repository) => (
-            <MenuItem key={repository.id} value={String(repository.id)}>
-              {productLabel(repository.productName, repository.repoName)}
-            </MenuItem>
-          ))}
-        </Select>
-        {interval === "day" && (
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            aria-label="Chart type"
-            value={chart}
-            onChange={(_event, value: string | null) => {
-              if (value) replace({ chart: value === "line" ? null : value });
-            }}
-          >
-            <ToggleButton value="line">Line</ToggleButton>
-            <ToggleButton value="bar">Bars</ToggleButton>
-          </ToggleButtonGroup>
-        )}
-      </Stack>
+      <FilterBar
+        filters={filters}
+        onChange={onChange}
+        filterSlot={
+          <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id={viewLabelId}>View</InputLabel>
+              <Select
+                labelId={viewLabelId}
+                label="View"
+                value={interval}
+                // The interval's own default chart type takes over, as the
+                // standalone's local choice resets.
+                onChange={(event) => onChange({ interval: event.target.value, chart: null })}
+              >
+                {Object.entries(INTERVAL_LABEL).map(([value, label]) => (
+                  <MenuItem key={value} value={value}>
+                    {label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        }
+      />
 
       {rangeInverted ? (
         <Typography>From is after To.</Typography>
-      ) : downloads.isPending ? (
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-          <CircularProgress size={16} />
-          <Typography>Loading release downloads…</Typography>
-        </Stack>
-      ) : downloads.isError || downloads.data == null ? (
-        <ErrorNotice onRetry={() => void downloads.refetch()} error={downloads.error}>
-          Couldn't load release downloads.
-        </ErrorNotice>
-      ) : downloads.data.series.every((item) => item.points.length === 0) ? (
-        <Typography>No data for the selected range</Typography>
       ) : (
         <>
-          <DownloadChart
-            series={downloads.data.series}
-            names={names}
+          <ChartCard
+            title={`${INTERVAL_LABEL[interval]} downloads by product`}
+            subtitle="Downloads across the selected products and range"
+            showTypeToggle={interval === "day"}
+            defaultVariant={variant}
+            onVariantChange={(chosen) => onChange({ chart: chosen === "line" ? null : chosen })}
+          >
+            {(chosen) => (
+              <SeriesChart
+                variant={chosen}
+                series={series}
+                isLoading={downloads.isPending}
+                isError={downloads.isError}
+                error={downloads.error}
+                onRetry={() => void downloads.refetch()}
+                xTickFormat="short"
+              />
+            )}
+          </ChartCard>
+
+          {interval !== "cumulative" && summary.pointCount > 0 && (
+            <PeriodTiles summary={summary} interval={interval} from={from} to={to} />
+          )}
+
+          {/* Keyed by interval so a change of View remounts the table: the
+              chosen date (a day's form is not a month's) and the page start
+              over, as the standalone clears its picker. */}
+          <DownloadsTable
+            key={interval}
             interval={interval}
-            chart={chart}
-            from={from}
-            to={to}
+            series={series}
+            isLoading={downloads.isPending}
+            isError={downloads.isError}
+            error={downloads.error}
+            onRetry={() => void downloads.refetch()}
           />
-          <Card sx={{ p: 2, mt: 2 }}>
-            <ListingTable.Provider>
-              <ListingTable.Container>
-                <ListingTable bordered>
-                  <ListingTable.Head>
-                    <ListingTable.Row>
-                      <ListingTable.Cell>Product</ListingTable.Cell>
-                      <ListingTable.Cell>Date</ListingTable.Cell>
-                      <ListingTable.Cell align="right">Downloads</ListingTable.Cell>
-                    </ListingTable.Row>
-                  </ListingTable.Head>
-                  <ListingTable.Body>
-                    {downloads.data.series.flatMap((item) =>
-                      item.points.map((point) => (
-                        <ListingTable.Row key={`${item.repoId}-${point.date}`}>
-                          <ListingTable.Cell>
-                            {names.get(item.repoId) ?? item.repoName}
-                          </ListingTable.Cell>
-                          <ListingTable.Cell>{point.date}</ListingTable.Cell>
-                          <ListingTable.Cell align="right">{formatCompact(point.value)}</ListingTable.Cell>
-                        </ListingTable.Row>
-                      )),
-                    )}
-                  </ListingTable.Body>
-                </ListingTable>
-              </ListingTable.Container>
-            </ListingTable.Provider>
-          </Card>
         </>
       )}
     </Box>
   );
 }
 
-function isolatedDot(
-  data: Record<string, string | number | null>[],
-  dataKey: string,
-  stroke: string,
-) {
-  return (props: { cx?: number; cy?: number; index?: number }) => {
-    const index = props.index ?? -1;
-    const value = data[index]?.[dataKey];
-    if (!isIsolatedPoint(data, dataKey, index) || typeof value !== "number") return null;
-    if (props.cx == null || props.cy == null) return null;
-    return <circle cx={props.cx} cy={props.cy} r={3} fill={stroke} />;
-  };
-}
-
-function DownloadChart({
-  series,
-  names,
+// The four headline figures of the range, under the chart: the average per
+// day or month, the highest and lowest with their dates, and the total with
+// the range. Cumulative has none, as a running total has no "per point".
+function PeriodTiles({
+  summary,
   interval,
-  chart,
   from,
   to,
 }: {
-  series: Parameters<typeof dailyChartModel>[0];
-  names: Map<number, string>;
-  interval: ReleaseDownloadGrain;
-  chart: "line" | "bar";
+  summary: PeriodSummary;
+  interval: Exclude<ReleaseDownloadGrain, "cumulative">;
   from: string;
   to: string;
 }): JSX.Element {
-  // Monthly points are YYYY-MM. Expanding those through calendar days would
-  // mix month buckets with empty days, so the chart keeps only returned labels.
-  const range = interval === "month" ? { from: "", to: "" } : { from, to };
-  const { data, lines } = dailyChartModel(series, names, range);
-  const bars = interval === "month" || (interval === "day" && chart === "bar");
+  const unit = interval === "month" ? "Month" : "Day";
+  const formatPoint = interval === "month" ? formatMonthYear : formatDate;
   return (
-    <Box sx={{ width: "100%", height: 280 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        {bars ? (
-          <BarChart data={data}>
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            {lines.map((line) => (
-              <Bar key={line.repoId} name={line.name} dataKey={line.dataKey} fill={line.stroke} />
-            ))}
-          </BarChart>
-        ) : (
-          <LineChart data={data}>
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            {lines.map((line) => (
-              <Line
-                key={line.repoId}
-                name={line.name}
-                type="monotone"
-                dataKey={line.dataKey}
-                stroke={line.stroke}
-                dot={isolatedDot(data, line.dataKey, line.stroke)}
-                connectNulls={false}
-              />
-            ))}
-          </LineChart>
-        )}
-      </ResponsiveContainer>
+    <Box
+      sx={{
+        display: "grid",
+        gap: 2,
+        gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" },
+        mt: 2,
+      }}
+    >
+      <StatCard
+        label="Average Downloads"
+        value={formatCompact(summary.avgPerPoint)}
+        tooltipText={`Average downloads per ${unit.toLowerCase()} across all selected products in the selected date range`}
+      />
+      <StatCard label={`Highest ${unit} (${formatPoint(summary.peakDate)})`} value={formatCompact(summary.peakValue)} />
+      <StatCard label={`Lowest ${unit} (${formatPoint(summary.minDate)})`} value={formatCompact(summary.minValue)} />
+      <StatCard
+        label={`Period Total (${formatPoint(from)} – ${formatPoint(to)})`}
+        value={formatCompact(summary.total)}
+      />
     </Box>
+  );
+}
+
+// The date × product table: one row per date, newest first, one column per
+// Product and a bold Total. A Product with no point on a date reads 0, as on
+// the standalone. Daily and Cumulative dates are calendar days; Monthly keeps
+// the API's own month label. The Date header's calendar narrows the rows to
+// one date; the pages are the standalone's.
+//
+// While the series loads the table shows skeleton rows, and when it fails the
+// error with Retry, rather than the standalone's "No data" sentence for both:
+// a failed request is never presented as nothing to show
+// (docs/conventions.md, "Data fetching").
+function DownloadsTable({
+  interval,
+  series,
+  isLoading,
+  isError,
+  error,
+  onRetry,
+}: {
+  interval: ReleaseDownloadGrain;
+  series: ChartSeries[];
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  onRetry: () => void;
+}): JSX.Element {
+  const isMonthly = interval === "month";
+  const [dateFilter, setDateFilter] = useState("");
+  const matrix = buildDateMatrix(series);
+  const dates = dateFilter ? matrix.dates.filter((date) => date === dateFilter) : matrix.dates;
+  const pagination = usePagination(dates);
+  const formatRowDate = (date: string) => (isMonthly ? date : formatDate(date));
+
+  return (
+    <Card sx={{ p: 2, mt: 2, overflowX: "auto" }}>
+      <Typography variant="h6" component="h3" sx={{ mb: 2 }}>
+        {INTERVAL_LABEL[interval]} downloads table
+      </Typography>
+      {isLoading ? (
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+            <Skeleton key={i} variant="rounded" height={36} />
+          ))}
+        </Box>
+      ) : isError ? (
+        <ErrorState error={error} onRetry={onRetry} minHeight={160} />
+      ) : matrix.dates.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          No data for the selected range.
+        </Typography>
+      ) : (
+        <>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                    Date
+                    <DateHeaderFilter
+                      type={isMonthly ? "month" : "date"}
+                      value={dateFilter}
+                      onChange={setDateFilter}
+                      format={formatRowDate}
+                    />
+                  </Box>
+                </TableCell>
+                {matrix.columns.map((column) => (
+                  <TableCell key={column.key} align="right">
+                    {column.name}
+                  </TableCell>
+                ))}
+                <TableCell align="right">
+                  <strong>Total</strong>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {pagination.paged.map((date) => (
+                <TableRow key={date}>
+                  <TableCell>{formatRowDate(date)}</TableCell>
+                  {matrix.columns.map((column) => (
+                    <TableCell key={column.key} align="right">
+                      {formatCompact(matrix.cell(date, column.key) ?? 0)}
+                    </TableCell>
+                  ))}
+                  <TableCell align="right">
+                    <strong>{formatCompact(matrix.totalForDate(date))}</strong>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <TablePagination
+            component="div"
+            count={pagination.count}
+            page={pagination.page}
+            onPageChange={pagination.onPageChange}
+            rowsPerPage={pagination.rowsPerPage}
+            onRowsPerPageChange={pagination.onRowsPerPageChange}
+            rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
+            showFirstButton
+            showLastButton
+          />
+        </>
+      )}
+    </Card>
   );
 }

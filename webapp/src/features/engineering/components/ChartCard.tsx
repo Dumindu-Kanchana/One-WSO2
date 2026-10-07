@@ -33,6 +33,11 @@ interface ChartCardProps {
    */
   defaultVariant?: ChartVariant;
   /**
+   * Called when the reader toggles. A screen that keeps the chart type in the
+   * address (Downloads) writes it there and feeds it back as defaultVariant.
+   */
+  onVariantChange?: (variant: ChartVariant) => void;
+  /**
    * Render prop called with the current (possibly user-toggled) chart variant
    * so the child SeriesChart can be stateless. Also accepts a plain ReactNode
    * for cards that have no toggle.
@@ -48,6 +53,7 @@ export default function ChartCard({
   action,
   showTypeToggle = false,
   defaultVariant = "line",
+  onVariantChange,
   children,
 }: ChartCardProps): JSX.Element {
   const [variant, setVariant] = useState<ChartVariant>(defaultVariant);
@@ -91,7 +97,11 @@ export default function ChartCard({
               exclusive
               color="primary"
               value={variant}
-              onChange={(_, v: ChartVariant | null) => v && setVariant(v)}
+              onChange={(_, v: ChartVariant | null) => {
+                if (!v) return;
+                setVariant(v);
+                onVariantChange?.(v);
+              }}
             >
               <ToggleButton value="line" aria-label="Line chart" sx={{ p: 0.75 }}>
                 <ChartLine size={16} />

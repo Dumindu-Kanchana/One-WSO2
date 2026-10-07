@@ -15,7 +15,7 @@
 // under the License.
 
 import { describe, expect, it } from "vitest";
-import { isIsolatedPoint, jobStatusLabel } from "./display";
+import { jobStatusLabel } from "./display";
 
 describe("jobStatusLabel", () => {
   it("names the collection job states and keeps an unknown one", () => {
@@ -24,24 +24,5 @@ describe("jobStatusLabel", () => {
     expect(jobStatusLabel("SUCCESS")).toBe("Success");
     expect(jobStatusLabel("STARTED")).toBe("Started");
     expect(jobStatusLabel("QUEUED")).toBe("QUEUED");
-  });
-});
-
-describe("isIsolatedPoint", () => {
-  const data = [
-    { date: "2026-09-01", "repo-1": null },
-    { date: "2026-09-02", "repo-1": 40 },
-    { date: "2026-09-03", "repo-1": null },
-  ];
-
-  it("marks a lone download and skips a point that has a neighbor", () => {
-    expect(isIsolatedPoint(data, "repo-1", 1)).toBe(true);
-    expect(isIsolatedPoint(data, "repo-1", 0)).toBe(false);
-    const run = [
-      { date: "2026-09-01", "repo-1": 1 },
-      { date: "2026-09-02", "repo-1": 2 },
-    ];
-    expect(isIsolatedPoint(run, "repo-1", 0)).toBe(false);
-    expect(isIsolatedPoint(run, "repo-1", 1)).toBe(false);
   });
 });

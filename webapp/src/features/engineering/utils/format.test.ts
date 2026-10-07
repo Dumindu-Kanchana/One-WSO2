@@ -20,6 +20,7 @@ import {
   formatCompact,
   formatDate,
   formatDateTime,
+  formatMonthYear,
   formatNumber,
   productLabel,
 } from "./format";
@@ -83,6 +84,20 @@ describe("formatDate", () => {
     expect(formatDate(null)).toBe("—");
     expect(formatDate(undefined)).toBe("—");
     expect(formatDate("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatMonthYear", () => {
+  it("writes a month label or a calendar date as short month and year", () => {
+    expect(formatMonthYear("2025-03")).toBe("Mar 2025");
+    expect(formatMonthYear("2025-01-01")).toBe("Jan 2025");
+    expect(formatMonthYear("2026-10-07")).toBe("Oct 2026");
+  });
+
+  it("shows an em dash for a blank and keeps an unreadable value", () => {
+    expect(formatMonthYear(null)).toBe("—");
+    expect(formatMonthYear("")).toBe("—");
+    expect(formatMonthYear("not-a-month")).toBe("not-a-month");
   });
 });
 

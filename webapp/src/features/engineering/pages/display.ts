@@ -14,11 +14,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Helpers the current screens still read while they wait to be rebuilt on the
-// kit (../utils/format.ts, ../utils/filters.ts). The compact figure, the
-// Product label, the local date-time and the calendar-day guard moved there;
-// what is left here has no counterpart in the standalone and goes when its
-// screen does.
+// What Admin still reads while it waits to be rebuilt on the kit
+// (../utils/format.ts, ../utils/filters.ts). The compact figure, the Product
+// label, the local date-time and the calendar-day guard moved there, and the
+// lone-point dot went with the Downloads chart it decorated; the job status
+// label has no counterpart in the standalone and goes when Admin does.
 
 const JOB_STATUS_LABEL: Record<string, string> = {
   SUCCESS: "Success",
@@ -29,15 +29,4 @@ const JOB_STATUS_LABEL: Record<string, string> = {
 
 export function jobStatusLabel(status: string): string {
   return JOB_STATUS_LABEL[status] ?? status;
-}
-
-export function isIsolatedPoint(
-  data: readonly Record<string, string | number | null>[],
-  dataKey: string,
-  index: number,
-): boolean {
-  const value = data[index]?.[dataKey];
-  const prev = index > 0 ? data[index - 1]?.[dataKey] : null;
-  const next = index + 1 < data.length ? data[index + 1]?.[dataKey] : null;
-  return typeof value === "number" && typeof prev !== "number" && typeof next !== "number";
 }

@@ -64,6 +64,17 @@ export function formatDate(value: string | null | undefined): string {
   });
 }
 
+// Formats a month label (YYYY-MM) or a calendar date as short month and year
+// (e.g. "Mar 2025"), for the Monthly tiles. In "en-US", as the standalone's
+// Downloads writes it — so September is "Sep" here and "Sept" in formatDate.
+export function formatMonthYear(value: string | null | undefined): string {
+  if (!value) return "—";
+  const iso = value.length === 7 ? `${value}-01` : value;
+  const date = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
+
 // Formats an RFC3339 timestamp as a readable date-time, intentionally in the
 // viewer's local time zone (these are real instants, e.g. sync job run times).
 export function formatDateTime(value: string | null | undefined): string {
