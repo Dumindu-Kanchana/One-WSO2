@@ -69,6 +69,7 @@ export default function FrameworkPicker({
   const { data: frameworks = [] } = useQuery<Framework[]>({
     queryKey: ["frameworks", productId || undefined],
     queryFn: () => frameworksApi.list(productId ? Number(productId) : undefined),
+    refetchOnMount: true,
     enabled: !!productId,
   });
 
@@ -76,16 +77,19 @@ export default function FrameworkPicker({
   const { data: allControls = [], isFetching: isControlsLoading } = useQuery<Control[]>({
     queryKey: ["controls"],
     queryFn: () => controlsApi.list(),
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   const { data: allEvidence = [], isFetching: isEvidenceLoading } = useQuery<Evidence[]>({
     queryKey: ["evidence"],
     queryFn: evidenceApi.list,
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   const { data: allSubmissions = [], isFetching: isSubmissionsLoading } = useQuery<Submission[]>({
     queryKey: ["submissions"],
     queryFn: submissionsApi.list,
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   // Only fetched while the delete dialog is open, so we can warn about an
@@ -94,6 +98,7 @@ export default function FrameworkPicker({
   const { data: allTasks = [], isFetching: isTasksLoading } = useQuery<AgentTask[]>({
     queryKey: ["agent-tasks"],
     queryFn: () => agentApi.listTasks(500),
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
 

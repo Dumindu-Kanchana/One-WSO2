@@ -56,27 +56,27 @@ export default function Dashboard() {
     data: products = [],
     isError: productsError,
     refetch: refetchProducts,
-  } = useQuery<Product[]>({ queryKey: ["products"], queryFn: productsApi.list });
+  } = useQuery<Product[]>({ queryKey: ["products"], queryFn: productsApi.list, refetchOnMount: true });
   const {
     data: allFrameworks = [],
     isError: frameworksError,
     refetch: refetchFrameworks,
-  } = useQuery<Framework[]>({ queryKey: ["frameworks"], queryFn: () => frameworksApi.list() });
+  } = useQuery<Framework[]>({ queryKey: ["frameworks"], queryFn: () => frameworksApi.list(), refetchOnMount: true });
   const {
     data: allControls = [],
     isError: controlsError,
     refetch: refetchControls,
-  } = useQuery<Control[]>({ queryKey: ["controls"], queryFn: () => controlsApi.list() });
+  } = useQuery<Control[]>({ queryKey: ["controls"], queryFn: () => controlsApi.list(), refetchOnMount: true });
   const {
     data: allEvidence = [],
     isError: evidenceError,
     refetch: refetchEvidence,
-  } = useQuery<Evidence[]>({ queryKey: ["evidence"], queryFn: evidenceApi.list });
+  } = useQuery<Evidence[]>({ queryKey: ["evidence"], queryFn: evidenceApi.list, refetchOnMount: true });
   const {
     data: allSubmissions = [],
     isError: submissionsError,
     refetch: refetchSubmissions,
-  } = useQuery<Submission[]>({ queryKey: ["submissions"], queryFn: submissionsApi.list });
+  } = useQuery<Submission[]>({ queryKey: ["submissions"], queryFn: submissionsApi.list, refetchOnMount: true });
 
   // Any of these failing means the stats/table below would render misleading
   // zero-valued data, so surface an explicit error state instead.

@@ -434,26 +434,31 @@ export default function EvidenceList() {
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: productsApi.list,
+    refetchOnMount: true,
     staleTime: 60_000,
   });
   const { data: allFrameworks = [] } = useQuery<Framework[]>({
     queryKey: ["frameworks"],
     queryFn: () => frameworksApi.list(),
+    refetchOnMount: true,
     staleTime: 60_000,
   });
   const { data: allControls = [] } = useQuery<Control[]>({
     queryKey: ["controls"],
     queryFn: () => controlsApi.list(),
+    refetchOnMount: true,
     staleTime: 60_000,
   });
   const { data: evidence = [], isLoading, isFetching } = useQuery<Evidence[]>({
     queryKey: ["evidence"],
     queryFn: evidenceApi.list,
+    refetchOnMount: true,
     staleTime: 60_000,
   });
   const { data: submissions = [] } = useQuery<Submission[]>({
     queryKey: ["submissions"],
     queryFn: submissionsApi.list,
+    refetchOnMount: true,
     staleTime: 60_000,
   });
 

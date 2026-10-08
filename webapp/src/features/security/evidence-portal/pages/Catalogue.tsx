@@ -176,7 +176,7 @@ export default function Catalogue() {
     isLoading: isProductsLoading,
     isError: isProductsError,
     refetch: refetchProducts,
-  } = useQuery<Product[]>({ queryKey: ["products"], queryFn: productsApi.list });
+  } = useQuery<Product[]>({ queryKey: ["products"], queryFn: productsApi.list, refetchOnMount: true });
 
   // The Frameworks column itself: only the selected product's rows, kept
   // stale the moment a different product is picked because the product id
@@ -190,6 +190,7 @@ export default function Catalogue() {
   } = useQuery<Framework[]>({
     queryKey: ["frameworks", selectedProductId ?? undefined],
     queryFn: () => frameworksApi.list(selectedProductId ?? undefined),
+    refetchOnMount: true,
     enabled: selectedProductId !== null,
   });
 
@@ -205,6 +206,7 @@ export default function Catalogue() {
   } = useQuery<Control[]>({
     queryKey: ["controls", selectedFrameworkId ?? undefined],
     queryFn: () => controlsApi.list(selectedFrameworkId ?? undefined),
+    refetchOnMount: true,
     enabled: selectedFrameworkId !== null,
   });
 
@@ -219,6 +221,7 @@ export default function Catalogue() {
   const { data: allFrameworks = [], isFetching: isAllFrameworksLoading } = useQuery<Framework[]>({
     queryKey: ["frameworks"],
     queryFn: () => frameworksApi.list(),
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   const anyDeleteTarget = !!deleteTarget || !!deleteFrameworkTarget || !!deleteControlTarget;
@@ -232,16 +235,19 @@ export default function Catalogue() {
   const { data: allControls = [], isFetching: isControlsLoading } = useQuery<Control[]>({
     queryKey: ["controls"],
     queryFn: () => controlsApi.list(),
+    refetchOnMount: true,
     enabled: productOrFrameworkDeleteTarget,
   });
   const { data: allEvidence = [], isFetching: isEvidenceLoading } = useQuery<Evidence[]>({
     queryKey: ["evidence"],
     queryFn: evidenceApi.list,
+    refetchOnMount: true,
     enabled: anyDeleteTarget,
   });
   const { data: allSubmissions = [], isFetching: isSubmissionsLoading } = useQuery<Submission[]>({
     queryKey: ["submissions"],
     queryFn: submissionsApi.list,
+    refetchOnMount: true,
     enabled: anyDeleteTarget,
   });
   // Only fetched while a delete dialog is open, so we can warn about an
@@ -250,6 +256,7 @@ export default function Catalogue() {
   const { data: allTasks = [], isFetching: isTasksLoading } = useQuery<AgentTask[]>({
     queryKey: ["agent-tasks"],
     queryFn: () => agentApi.listTasks(500),
+    refetchOnMount: true,
     enabled: anyDeleteTarget,
   });
 

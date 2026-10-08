@@ -269,6 +269,7 @@ export default function Cost() {
   } = useQuery<Summary>({
     queryKey: ["usage-summary"],
     queryFn: usageApi.summary,
+    refetchOnMount: true,
     refetchInterval: 15000,
   });
   const {
@@ -279,6 +280,7 @@ export default function Cost() {
   } = useQuery<DayPoint[]>({
     queryKey: ["usage-timeseries", days],
     queryFn: () => usageApi.timeseries(days),
+    refetchOnMount: true,
     refetchInterval: 30000,
   });
   const {
@@ -289,6 +291,7 @@ export default function Cost() {
   } = useQuery<ByModel[]>({
     queryKey: ["usage-by-model"],
     queryFn: usageApi.byModel,
+    refetchOnMount: true,
     refetchInterval: 30000,
   });
   const {
@@ -298,6 +301,7 @@ export default function Cost() {
   } = useQuery<RecentRun[]>({
     queryKey: ["usage-recent"],
     queryFn: () => usageApi.recent(10),
+    refetchOnMount: true,
     refetchInterval: 15000,
   });
 

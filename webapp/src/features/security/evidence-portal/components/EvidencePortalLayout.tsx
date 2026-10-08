@@ -17,7 +17,6 @@
 import type { JSX } from "react";
 import { Alert, Box, CircularProgress } from "@wso2/oxygen-ui";
 import { Outlet } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
 import { isEvidencePortalBackendConfigured } from "@config/apiConfig";
 import { useEvidencePortalAuth } from "../shim/useEvidencePortalAuth";
 import { useCurrentUser } from "../hooks/useCurrentUser";
@@ -45,33 +44,8 @@ import AccessDenied from "./AccessDenied";
 //      App.tsx/Gate split (see grc-tools's webapp/src/App.tsx): resolving shows
 //      nothing, a 403 shows AccessDenied with the backend's own message, and
 //      only then does the subtree mount.
-//   4. Turn refetch on mount back on for this module's own query keys. The
-//      app wide client sets refetchOnMount: false, so after a submit the
-//      Evidence page kept showing its cached list until a hard reload, even
-//      though the submit had invalidated it. Stale data now refetches when a
-//      page mounts, and staleTime still decides what counts as stale. "me"
-//      is left alone on purpose.
-const FRESH_ON_MOUNT_KEYS = [
-  "products",
-  "frameworks",
-  "controls",
-  "evidence",
-  "submissions",
-  "agent-tasks",
-  "usage-summary",
-  "usage-timeseries",
-  "usage-by-model",
-  "usage-recent",
-];
-
 export default function EvidencePortalLayout(): JSX.Element | null {
   useEvidencePortalAuth();
-  const queryClient = useQueryClient();
-  // Set during render, before any child page's useQuery reads its options.
-  // Setting the same defaults again on a re-render is harmless.
-  for (const key of FRESH_ON_MOUNT_KEYS) {
-    queryClient.setQueryDefaults([key], { refetchOnMount: true });
-  }
 
   if (!isEvidencePortalBackendConfigured()) {
     return (

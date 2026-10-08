@@ -74,6 +74,7 @@ export default function ProductPicker({
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: productsApi.list,
+    refetchOnMount: true,
   });
 
   // Load dependent data only when delete is being considered, so we can show
@@ -81,21 +82,25 @@ export default function ProductPicker({
   const { data: allFrameworks = [], isFetching: isFrameworksLoading } = useQuery<Framework[]>({
     queryKey: ["frameworks"],
     queryFn: () => frameworksApi.list(),
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   const { data: allControls = [], isFetching: isControlsLoading } = useQuery<Control[]>({
     queryKey: ["controls"],
     queryFn: () => controlsApi.list(),
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   const { data: allEvidence = [], isFetching: isEvidenceLoading } = useQuery<Evidence[]>({
     queryKey: ["evidence"],
     queryFn: evidenceApi.list,
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   const { data: allSubmissions = [], isFetching: isSubmissionsLoading } = useQuery<Submission[]>({
     queryKey: ["submissions"],
     queryFn: submissionsApi.list,
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   // Only fetched while the delete dialog is open, so we can warn about an
@@ -104,6 +109,7 @@ export default function ProductPicker({
   const { data: allTasks = [], isFetching: isTasksLoading } = useQuery<AgentTask[]>({
     queryKey: ["agent-tasks"],
     queryFn: () => agentApi.listTasks(500),
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
 
