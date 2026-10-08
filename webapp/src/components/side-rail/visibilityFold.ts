@@ -35,7 +35,7 @@ import {
   PROMOTION_TEAM_HISTORY_ITEM_ID,
   SALES_ITEM_IDS,
   SUBSCRIPTION_ITEM_IDS,
-  UMT_ADMIN_ITEM_IDS,
+  UMT_ITEM_IDS,
   type PerspectiveSection,
 } from "@constants/perspectives";
 import { SECURITY_ITEM_IDS } from "@constants/securityApps";
@@ -177,7 +177,7 @@ export function claimOf(name: AdapterName): SectionClaim {
     case "security":
       return { kind: "sections", ids: SECURITY_ITEM_IDS };
     case "umt":
-      return { kind: "sections", ids: UMT_ADMIN_ITEM_IDS };
+      return { kind: "sections", ids: UMT_ITEM_IDS };
     case "subscriptions":
       return { kind: "sections", ids: SUBSCRIPTION_ITEM_IDS };
     case "engineering":

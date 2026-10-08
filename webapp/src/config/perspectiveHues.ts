@@ -27,8 +27,8 @@
  * the launcher is the one surface with nothing else doing that job.
  *
  * SIZING, and the constraint that will eventually break this: the registry holds
- * nine perspective hues. Infra is the ninth, kept as its own teal. Hue
- * discrimination collapses somewhere past that,
+ * eleven perspective hues, two past the nine perspectiveHues.test.ts allows. Hue
+ * discrimination collapses somewhere past nine,
  * and each new perspective wants one — at which point the answer is a different
  * encoding (hue per domain family, or back to monochrome), not a longer list.
  * perspectiveHues.test.ts caps the palette at nine so that decision is forced
@@ -128,8 +128,8 @@ export const PERSPECTIVE_HUES: Record<string, PerspectiveHue> = {
   // and Legal at 225, 18 apart). It reads as audit/caution, which suits the
   // subject, but that is a bonus rather than the reason.
   //
-  // Infra is the ninth hue, and the next perspective should force a different
-  // encoding.
+  // With Infra after it, the palette reaches eight hues, and the next
+  // perspective should force a different encoding.
   security: {
     hue: "#B8860B",
     light: { bg: "#F9EFD7", fg: "#7E5C07" },

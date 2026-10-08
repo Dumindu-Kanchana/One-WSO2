@@ -17,8 +17,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Several perspectives and rail groups are behind preview flags, so the
-// registry depends on `window.config` and has to be imported fresh per state rather than once at the top of the
-// file.
+// registry depends on `window.config` and has to be imported fresh per state
+// rather than once at the top of the file.
 type Perspectives = typeof import("./perspectives");
 
 async function load(
@@ -178,6 +178,15 @@ describe("UMT inside Engineering", () => {
   it("keeps Product Management in the UMT admin gate set", async () => {
     const { UMT_ADMIN_ITEM_IDS } = await load({ engineering: true, umt: true });
     expect(UMT_ADMIN_ITEM_IDS.has("umt-products")).toBe(true);
+  });
+
+  // Every UMT row is decided by UMT's own roles. An id missing from this set
+  // would fall back to `requires`, which none of them sets: visible to all.
+  it("gates every UMT row, the group included, on UMT's roles", async () => {
+    const perspectives = await load({ engineering: true, umt: true });
+    const group = umtGroupOf(perspectives);
+    const ids = [group?.id, ...(group?.children ?? []).map((c) => c.id)];
+    expect(new Set(ids)).toEqual(perspectives.UMT_ITEM_IDS);
   });
 });
 

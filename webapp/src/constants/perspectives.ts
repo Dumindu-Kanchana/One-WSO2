@@ -490,7 +490,7 @@ const UMT_SECTION: PerspectiveSection = {
   icon: RefreshCw,
   alwaysGroup: true,
   children: [
-    { id: "engineering-umt-overview", label: "Overview", path: UMT_PATH },
+    { id: "umt-overview", label: "Overview", path: UMT_PATH },
     { id: "umt-updates", label: "Updates", path: umtPaths.updates },
     // Admin-only. `requires` speaks One WSO2's own capabilities, which have
     // nothing to do with the roles the UMT backend (ONE_WSO2_UMT_BACKEND_URL)
@@ -513,6 +513,17 @@ const UMT_SECTION: PerspectiveSection = {
  * ask useUmtGate directly rather than reading `requires` for them.
  */
 export const UMT_ADMIN_ITEM_IDS: ReadonlySet<string> = new Set(["umt-products"]);
+
+/**
+ * Every UMT rail id, the group included. UMT's own roles decide all of them
+ * (see umtVisibility), so someone in Engineering with no UMT role does not see
+ * the group — the same way MIS, Due Diligence and CadO2 hide from callers their
+ * backends grant nothing.
+ */
+export const UMT_ITEM_IDS: ReadonlySet<string> = new Set([
+  UMT_SECTION.id,
+  ...(UMT_SECTION.children ?? []).map((child) => child.id),
+]);
 // Sales's rail: the meeting history, and CadO2 while its preview flag is on.
 const SALES_MEETINGS_SECTION: PerspectiveSection = {
   id: "sales-meetings",

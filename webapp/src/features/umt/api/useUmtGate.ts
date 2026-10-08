@@ -19,6 +19,7 @@ import { useEffect } from "react";
 import { describeError } from "@api/errors";
 import { isUmtBackendConfigured } from "@config/apiConfig";
 import { SIGNING_OUT_EVENT } from "@constants/appEvents";
+import { UMT_ADMIN_ITEM_IDS } from "@constants/perspectives";
 import { UMT_ROLE_ID, type UmtRole } from "./umtTypes";
 import { useUmtUserInfo } from "./useUmtUserInfo";
 
@@ -156,10 +157,21 @@ export function useUmtGate(enabled = true): UmtGate {
   };
 }
 
-/** Product Management is an admin section. A failed read hides it; the landing does not retry. */
+/**
+ * Every UMT row needs a UMT role, and Product Management needs UMT admin. A
+ * failed read hides them; the landing does not retry. With no backend URL
+ * there is no role to ask for, so the rows stay and lead to UmtShell's "not
+ * connected" notice — all but Product Management, which needs a confirmed admin.
+ */
 export function umtVisibility(gate: UmtGate): VisibilityAnswer {
+  const configured = isUmtBackendConfigured();
   return {
-    canSee: () => gate.isAdmin && !gate.isResolving,
+    canSee: (id) => {
+      const adminOnly = UMT_ADMIN_ITEM_IDS.has(id);
+      if (!configured) return !adminOnly;
+      if (gate.isResolving) return false;
+      return adminOnly ? gate.isAdmin : gate.isAuthorized;
+    },
     resolving: gate.isResolving,
     retry: () => undefined,
   };
