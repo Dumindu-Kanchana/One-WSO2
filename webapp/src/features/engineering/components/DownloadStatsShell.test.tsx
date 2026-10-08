@@ -19,7 +19,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { downloadStatsPaths, type DownloadStatsScreen } from "@constants/downloadStatsApps";
+import {
+  DOWNLOAD_STATS_DESCRIPTION,
+  downloadStatsPaths,
+  type DownloadStatsScreen,
+} from "@constants/downloadStatsApps";
 import DownloadStatsShell from "./DownloadStatsShell";
 
 // The ladder every Download Stats screen stands behind, rendered on its route
@@ -88,7 +92,6 @@ function show(screenKey: DownloadStatsScreen, actions?: React.ReactNode) {
 
 const theScreen = () => screen.queryByText("the real screen");
 const denial = () => screen.queryByText(/don't have access to admin/i);
-const ADMIN_DESCRIPTION = "Manage tracked repositories and review DB sync and scraper job history.";
 
 describe("the screen tabs", () => {
   it("offers the five open screens under the description, with the open one selected", async () => {
@@ -112,9 +115,7 @@ describe("the screen tabs", () => {
     );
     expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument();
 
-    const description = screen.getByText(
-      "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
-    );
+    const description = screen.getByText(DOWNLOAD_STATS_DESCRIPTION);
     expect(
       description.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -226,9 +227,7 @@ describe("a screen anyone may open", () => {
     show("overview");
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     const appTitle = screen.getByRole("heading", { level: 1, name: "GitHub Product Download Stats" });
-    const description = screen.getByText(
-      "Download activity and repository stats across all WSO2 products.",
-    );
+    const description = screen.getByText(DOWNLOAD_STATS_DESCRIPTION);
     expect(
       appTitle.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -244,35 +243,19 @@ describe("a screen anyone may open", () => {
     ]);
   });
 
-  it.each<[DownloadStatsScreen, string, string]>([
-    ["overview", "Overview", "Download activity and repository stats across all WSO2 products."],
-    [
-      "downloads",
-      "Downloads",
-      "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
-    ],
-    [
-      "versions",
-      "Versions",
-      "Per-release download breakdown and asset-level stats for each tracked product.",
-    ],
-    [
-      "packages",
-      "Packages",
-      "GitHub container package downloads per product — package totals and per-version breakdowns.",
-    ],
-    [
-      "repositoryStats",
-      "Repository Stats",
-      "Stars, forks, watchers, open issues, and clone traffic over time for each tracked repository.",
-    ],
-  ])("opens %s with its sentence and no second title", (key, title, description) => {
+  it.each<[DownloadStatsScreen, string]>([
+    ["overview", "Overview"],
+    ["downloads", "Downloads"],
+    ["versions", "Versions"],
+    ["packages", "Packages"],
+    ["repositoryStats", "Repository Stats"],
+  ])("opens %s with the app sentence and no second title", (key, title) => {
     configure();
     vi.stubGlobal("fetch", vi.fn());
     show(key);
     expect(screen.getByRole("tab", { name: title })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("heading", { name: title })).not.toBeInTheDocument();
-    expect(screen.getByText(description)).toBeInTheDocument();
+    expect(screen.getByText(DOWNLOAD_STATS_DESCRIPTION)).toBeInTheDocument();
     expect(theScreen()).toBeInTheDocument();
   });
 
@@ -295,7 +278,7 @@ describe("the ladder in front of every screen", () => {
     // still names the screen, and the sentence still describes it.
     expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
-    expect(screen.getByText(ADMIN_DESCRIPTION)).toBeInTheDocument();
+    expect(screen.getByText(DOWNLOAD_STATS_DESCRIPTION)).toBeInTheDocument();
     expect(denial()).not.toBeInTheDocument();
     expect(theScreen()).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -307,7 +290,7 @@ describe("the ladder in front of every screen", () => {
     vi.stubGlobal("fetch", fetchMock);
     show("admin");
     expect(screen.getByText(/needs an https address/i)).toBeInTheDocument();
-    expect(screen.getByText(ADMIN_DESCRIPTION)).toBeInTheDocument();
+    expect(screen.getByText(DOWNLOAD_STATS_DESCRIPTION)).toBeInTheDocument();
     expect(denial()).not.toBeInTheDocument();
     expect(theScreen()).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -355,8 +338,8 @@ describe("the Admin check", () => {
     expect(await screen.findByText(/don't have access to admin/i)).toBeInTheDocument();
     expect(screen.getByText(/ask someone who already manages that list/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
-    // The description sells a screen being withheld, so it goes with the screen.
-    expect(screen.queryByText(ADMIN_DESCRIPTION)).not.toBeInTheDocument();
+    // The sentence names the app, not the withheld screen, so it stays.
+    expect(screen.getByText(DOWNLOAD_STATS_DESCRIPTION)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add tracked repository" })).not.toBeInTheDocument();
     expect(theScreen()).not.toBeInTheDocument();
   });
@@ -368,7 +351,7 @@ describe("the Admin check", () => {
     expect(await screen.findByText("the real screen")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Admin" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
-    expect(screen.getByText(ADMIN_DESCRIPTION)).toBeInTheDocument();
+    expect(screen.getByText(DOWNLOAD_STATS_DESCRIPTION)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add tracked repository" })).toBeInTheDocument();
     expect(denial()).not.toBeInTheDocument();
   });

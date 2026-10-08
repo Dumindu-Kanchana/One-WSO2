@@ -21,6 +21,7 @@ import PerspectiveHeader from "@components/perspective-header/PerspectiveHeader"
 import RoutedTabs, { type RoutedTabDef } from "@components/routed-tabs/RoutedTabs";
 import {
   DOWNLOAD_STATS_APPS,
+  DOWNLOAD_STATS_DESCRIPTION,
   DOWNLOAD_STATS_PATH,
   DOWNLOAD_STATS_SCREENS,
   ENGINEERING_ADMIN_ITEM_ID,
@@ -34,8 +35,8 @@ import {
 } from "../api/productDownloadStats";
 
 // Shared page frame for every Download Stats screen. The title above the tab
-// bar names the app, and the one-line description sits under that title, the
-// same place the other shells put theirs. The tab bar names the screen. A
+// bar names the app, and one sentence sits under that title on every screen,
+// the way Banking does. The tab bar names the screen. A
 // screen's own name is a heading only while its tab is hidden (Admin, until
 // the API has said the caller is an Admin). The shell exists so ONE place owns every
 // degraded state and no screen has to remember them (MisShell is the
@@ -89,7 +90,7 @@ export default function DownloadStatsShell({
   actions?: ReactNode;
   children: ReactNode;
 }): JSX.Element {
-  const { id, label: title, desc: description } = DOWNLOAD_STATS_SCREENS[screen];
+  const { id, label: title } = DOWNLOAD_STATS_SCREENS[screen];
   const base = productDownloadStatsBackendUrl();
   const configured = isProductDownloadStatsConfigured();
   // https, or http on localhost alone — see productDownloadStats.ts.
@@ -134,12 +135,9 @@ export default function DownloadStatsShell({
           <Typography component="h1" variant="h5" sx={{ mb: 0.5, mt: 0 }}>
             GitHub Product Download Stats
           </Typography>
-          {/* The description is dropped on the denied rung alone: it sells the
-              screen, which is right on one you can use and wrong above a notice
-              about to refuse you. */}
           <PerspectiveHeader
             title={namedByTab ? undefined : title}
-            subtitle={denied ? undefined : description}
+            subtitle={DOWNLOAD_STATS_DESCRIPTION}
           />
         </Box>
         {allowed && actions}

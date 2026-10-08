@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DOWNLOAD_STATS_APPS,
+  DOWNLOAD_STATS_DESCRIPTION,
   DOWNLOAD_STATS_PATH,
   DOWNLOAD_STATS_SCREENS,
   ENGINEERING_ADMIN_ITEM_ID,
@@ -68,27 +69,11 @@ describe("the Download Stats registry", () => {
     expect(Object.values(downloadStatsPaths).sort()).toEqual(items.map((item) => item.path).sort());
   });
 
-  // The shell reads the title and the one-line description off the same entry
-  // the rail reads its label from, so the two cannot drift.
-  it("carries a description for every screen", () => {
-    expect(DOWNLOAD_STATS_SCREENS.overview.desc).toBe(
-      "Download activity and repository stats across all WSO2 products.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.downloads.desc).toBe(
-      "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.versions.desc).toBe(
-      "Per-release download breakdown and asset-level stats for each tracked product.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.packages.desc).toBe(
-      "GitHub container package downloads per product — package totals and per-version breakdowns.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.repositoryStats.desc).toBe(
-      "Stars, forks, watchers, open issues, and clone traffic over time for each tracked repository.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.admin.desc).toBe(
-      "Manage tracked repositories and review DB sync and scraper job history.",
-    );
+  // One sentence for the app. The tabs name the screen; the description does not.
+  it("gives every screen the same description", () => {
+    for (const item of items) {
+      expect(item.desc).toBe(DOWNLOAD_STATS_DESCRIPTION);
+    }
   });
 
   // Admin is the one row the Download Stats API decides. The rail's visibility
