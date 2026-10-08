@@ -99,6 +99,17 @@ export const STATUS_CONFIG: Record<string, StatusCfg> = {
 // constructing a local Date from them sidesteps new Date(s)'s UTC
 // interpretation, which otherwise drifts the displayed day back by one in
 // any timezone west of UTC.
+// Whether a risk may be cancelled: only while no Risk Owner has ever approved
+// it — from PENDING_RISK_OWNER_APPROVAL, or from PENDING_REVISION when it has
+// never been owner-approved. The second case lets a risk raised under the wrong
+// customer (which is locked, being part of the risk code) be cancelled and
+// raised again after the owner rejects it. Mirrors the backend's rule, which is
+// what actually enforces it.
+export function canCancelRisk(status: string, ownerFirstApprovedAt: string | null | undefined): boolean {
+  if (status === "PENDING_RISK_OWNER_APPROVAL") return true;
+  return status === "PENDING_REVISION" && !ownerFirstApprovedAt;
+}
+
 export function parseDateStr(s: string): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (m) {

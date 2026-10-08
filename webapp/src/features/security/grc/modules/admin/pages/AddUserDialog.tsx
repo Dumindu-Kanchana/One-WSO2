@@ -252,7 +252,7 @@ export default function AddUserDialog({
       {/* Fixed height so the dialog doesn't grow/shrink as content changes —
           picking a person, switching stages, or a long results/grants list
           all scroll inside this box instead of resizing the dialog itself. */}
-      <DialogContent sx={{ height: 360, overflowY: "auto", pt: 2.5 }}>
+      <DialogContent sx={{ height: 360, overflowY: "auto", pt: "20px !important" }}>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}

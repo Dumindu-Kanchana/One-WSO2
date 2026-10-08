@@ -117,7 +117,7 @@ export default function GrantEditorDialog({ open, user, roles, onClose, onChange
       </DialogTitle>
       <Divider />
 
-      <DialogContent sx={{ pt: 2.5 }}>
+      <DialogContent sx={{ pt: "20px !important" }}>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}

@@ -19,10 +19,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   Paper,
   Stack,
@@ -36,9 +32,10 @@ import {
   Typography,
 } from "@wso2/oxygen-ui";
 import { Pencil, Plus, Trash2 } from "@wso2/oxygen-ui-icons-react";
-import { type JSX, useEffect, useState } from "react";
+import { type JSX, useState } from "react";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
-import { dialogPaperSx } from "../cardStyles";
+import { ConfirmDeleteDialog, CrudFormDialog } from "./CrudDialogs";
+import { useCrudList } from "./useCrudList";
 
 interface ReferenceRow {
   id: number;
@@ -84,9 +81,7 @@ export default function SimpleReferenceCrudPage({
   del,
 }: SimpleReferenceCrudPageProps): JSX.Element {
   const authFetch = useAuthApiClient();
-  const [rows, setRows] = useState<ReferenceRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { rows, loading, error, setError, reload } = useCrudList(() => fetchAll(authFetch), []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ReferenceRow | null>(null);
   const [name, setName] = useState("");
@@ -96,20 +91,6 @@ export default function SimpleReferenceCrudPage({
   const [deleteTarget, setDeleteTarget] = useState<ReferenceRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const load = () => {
-    setLoading(true);
-    setError(null);
-    fetchAll(authFetch)
-      .then(setRows)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const openAdd = () => {
     setEditing(null);
@@ -142,7 +123,7 @@ export default function SimpleReferenceCrudPage({
         await create(authFetch, payload);
       }
       setDialogOpen(false);
-      load();
+      reload();
     } catch (e) {
       setDialogError(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -157,7 +138,7 @@ export default function SimpleReferenceCrudPage({
     try {
       await del(authFetch, deleteTarget.id);
       setDeleteTarget(null);
-      load();
+      reload();
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "Failed to delete");
     } finally {
@@ -233,23 +214,16 @@ export default function SimpleReferenceCrudPage({
         </Table>
       </TableContainer>
 
-      <Dialog
+      <CrudFormDialog
         open={dialogOpen}
+        title={editing ? "Edit" : addLabel}
+        error={dialogError}
+        saving={saving}
+        minHeight={300}
         onClose={() => setDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: dialogPaperSx }}
+        onClearError={() => setDialogError(null)}
+        onSave={handleSave}
       >
-        <DialogTitle>{editing ? "Edit" : addLabel}</DialogTitle>
-        {/* minHeight for breathing room, pt bumped above the default —
-            otherwise the first field's floating label (autoFocus Name)
-            renders partly clipped against the content box's top edge. */}
-        <DialogContent sx={{ minHeight: 300, pt: 3 }}>
-          {dialogError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError(null)}>
-              {dialogError}
-            </Alert>
-          )}
           <TextField
             autoFocus
             fullWidth
@@ -270,43 +244,20 @@ export default function SimpleReferenceCrudPage({
             onChange={(e) => setDescription(e.target.value)}
             helperText={descriptionHint}
           />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={saving} onClick={handleSave}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </CrudFormDialog>
 
-      <Dialog
+      <ConfirmDeleteDialog
         open={!!deleteTarget}
-        onClose={() => (deleting ? undefined : setDeleteTarget(null))}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{ sx: dialogPaperSx }}
+        itemLabel={itemLabel}
+        error={deleteError}
+        deleting={deleting}
+        onClose={() => setDeleteTarget(null)}
+        onClearError={() => setDeleteError(null)}
+        onConfirm={handleDelete}
       >
-        <DialogTitle>Delete {itemLabel}?</DialogTitle>
-        <DialogContent>
-          {deleteError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDeleteError(null)}>
-              {deleteError}
-            </Alert>
-          )}
-          <Typography variant="body2">
-            This permanently removes <b>{deleteTarget?.name}</b>. This can't be undone. If it's still tagged on any
-            risk, deletion is refused.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button variant="contained" color="error" disabled={deleting} onClick={handleDelete}>
-            {deleting ? "Deleting…" : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        This permanently removes <b>{deleteTarget?.name}</b>. This can't be undone. If it's still tagged on any risk,
+        deletion is refused.
+      </ConfirmDeleteDialog>
     </Box>
   );
 }

@@ -59,11 +59,17 @@ export const YEAR_OPTIONS: number[] = Array.from(
 );
 
 // Produces the canonical risk code string shown in the UI and stored in the DB.
-// Format: YEAR-TEAMCODE-QUARTER-NNNN  (e.g. 2026-ASG-Q2-0001)
+// Format: YEAR-TEAMCODE-QUARTER-NNNN  (e.g. 2026-ASG-Q2-0001), or with a
+// customer, YEAR-TEAMCODE-CUSTOMERCODE-QUARTER-NNNN (e.g. 2026-MS-BANKONESUB-Q2-0003)
 export const buildRiskCode = (
   year: number,
   teamCode: string,
   quarter: string,
   sequenceId: number,
+  // Managed Services registers put the customer's code in the middle:
+  // YEAR-TEAMCODE-CUSTOMERCODE-QUARTER-NNNN (RISK_MODULE_DESIGN.md §12).
+  customerCode?: string | null,
 ): string =>
-  `${year}-${teamCode}-${quarter}-${String(sequenceId).padStart(4, "0")}`;
+  customerCode
+    ? `${year}-${teamCode}-${customerCode}-${quarter}-${String(sequenceId).padStart(4, "0")}`
+    : `${year}-${teamCode}-${quarter}-${String(sequenceId).padStart(4, "0")}`;

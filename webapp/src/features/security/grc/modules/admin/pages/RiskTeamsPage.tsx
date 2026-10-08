@@ -43,7 +43,14 @@ import {
 import { Pencil, Plus } from "@wso2/oxygen-ui-icons-react";
 import { type JSX, useEffect, useState } from "react";
 import { useAuthApiClient } from "@features/security/grc/shim/useAuthApiClient";
-import { createTeam, fetchAllTeams, updateTeam, type AdminTeam, type TeamPayload } from "../api/adminApi";
+import {
+  createTeam,
+  fetchAllTeams,
+  updateTeam,
+  type AdminTeam,
+  type RegisterTemplate,
+  type TeamPayload,
+} from "../api/adminApi";
 import { dialogPaperSx } from "../cardStyles";
 
 // The DB's team_type enum still has three values (SOURCE_REGISTER, ASSIGNMENT,
@@ -61,6 +68,25 @@ const teamTypeOptions: { value: "BOTH" | "ASSIGNMENT"; label: string; hint: stri
   { value: "ASSIGNMENT", label: "Assignment", hint: "Assignment target only — cannot be a risk's source register." },
 ];
 
+// A Register Template picks the fields a register's risks carry
+// (RISK_MODULE_DESIGN.md §14). An assignment-only team has no risks of its own,
+// so the form doesn't ask for one.
+const templateLabel: Record<RegisterTemplate, string> = {
+  STANDARD: "Standard",
+  AGGREGATED: "Aggregated",
+  MANAGED_SERVICES: "Managed Services",
+};
+
+const registerTemplateOptions: { value: RegisterTemplate; label: string; hint: string }[] = [
+  { value: "STANDARD", label: "Standard", hint: "The original risk fields, including Security Compliance Reference." },
+  { value: "AGGREGATED", label: "Aggregated", hint: "The standard fields plus Platform." },
+  {
+    value: "MANAGED_SERVICES",
+    label: "Managed Services",
+    hint: "No Security Compliance Reference; adds Customer Name, Product, Deployment Type and Environment.",
+  },
+];
+
 const teamTypeLabel = (t: AdminTeam["team_type"]): string =>
   t === "BOTH" ? "Register" : t === "ASSIGNMENT" ? "Assignment" : "Source Register";
 
@@ -75,6 +101,7 @@ export default function RiskTeamsPage(): JSX.Element {
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [teamType, setTeamType] = useState<"BOTH" | "ASSIGNMENT">("BOTH");
+  const [registerTemplate, setRegisterTemplate] = useState<RegisterTemplate>("STANDARD");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [saving, setSaving] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -99,6 +126,7 @@ export default function RiskTeamsPage(): JSX.Element {
     setCode("");
     setDescription("");
     setTeamType("BOTH");
+    setRegisterTemplate("STANDARD");
     setStatus("ACTIVE");
     setDialogError(null);
     setDialogOpen(true);
@@ -116,6 +144,7 @@ export default function RiskTeamsPage(): JSX.Element {
     // below) and handleSave sends the real team_type unchanged, so this
     // display-only substitution never reaches the save payload.
     setTeamType(team.team_type === "ASSIGNMENT" ? "ASSIGNMENT" : "BOTH");
+    setRegisterTemplate(team.register_template);
     setStatus(team.status === "INACTIVE" ? "INACTIVE" : "ACTIVE");
     setDialogError(null);
     setDialogOpen(true);
@@ -127,6 +156,20 @@ export default function RiskTeamsPage(): JSX.Element {
   // SOURCE_REGISTER-only on save.
   const isSourceRegister = editing?.team_type === "SOURCE_REGISTER";
   const codeRequired = teamType === "BOTH" || isSourceRegister;
+  // The code only goes into generated risk codes, and only a register raises
+  // risks — so an assignment-only team isn't asked for one. A team that already
+  // has a code keeps showing it (and can't lose it: see handleSave).
+  const showCode = codeRequired || !!editing?.code;
+  // Once a risk uses the team as its source register its template is fixed:
+  // those risks carry its fields. The select is disabled while locked.
+  const templateLocked = !!editing?.has_risks;
+  // An assignment-only team isn't asked for a template. It sends what it
+  // already has (Standard for a new team), so a Team Type switch never changes
+  // a saved template, which the backend refuses once risks use it.
+  const showTemplate = !(teamType === "ASSIGNMENT" && !isSourceRegister);
+  const effectiveTemplate: RegisterTemplate = showTemplate
+    ? registerTemplate
+    : (editing?.register_template ?? "STANDARD");
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -150,9 +193,12 @@ export default function RiskTeamsPage(): JSX.Element {
     try {
       const payload: TeamPayload = {
         name: name.trim(),
-        code: code.trim() ? code.trim().toUpperCase() : null,
+        // Not sent when the field is hidden, so a code typed before switching
+        // the team to Assignment can't ride along unseen.
+        code: showCode && code.trim() ? code.trim().toUpperCase() : null,
         description: description.trim(),
         team_type: isSourceRegister ? "SOURCE_REGISTER" : teamType,
+        register_template: effectiveTemplate,
         status,
       };
       if (editing) {
@@ -190,6 +236,7 @@ export default function RiskTeamsPage(): JSX.Element {
               <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Type</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Template</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
               <TableCell sx={{ fontWeight: 700 }} align="right">
                 Actions
@@ -199,14 +246,14 @@ export default function RiskTeamsPage(): JSX.Element {
           <TableBody>
             {loading && (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <CircularProgress size={22} />
                 </TableCell>
               </TableRow>
             )}
             {!loading && teams.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     No teams found.
                   </Typography>
@@ -227,6 +274,7 @@ export default function RiskTeamsPage(): JSX.Element {
                     )}
                   </TableCell>
                   <TableCell>{teamTypeLabel(team.team_type)}</TableCell>
+                  <TableCell>{templateLabel[team.register_template] ?? team.register_template}</TableCell>
                   <TableCell>
                     <Chip
                       size="small"
@@ -253,10 +301,10 @@ export default function RiskTeamsPage(): JSX.Element {
         PaperProps={{ sx: dialogPaperSx }}
       >
         <DialogTitle>{editing ? "Edit Risk Team" : "Add Risk Team"}</DialogTitle>
-        {/* pt bumped above DialogContent's default — otherwise the first
-            field's floating label (autoFocus Name) renders partly clipped
-            against the content box's top edge. */}
-        <DialogContent sx={{ minHeight: 380, pt: 3 }}>
+        {/* pt needs !important: MUI zeroes the top padding of a DialogContent that
+            directly follows the DialogTitle, and that rule outranks a plain pt, so
+            the first field's floating label was cut off at the top edge. */}
+        <DialogContent sx={{ minHeight: 470, pt: "24px !important" }}>
           {dialogError && (
             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setDialogError(null)}>
               {dialogError}
@@ -272,7 +320,28 @@ export default function RiskTeamsPage(): JSX.Element {
             helperText="The team or product name shown throughout the Risk Hub."
             sx={{ mb: 2.5 }}
           />
-          <Stack direction="row" spacing={2} sx={{ mb: 2.5 }}>
+          {/* Team Type first: it decides whether a Code is asked for at all. */}
+          <FormControl fullWidth size="small" disabled={isSourceRegister}>
+            <InputLabel id="team-type-label">Team Type</InputLabel>
+            <Select
+              labelId="team-type-label"
+              label="Team Type"
+              value={teamType}
+              onChange={(e) => setTeamType(e.target.value as "BOTH" | "ASSIGNMENT")}
+            >
+              {teamTypeOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, mb: 2.5 }}>
+            {isSourceRegister
+              ? "Source Register-only — this type isn't editable from this console; saving keeps it unchanged."
+              : teamTypeOptions.find((o) => o.value === teamType)?.hint}
+          </Typography>
+          {showCode && (
             <TextField
               fullWidth
               size="small"
@@ -280,33 +349,34 @@ export default function RiskTeamsPage(): JSX.Element {
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               slotProps={{ htmlInput: { maxLength: 10, style: { textTransform: "uppercase" } } }}
-              helperText={
-                codeRequired
-                  ? "Short abbreviation used to build generated risk codes, e.g. CHO."
-                  : "Only needed for a Register team — this one doesn't require it."
-              }
+              helperText="Short abbreviation used to build generated risk codes, e.g. CHO."
+              sx={{ mb: 2.5 }}
             />
-            <FormControl fullWidth size="small" disabled={isSourceRegister}>
-              <InputLabel id="team-type-label">Team Type</InputLabel>
-              <Select
-                labelId="team-type-label"
-                label="Team Type"
-                value={teamType}
-                onChange={(e) => setTeamType(e.target.value as "BOTH" | "ASSIGNMENT")}
-              >
-                {teamTypeOptions.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: -1.5, mb: 2.5 }}>
-            {isSourceRegister
-              ? "Source Register-only — this type isn't editable from this console; saving keeps it unchanged."
-              : teamTypeOptions.find((o) => o.value === teamType)?.hint}
-          </Typography>
+          )}
+          {showTemplate && (
+            <>
+              <FormControl fullWidth size="small" disabled={templateLocked}>
+                <InputLabel id="team-template-label">Register Template</InputLabel>
+                <Select
+                  labelId="team-template-label"
+                  label="Register Template"
+                  value={effectiveTemplate}
+                  onChange={(e) => setRegisterTemplate(e.target.value as RegisterTemplate)}
+                >
+                  {registerTemplateOptions.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, mb: 2.5 }}>
+                {templateLocked
+                  ? "Locked: risks already use this team, so its template can no longer be changed."
+                  : `${registerTemplateOptions.find((o) => o.value === effectiveTemplate)?.hint} Fixed once a risk uses the team.`}
+              </Typography>
+            </>
+          )}
           <TextField
             fullWidth
             multiline

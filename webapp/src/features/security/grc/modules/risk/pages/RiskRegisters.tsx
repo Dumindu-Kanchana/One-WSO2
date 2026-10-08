@@ -68,6 +68,7 @@ import {
   fetchActionPlans,
   fetchAssignmentTeams,
   fetchComplianceReferences,
+  fetchLookupOptions,
   fetchRiskDetail,
   fetchRisks,
   fetchRiskScores,
@@ -84,6 +85,8 @@ import type {
   ComplianceReference,
   Escalation,
   HistoryEntry,
+  LookupOption,
+  RiskEnvironment,
   RiskDetail,
   RiskListItem,
   RiskScore,
@@ -105,6 +108,7 @@ import ActionPlanDialog from "./risk-registers/ActionPlanDialog";
 import type { ActionPlanPayload } from "./risk-registers/ActionPlanDialog";
 import EscalationCommentDialog from "./risk-registers/EscalationCommentDialog";
 import ColumnFilter from "./risk-registers/ColumnFilter";
+import { ENVIRONMENTS, templateInView } from "./add-risk/templates";
 import DateRangeFilter from "./risk-registers/DateRangeFilter";
 import {
   ALL_OPEN_STATUSES,
@@ -223,6 +227,11 @@ interface Filters {
   riskType: string[];
   treatmentStrategy: string[];
   ownerId: number[];
+  // Register-template columns' filters. Only meaningful while the matching
+  // column is shown (see templateInView), and cleared when it is hidden.
+  customerId: number[];
+  environment: RiskEnvironment[];
+  platformId: number[];
   submittedFrom: string;
   submittedTo: string;
   dueFrom: string;
@@ -238,6 +247,9 @@ const EMPTY_FILTERS: Filters = {
   riskType: [],
   treatmentStrategy: [],
   ownerId: [],
+  customerId: [],
+  environment: [],
+  platformId: [],
   submittedFrom: "",
   submittedTo: "",
   dueFrom: "",
@@ -407,6 +419,10 @@ export default function RiskRegisters(): JSX.Element {
   const [complianceRefs, setComplianceRefs] = useState<ComplianceReference[]>([]);
 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  // Every customer / platform, inactive included: an older risk may still
+  // carry one that has since been deactivated, and must stay filterable.
+  const [customerFilterOptions, setCustomerFilterOptions] = useState<LookupOption[]>([]);
+  const [platformFilterOptions, setPlatformFilterOptions] = useState<LookupOption[]>([]);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerDetail, setDrawerDetail] = useState<RiskDetail | null>(null);
@@ -516,6 +532,36 @@ export default function RiskRegisters(): JSX.Element {
   // "looks like Open" treatment.
   const statusColumnOptions = statusOptions.map((s) => ({ label: statusLabel(s), value: s }));
 
+  // The register-template columns the table shows: only when the Register
+  // filter narrows to registers sharing one non-Standard template — otherwise
+  // there is nothing sensible to put in them and the table is as it always was.
+  const viewTemplate = templateInView(filters.teamId, sourceTeams);
+  useEffect(() => {
+    if (viewTemplate === "MANAGED_SERVICES") {
+      fetchLookupOptions(authFetch, "customers", "ALL").then(setCustomerFilterOptions).catch(console.error);
+    } else if (viewTemplate === "AGGREGATED") {
+      fetchLookupOptions(authFetch, "platforms", "ALL").then(setPlatformFilterOptions).catch(console.error);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per template coming into view
+  }, [viewTemplate]);
+
+  // A filter on a column that is no longer shown would keep hiding rows with
+  // nothing on screen to show why, so it is cleared with the column.
+  useEffect(() => {
+    setFilters((prev) => {
+      const dropManagedServices =
+        viewTemplate !== "MANAGED_SERVICES" && (prev.customerId.length > 0 || prev.environment.length > 0);
+      const dropAggregated = viewTemplate !== "AGGREGATED" && prev.platformId.length > 0;
+      if (!dropManagedServices && !dropAggregated) return prev;
+      return {
+        ...prev,
+        customerId: dropManagedServices ? [] : prev.customerId,
+        environment: dropManagedServices ? [] : prev.environment,
+        platformId: dropAggregated ? [] : prev.platformId,
+      };
+    });
+  }, [viewTemplate]);
+
   useEffect(() => {
     fetchSourceRegisterTeams(authFetch, true).then(setSourceTeams).catch(console.error);
     fetchAssignmentTeams(authFetch).then(setAssignmentTeams).catch(console.error);
@@ -558,6 +604,9 @@ export default function RiskRegisters(): JSX.Element {
         risk_type: filters.riskType.length ? filters.riskType : undefined,
         treatment_strategy: filters.treatmentStrategy.length ? filters.treatmentStrategy : undefined,
         owner_id: filters.ownerId.length ? filters.ownerId : undefined,
+        customer_id: filters.customerId.length ? filters.customerId : undefined,
+        environment: filters.environment.length ? filters.environment : undefined,
+        platform_id: filters.platformId.length ? filters.platformId : undefined,
         submitted_from: filters.submittedFrom || undefined,
         submitted_to: filters.submittedTo || undefined,
         due_from: filters.dueFrom || undefined,
@@ -932,7 +981,8 @@ export default function RiskRegisters(): JSX.Element {
 
   const showStatusCol = activeTab === "approved" || activeTab === "overdue" || allStagesView;
   const showRiskTypeCol = activeTabDef.showRiskType || allStagesView;
-  const colSpan = 8 + (showStatusCol ? 1 : 0) + (showRiskTypeCol ? 1 : 0);
+  const templateColumns = viewTemplate === "MANAGED_SERVICES" ? 2 : viewTemplate === "AGGREGATED" ? 1 : 0;
+  const colSpan = 8 + (showStatusCol ? 1 : 0) + (showRiskTypeCol ? 1 : 0) + templateColumns;
 
   // Human-readable summary of the applied dashboard filter, e.g.
   // "Medium · To be Remediated · Asgardeo".
@@ -1026,6 +1076,47 @@ export default function RiskRegisters(): JSX.Element {
                     />
                   </Box>
                 </TableCell>
+                {viewTemplate === "MANAGED_SERVICES" && (
+                  <>
+                    <TableCell sx={{ fontWeight: 700 }}>
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        Customer
+                        <ColumnFilter
+                          label="Customer"
+                          options={customerFilterOptions.map((c) => ({ label: c.name, value: String(c.id) }))}
+                          selected={filters.customerId.map(String)}
+                          onChange={(v) => setColumnFilter("customerId", v.map(Number))}
+                          searchable
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>
+                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                        Environment
+                        <ColumnFilter
+                          label="Environment"
+                          options={ENVIRONMENTS.map((e) => ({ label: e.label, value: e.value }))}
+                          selected={filters.environment}
+                          onChange={(v) => setColumnFilter("environment", v as RiskEnvironment[])}
+                        />
+                      </Box>
+                    </TableCell>
+                  </>
+                )}
+                {viewTemplate === "AGGREGATED" && (
+                  <TableCell sx={{ fontWeight: 700 }}>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      Platform
+                      <ColumnFilter
+                        label="Platform"
+                        options={platformFilterOptions.map((p) => ({ label: p.name, value: String(p.id) }))}
+                        selected={filters.platformId.map(String)}
+                        onChange={(v) => setColumnFilter("platformId", v.map(Number))}
+                        searchable
+                      />
+                    </Box>
+                  </TableCell>
+                )}
                 <TableCell sx={{ fontWeight: 700 }}>
                   <Box sx={{ display: "flex", alignItems: "center" }}>
                     Residual Level
@@ -1145,6 +1236,27 @@ export default function RiskRegisters(): JSX.Element {
                     <TableCell>
                       <Typography variant="body2">{risk.source_register_name}</Typography>
                     </TableCell>
+                    {viewTemplate === "MANAGED_SERVICES" && (
+                      <>
+                        <TableCell>
+                          <Typography variant="body2">{risk.customer_name || "—"}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {risk.environments.length > 0
+                              ? risk.environments.map((e) => ENVIRONMENTS.find((o) => o.value === e)?.label ?? e).join(", ")
+                              : "—"}
+                          </Typography>
+                        </TableCell>
+                      </>
+                    )}
+                    {viewTemplate === "AGGREGATED" && (
+                      <TableCell>
+                        <Typography variant="body2">
+                          {risk.platform_names.length > 0 ? risk.platform_names.join(", ") : "—"}
+                        </Typography>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <LevelChip level={risk.risk_level} color={risk.risk_level_color} />
                     </TableCell>

@@ -28,7 +28,7 @@ import {
 } from "./categoryViews";
 
 function team(id: number, name: string, code: string | null): RiskTeam {
-  return { id, name, code, description: null, team_type: "BOTH", status: "ACTIVE" };
+  return { id, name, code, description: null, team_type: "BOTH", register_template: "STANDARD", status: "ACTIVE" };
 }
 
 function repeated(registerId: number, registerName: string, categoryId: number): RepeatedCategory {
