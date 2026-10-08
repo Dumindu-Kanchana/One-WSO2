@@ -67,15 +67,15 @@ describe("the Download Stats addresses", () => {
     expect(where()).toBe(downloadStatsPaths.overview);
   });
 
-  // A bookmark made during the preview carries its filters in the query
-  // string, and a redirect that dropped them would open a different view.
+  // An earlier address carries its filters in the query string, and a
+  // redirect that dropped them would open a different view.
   it.each([
     ["/engineering/downloads", downloadStatsPaths.downloads],
     ["/engineering/versions", downloadStatsPaths.versions],
     ["/engineering/packages", downloadStatsPaths.packages],
     ["/engineering/repository-stats", downloadStatsPaths.repositoryStats],
     ["/engineering/admin", downloadStatsPaths.admin],
-  ])("carry a preview-era bookmark of %s to %s, query string and all", (old, current) => {
+  ])("forwards an earlier address %s to %s, query string and all", (old, current) => {
     visit(`${old}?from=2026-01-01&interval=month&repo=4`);
     expect(where()).toBe(`${current}?from=2026-01-01&interval=month&repo=4`);
   });

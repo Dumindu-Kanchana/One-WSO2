@@ -251,8 +251,8 @@ export default function App() {
               <Route path="umt/statistics" element={<UmtStatisticsPage />} />
             </>
           )}
-          {/* Engineering → Download Stats, routed as perspective / app / screen
-              with the preview-era addresses redirecting. The feature owns the
+          {/* Engineering → Download Stats, routed as perspective / app / screen,
+              with the earlier addresses forwarding. The feature owns the
               tree, as CadO2 and the GRC modules own theirs; see
               @features/engineering/routes for why it is registered even while
               the engineering preview flag is off. */}

@@ -54,9 +54,11 @@ describe("colorForName", () => {
 
   it("gives a Product the same colour on every screen, whatever else is drawn beside it", () => {
     const alone = colorForName("API Manager");
-    const afterOthers = [...PRODUCTS].reverse().map(colorForName);
+    const afterOthers = [...PRODUCTS].reverse().map((name) => colorForName(name));
     expect(afterOthers[PRODUCTS.length - 1]).toBe(alone);
-    expect(PRODUCTS.map(colorForName)).toEqual([...PRODUCTS].map(colorForName));
+    expect(PRODUCTS.map((name) => colorForName(name))).toEqual(
+      [...PRODUCTS].map((name) => colorForName(name)),
+    );
   });
 
   it("is assigned by name, not by position: reordering the series moves no colour", () => {
@@ -68,7 +70,7 @@ describe("colorForName", () => {
   });
 
   it("spreads different names over more than one colour", () => {
-    expect(new Set(PRODUCTS.map(colorForName)).size).toBeGreaterThan(1);
+    expect(new Set(PRODUCTS.map((name) => colorForName(name))).size).toBeGreaterThan(1);
   });
 
   it("keeps a name's colour stable in each mode, and can shift it between modes", () => {

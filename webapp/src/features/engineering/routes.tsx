@@ -53,11 +53,10 @@ const SCREEN_ELEMENTS: Readonly<Record<DownloadStatsScreen, JSX.Element>> = {
   admin: <EngineeringAdminPage />,
 };
 
-// The preview-era addresses, perspective / screen, and the screen each one
-// now lives at. They redirect while the perspective is in preview and go when
-// it ships. Overview's old address was /engineering itself, which is the
-// landing and already forwards.
-const PREVIEW_ERA_ADDRESSES: ReadonlyArray<readonly [string, DownloadStatsScreen]> = [
+// Earlier addresses that forward to each screen: perspective / screen, and
+// the screen each one now lives at. Overview's earlier address was
+// /engineering itself, which is the landing and already forwards.
+const EARLIER_ADDRESSES: ReadonlyArray<readonly [string, DownloadStatsScreen]> = [
   ["/engineering/downloads", "downloads"],
   ["/engineering/versions", "versions"],
   ["/engineering/packages", "packages"],
@@ -84,7 +83,7 @@ export const engineeringRoutes = (
         element={SCREEN_ELEMENTS[screen]}
       />
     ))}
-    {PREVIEW_ERA_ADDRESSES.map(([old, screen]) => (
+    {EARLIER_ADDRESSES.map(([old, screen]) => (
       <Route
         key={old}
         path={relative(old)}

@@ -46,10 +46,9 @@ import type { MenuApp, MenuAppItem } from "@constants/appMenu";
 /** Root of every Download Stats route: perspective / app. */
 export const DOWNLOAD_STATS_PATH = "/engineering/download-stats";
 
-// Nested under the Engineering perspective's own path. The preview-era port
-// routed the screens as /engineering/<screen>, which made Download Stats the
-// one app whose address skipped the app segment; those addresses now redirect
-// here (see features/engineering/routes.tsx).
+// Nested under the Engineering perspective's own path. Earlier addresses
+// were /engineering/<screen>, so the path skipped the app segment; those
+// addresses now forward here (see features/engineering/routes.tsx).
 export const downloadStatsPaths = {
   overview: `${DOWNLOAD_STATS_PATH}/overview`,
   downloads: `${DOWNLOAD_STATS_PATH}/downloads`,
