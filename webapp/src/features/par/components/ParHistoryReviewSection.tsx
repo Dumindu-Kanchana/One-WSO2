@@ -39,15 +39,15 @@ export default function ParHistoryReviewSection({ reviews }: { reviews: Par360Re
     );
   };
 
+  if (reviews.length === 0) return null;
+
   return (
-    <Accordion variant="outlined" disabled={reviews.length === 0}>
+    <Accordion variant="outlined">
       <AccordionSummary expandIcon={<ChevronDownIcon size={18} />}>
         <Typography variant="h6">360° Feedback</Typography>
       </AccordionSummary>
       <AccordionDetails>
-        {reviews.length === 0 ? (
-          <ParEmptyState text="No 360° feedback received" />
-        ) : completed.length === 0 ? (
+        {completed.length === 0 ? (
           <ParEmptyState text="All 360° feedback was rejected" />
         ) : (
           <Stack spacing={1.5}>

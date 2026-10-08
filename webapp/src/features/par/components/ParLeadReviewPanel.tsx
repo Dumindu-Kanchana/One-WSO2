@@ -73,6 +73,8 @@ type SpecialRatingUi = "NONE" | "TOP5P" | "TOP20P";
 const toSpecialRatingUi = (value: string | undefined): SpecialRatingUi =>
   value === "TOP5P" || value === "TOP20P" ? value : "NONE";
 
+const SPECIAL_RATING_LABELS: Record<SpecialRatingUi, string> = { NONE: "N/A", TOP5P: "Top 5%", TOP20P: "Top 20%" };
+
 // Ports LeadReviewPanel.tsx's lead-only path, plus (via `isAdminView`) its
 // isAdminAuditViewOn branch used from the Admin Portal's Employee View/Team
 // View "Review" action. Not ported even in admin mode: editing the
@@ -433,7 +435,7 @@ export default function ParLeadReviewPanel({
                       Top 5%/20%
                     </Typography>
                     {readOnly ? (
-                      <Chip size="small" label={specialRating} />
+                      <Chip size="small" label={SPECIAL_RATING_LABELS[specialRating]} />
                     ) : (
                       <ComplexSelect
                         fullWidth
@@ -442,9 +444,11 @@ export default function ParLeadReviewPanel({
                         disabled={!specialRatingConfirmed || ratingUpdate.isPending}
                         aria-labelledby="lead-review-special-rating-label"
                       >
-                        <ComplexSelect.MenuItem value="NONE">N/A</ComplexSelect.MenuItem>
-                        <ComplexSelect.MenuItem value="TOP5P">Top 5%</ComplexSelect.MenuItem>
-                        <ComplexSelect.MenuItem value="TOP20P">Top 20%</ComplexSelect.MenuItem>
+                        {(Object.keys(SPECIAL_RATING_LABELS) as SpecialRatingUi[]).map((value) => (
+                          <ComplexSelect.MenuItem key={value} value={value}>
+                            {SPECIAL_RATING_LABELS[value]}
+                          </ComplexSelect.MenuItem>
+                        ))}
                       </ComplexSelect>
                     )}
                   </Box>
@@ -595,17 +599,19 @@ export default function ParLeadReviewPanel({
         </Grid>
       )}
 
-      <Grid size={12}>
-        {reviews.isLoading ? (
-          <Skeleton variant="rectangular" height={72} sx={{ borderRadius: 1.5 }} />
-        ) : reviews.isError ? (
-          <ErrorNotice error={reviews.error} onRetry={() => reviews.refetch()} retrying={reviews.isFetching}>
-            Couldn't load 360° feedback.
-          </ErrorNotice>
-        ) : (
-          <ParHistoryReviewSection reviews={reviews.data ?? []} />
-        )}
-      </Grid>
+      {!(reviews.isSuccess && reviews.data.length === 0) && (
+        <Grid size={12}>
+          {reviews.isLoading ? (
+            <Skeleton variant="rectangular" height={72} sx={{ borderRadius: 1.5 }} />
+          ) : reviews.isError ? (
+            <ErrorNotice error={reviews.error} onRetry={() => reviews.refetch()} retrying={reviews.isFetching}>
+              Couldn't load 360° feedback.
+            </ErrorNotice>
+          ) : (
+            <ParHistoryReviewSection reviews={reviews.data ?? []} />
+          )}
+        </Grid>
+      )}
 
       <Dialog open={confirming} onClose={() => setConfirming(false)} maxWidth="md" fullWidth>
         <DialogTitle>Share Lead's Feedback?</DialogTitle>

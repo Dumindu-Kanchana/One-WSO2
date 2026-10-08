@@ -87,6 +87,38 @@ export function sanitizeParHtml(html: string): string {
   return DOMPurify.sanitize(decodeHtmlEntities(html), SANITIZE_CONFIG);
 }
 
+/** Quill keeps a link typed without a scheme (`www.example.com`) as-is,
+ * which the browser then resolves relative to this app. */
+export function addLinkProtocol(html: string): string {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  let changed = false;
+  template.content.querySelectorAll("a[href]").forEach((anchor) => {
+    const href = anchor.getAttribute("href")!;
+    const fixed = withLinkProtocol(href);
+    if (fixed !== href) {
+      anchor.setAttribute("href", fixed);
+      changed = true;
+    }
+  });
+  // Re-serializing can differ from the editor's own markup, so the input is
+  // handed back untouched unless a link actually changed.
+  return changed ? template.innerHTML : html;
+}
+
+const KNOWN_SCHEME_RE = /^(?:https?|ftps?|mailto|tel|sms):/i;
+const EMAIL_RE = /^[^\s@/:]+@[^\s@/:]+\.[^\s@/:]+$/;
+
+/** Adds https:// to anything without a known scheme, so `localhost:3000/x`
+ * or `example.com:8080` isn't read as a scheme of its own. A bare email
+ * address becomes a mailto: link. A value starting with `/` or `#` is an
+ * in-app link and is kept as typed. */
+export function withLinkProtocol(url: string): string {
+  if (KNOWN_SCHEME_RE.test(url) || /^[/#]/.test(url)) return url;
+  if (EMAIL_RE.test(url)) return `mailto:${url}`;
+  return `https://${url}`;
+}
+
 /** A Quill editor with nothing typed still returns markup (`<p><br></p>`,
  * not `""`), so `.trim() === ""` never catches an empty answer. Strips tags
  * and `&nbsp;` the same way par-app's own validation does

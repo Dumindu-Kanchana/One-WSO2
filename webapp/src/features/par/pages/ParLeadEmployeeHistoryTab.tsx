@@ -78,10 +78,10 @@ function InfoItem({ label, value, secondaryValue }: { label: string; value: stri
       >
         {label}
       </Typography>
-      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
         {value || "—"}
       </Typography>
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
         {secondaryValue || "—"}
       </Typography>
     </Grid>
@@ -493,12 +493,12 @@ export default function ParLeadEmployeeHistoryTab() {
 
       {showLegacyDetails && selectedLegacyRecord && (
         <Stack spacing={2}>
-          <Card variant="outlined" sx={{ p: 2 }}>
-            <Grid container spacing={2} alignItems="center">
+          <Card variant="outlined" sx={{ px: 2, py: 1.25 }}>
+            <Grid container spacing={1.5} alignItems="center">
               <Grid size="auto">
                 {/* Legacy records carry no thumbnail — matches source's own
                     Avatar here, which never passes a src for this branch. */}
-                <Avatar variant="rounded" alt="Employee Thumbnail" sx={{ width: 100, height: 100 }} />
+                <Avatar variant="rounded" alt="Employee Thumbnail" sx={{ width: "3rem", height: "3rem", borderRadius: 3 }} />
               </Grid>
               {(() => {
                 const derived = deriveLegacyRatingFromScore(selectedLegacyRecord.managerScoreCode);
@@ -560,14 +560,14 @@ export default function ParLeadEmployeeHistoryTab() {
 
       {showRealDetails && rating.data && (
         <Stack spacing={2}>
-          <Card variant="outlined" sx={{ p: 2 }}>
-            <Grid container spacing={2} alignItems="center">
+          <Card variant="outlined" sx={{ px: 2, py: 1.25 }}>
+            <Grid container spacing={1.5} alignItems="center">
               <Grid size="auto">
                 <Avatar
                   variant="rounded"
                   src={selectedEmployeeEmail ? thumbnailByEmail.get(selectedEmployeeEmail) : undefined}
                   alt="Employee Thumbnail"
-                  sx={{ width: 100, height: 100 }}
+                  sx={{ width: "3rem", height: "3rem", borderRadius: 3 }}
                 />
               </Grid>
               <Grid size="grow">

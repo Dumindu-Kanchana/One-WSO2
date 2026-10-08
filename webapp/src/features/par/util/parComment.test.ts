@@ -16,6 +16,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  addLinkProtocol,
+  withLinkProtocol,
   decodeParComment,
   encodeParComment,
   isEmptyHtml,
@@ -91,5 +93,48 @@ describe("spotting an empty answer", () => {
 
   it("treats a real answer as not empty", () => {
     expect(isEmptyHtml("<p>Met every goal.</p>")).toBe(false);
+  });
+});
+
+describe("addLinkProtocol", () => {
+  it("adds https:// to a link typed without a scheme", () => {
+    expect(addLinkProtocol('<a href="www.example.com">x</a>')).toBe('<a href="https://www.example.com">x</a>');
+  });
+
+  it("leaves links that already have a scheme alone", () => {
+    const html = '<a href="http://a.com">a</a><a href="mailto:b@c.com">b</a>';
+    expect(addLinkProtocol(html)).toBe(html);
+  });
+
+  it("leaves text that only looks like an href alone", () => {
+    const html = '<p>href="example.com"</p>';
+    expect(addLinkProtocol(html)).toBe(html);
+  });
+});
+
+describe("withLinkProtocol", () => {
+  it("adds https:// only when the URL has no scheme", () => {
+    expect(withLinkProtocol("www.example.com")).toBe("https://www.example.com");
+    expect(withLinkProtocol("http://example.com")).toBe("http://example.com");
+  });
+
+  it("treats a host with a port as having no scheme", () => {
+    expect(withLinkProtocol("localhost:3000/x")).toBe("https://localhost:3000/x");
+    expect(withLinkProtocol("example.com:8080")).toBe("https://example.com:8080");
+  });
+
+  it("turns a bare email address into a mailto: link", () => {
+    expect(withLinkProtocol("user@example.com")).toBe("mailto:user@example.com");
+    expect(withLinkProtocol("mailto:user@example.com")).toBe("mailto:user@example.com");
+  });
+
+  it("keeps ftp: and ftps: links as typed", () => {
+    expect(withLinkProtocol("ftp://host/file")).toBe("ftp://host/file");
+    expect(withLinkProtocol("ftps://host/file")).toBe("ftps://host/file");
+  });
+
+  it("keeps in-app links as typed", () => {
+    expect(withLinkProtocol("/me/performance")).toBe("/me/performance");
+    expect(withLinkProtocol("#section")).toBe("#section");
   });
 });
