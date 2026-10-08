@@ -225,6 +225,10 @@ describe("a screen anyone may open", () => {
     vi.stubGlobal("fetch", fetchMock);
     show("overview");
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    const appTitle = screen.getByRole("heading", { level: 1, name: "GitHub Product Download Stats" });
+    expect(
+      appTitle.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
     expect(
       screen.getByText("Download activity and repository stats across all WSO2 products."),

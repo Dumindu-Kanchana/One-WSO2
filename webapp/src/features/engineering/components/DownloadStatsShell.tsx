@@ -33,10 +33,11 @@ import {
   productDownloadStatsBackendUrl,
 } from "../api/productDownloadStats";
 
-// Shared page frame for every Download Stats screen. The tab bar names the
-// screen, and the header under it is the one-line description. The heading
-// is kept only while that screen's tab is hidden (Admin, until the API has
-// said the caller is an Admin). The shell exists so ONE place owns every
+// Shared page frame for every Download Stats screen. The title above the tab
+// bar names the app, the same place the other shells put theirs. The tab bar
+// names the screen, and the header under it is the one-line description. A
+// screen's own name is a heading only while its tab is hidden (Admin, until
+// the API has said the caller is an Admin). The shell exists so ONE place owns every
 // degraded state and no screen has to remember them (MisShell is the
 // precedent). The ladder, in order:
 //
@@ -124,6 +125,9 @@ export default function DownloadStatsShell({
     // minWidth 0 lets the tab bar scroll inside the page. Without it this box
     // grows to the full label row and the page scrolls sideways instead.
     <Box sx={{ minWidth: 0, maxWidth: "100%" }}>
+      <Typography component="h1" variant="h5" sx={{ mb: 0.5, mt: 0 }}>
+        GitHub Product Download Stats
+      </Typography>
       <RoutedTabs
         basePath={DOWNLOAD_STATS_PATH}
         tabs={screenTabs(showAdminTab)}
