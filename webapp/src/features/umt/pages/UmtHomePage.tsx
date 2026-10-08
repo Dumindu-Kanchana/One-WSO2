@@ -36,6 +36,7 @@ import {
 } from "../components/UmtWidgets";
 import UmtCreateUpdateDialog from "../components/UmtCreateUpdateDialog";
 import UmtShell from "../components/UmtShell";
+import { umtPaths } from "../lib/umtPaths";
 // Key colors by status rather than array position so reordering chart data does
 // not silently change the meaning of a slice.
 const LIFECYCLE_COLORS: Record<string, UmtDashboardColor> = {
@@ -108,7 +109,7 @@ function UmtDashboardBody() {
           <>
             <Button
               variant="outlined"
-              onClick={() => navigate("/umt/updates")}
+              onClick={() => navigate(umtPaths.updates)}
             >
               View updates
             </Button>
@@ -209,13 +210,13 @@ function UmtDashboardBody() {
           <>
             <Button
               variant="outlined"
-              onClick={() => navigate("/umt/release-chunks?status=pending")}
+              onClick={() => navigate(`${umtPaths.releaseChunks}?status=pending`)}
             >
               View pending
             </Button>
             <Button
               variant="outlined"
-              onClick={() => navigate("/umt/release-chunks?status=released")}
+              onClick={() => navigate(`${umtPaths.releaseChunks}?status=released`)}
             >
               View released
             </Button>
@@ -225,7 +226,7 @@ function UmtDashboardBody() {
               <Button
                 variant="contained"
                 startIcon={<Plus size={16} />}
-                onClick={() => navigate("/umt/release-chunks/new")}
+                onClick={() => navigate(umtPaths.newReleaseChunk)}
               >
                 Create
               </Button>

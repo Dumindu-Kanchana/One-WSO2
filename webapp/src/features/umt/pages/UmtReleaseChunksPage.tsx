@@ -21,6 +21,7 @@ import { useUmtGate } from "../api/useUmtGate";
 import UmtPendingReleaseChunksGrid from "../components/release-chunks/UmtPendingReleaseChunksGrid";
 import UmtReleasedChunksGrid from "../components/release-chunks/UmtReleasedChunksGrid";
 import UmtShell from "../components/UmtShell";
+import { umtPaths } from "../lib/umtPaths";
 
 type UmtReleaseChunkStatusFilter = "pending" | "released";
 
@@ -76,7 +77,7 @@ function UmtReleaseChunksBody() {
           <Button
             variant="contained"
             startIcon={<PlusIcon size={16} />}
-            onClick={() => navigate("/umt/release-chunks/new")}
+            onClick={() => navigate(umtPaths.newReleaseChunk)}
           >
             Create
           </Button>

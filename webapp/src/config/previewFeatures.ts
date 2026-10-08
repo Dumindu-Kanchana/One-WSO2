@@ -24,7 +24,7 @@
  * branching the build or holding work out of `main`.
  *
  * ```js
- * ONE_WSO2_PREVIEW_FEATURES: { umt: true },
+ * ONE_WSO2_PREVIEW_FEATURES: { engineering: true, umt: true },
  * ```
  *
  * ## Absent means off
@@ -55,13 +55,12 @@
  */
 export type PreviewFeature =
   /**
-   * The whole UMT perspective — rail entry, launcher tile, landing-page
-   * option, favourites eligibility, and the `/umt` route. UMT is still being
-   * ported: only its dashboard exists so far (see perspectives.ts), and that
-   * is gated as a whole rather than screen-by-screen because the thing that
-   * needs to stay preview-only is the perspective's presence itself, not one
-   * route inside it. `useUmtGate`'s own role check against the UMT backend is
-   * unrelated and keeps working the same regardless of this flag.
+   * Engineering → UMT, the whole app — its rail group and every route under
+   * `/engineering/umt`. Needs `engineering` on as well: UMT lives inside that
+   * perspective, so without it there is no rail to show UMT in. Held back as a
+   * whole, the same way Finance MIS is inside Finance. `useUmtGate`'s own role
+   * check against the UMT backend is unrelated and keeps working the same
+   * regardless of this flag.
    */
   | "umt"
   /* The whole Infra Portal perspective. Still being ported, so the waffle
@@ -73,7 +72,7 @@ export type PreviewFeature =
    * the whole "Promotion" group under People Ops (Lead Portal, Team
    * Promotion History, Functional Lead Portal, Promotion Board Portal,
    * Admin Portal, Promotion Cycle History) — rail entries and routes
-   * alike. Unlike umt/infra this isn't a whole perspective; it's a set of
+   * alike. Unlike infra this isn't a whole perspective; it's a set of
    * items nested inside Me and People Ops, gated the same way so the
    * feature can ship to `main` without going live in production before
    * it's ready.

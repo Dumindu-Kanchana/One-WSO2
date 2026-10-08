@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PROMOTION_ADMIN_PORTAL_ITEM_ID,
   PROMOTION_CYCLE_HISTORY_ITEM_ID,
@@ -30,6 +30,12 @@ import { subscriptionVisibility } from "@features/subscriptions/api/useSubscript
 import { umtVisibility } from "@features/umt/api/useUmtGate";
 
 const quiet = { isLoading: false, isResolving: false };
+
+const umtBackend = vi.hoisted(() => ({ configured: true }));
+vi.mock("@config/apiConfig", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@config/apiConfig")>()),
+  isUmtBackendConfigured: () => umtBackend.configured,
+}));
 
 describe("salesVisibility", () => {
   it("passes the section id through to the sales gate", () => {
@@ -87,20 +93,57 @@ describe("parVisibility", () => {
 });
 
 describe("umtVisibility", () => {
-  it("hides Product Management on a failed read and does not ask the landing to retry", () => {
-    const retry = vi.fn();
-    const answer = umtVisibility({
+  const umtGate = (over: Partial<Parameters<typeof umtVisibility>[0]> = {}) =>
+    umtVisibility({
       isAuthorized: false,
       isUser: false,
       isAdmin: false,
       isProductLead: false,
       hasRole: () => false,
       isResolving: false,
-      isError: true,
-      errorMessage: "boom",
-      retry,
+      isError: false,
+      retry: () => undefined,
+      ...over,
     });
 
+  beforeEach(() => {
+    umtBackend.configured = true;
+  });
+
+  it("hides every UMT row from someone UMT gives no role", () => {
+    const answer = umtGate();
+    for (const id of ["engineering-umt", "umt-overview", "umt-updates", "umt-products"]) {
+      expect(answer.canSee(id), id).toBe(false);
+    }
+  });
+
+  it("shows a UMT user every row but Product Management", () => {
+    const answer = umtGate({ isAuthorized: true, isUser: true });
+    expect(answer.canSee("umt-updates")).toBe(true);
+    expect(answer.canSee("engineering-umt")).toBe(true);
+    expect(answer.canSee("umt-products")).toBe(false);
+  });
+
+  it("shows Product Management to a UMT admin", () => {
+    expect(umtGate({ isAuthorized: true, isAdmin: true }).canSee("umt-products")).toBe(true);
+  });
+
+  it("hides the rows while the role check is in progress", () => {
+    expect(umtGate({ isAuthorized: true, isResolving: true }).canSee("umt-updates")).toBe(false);
+  });
+
+  // With no backend URL nobody's role can be confirmed, and UMT asks nothing.
+  // The rows stay so their pages can say UMT is not connected.
+  it("keeps the rows, all but Product Management, while the backend is unset", () => {
+    umtBackend.configured = false;
+    const answer = umtGate();
+    expect(answer.canSee("umt-updates")).toBe(true);
+    expect(answer.canSee("umt-products")).toBe(false);
+  });
+
+  it("hides the rows on a failed read and does not ask the landing to retry", () => {
+    const answer = umtGate({ isError: true, errorMessage: "boom" });
+    expect(answer.canSee("umt-updates")).toBe(false);
     expect(answer.canSee("umt-products")).toBe(false);
     expect(answer.error).toBeUndefined();
   });

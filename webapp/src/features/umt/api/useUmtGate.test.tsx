@@ -31,6 +31,7 @@ const userInfo: {
 };
 
 const asgardeo: { isSignedIn: boolean } = { isSignedIn: true };
+const backend: { configured: boolean } = { configured: true };
 
 vi.mock("./useUmtUserInfo", () => ({
   useUmtUserInfo: () => userInfo,
@@ -38,6 +39,11 @@ vi.mock("./useUmtUserInfo", () => ({
 
 vi.mock("@asgardeo/react", () => ({
   useAsgardeo: () => asgardeo,
+}));
+
+vi.mock("@config/apiConfig", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@config/apiConfig")>()),
+  isUmtBackendConfigured: () => backend.configured,
 }));
 
 const { __resetUmtGateCacheForTests, useUmtGate } = await import("./useUmtGate");
@@ -50,6 +56,7 @@ beforeEach(() => {
   userInfo.error = undefined;
   userInfo.refetch.mockReset();
   asgardeo.isSignedIn = true;
+  backend.configured = true;
   __resetUmtGateCacheForTests();
 });
 
@@ -86,6 +93,14 @@ describe("gate states", () => {
     expect(gate().isResolving).toBe(true);
   });
 
+  // With no backend URL the query never runs, so it stays pending for ever.
+  // A gate that reported that as resolving would hold the Engineering rail.
+  it("is not resolving while the UMT backend is unset", () => {
+    backend.configured = false;
+    userInfo.isPending = true;
+    expect(gate().isResolving).toBe(false);
+  });
+
   it("reports a failed lookup separately from a denial", () => {
     userInfo.isError = true;
     userInfo.error = new Error("gateway unavailable");
@@ -115,7 +130,7 @@ describe("gate states", () => {
   });
 });
 
-describe("remount smoothing (the /umt <-> /umt/updates navigation flash)", () => {
+describe("remount smoothing (the dashboard <-> Updates navigation flash)", () => {
   it("serves the last resolved decision instead of re-resolving on a remount", () => {
     userInfo.data = { roles: [555] };
     expect(gate().isResolving).toBe(false);

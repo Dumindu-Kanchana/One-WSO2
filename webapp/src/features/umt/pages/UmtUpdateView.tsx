@@ -45,6 +45,7 @@ import { useUmtMarkAsDuplicate, useUmtOnHoldUpdate } from "../api/useUmtUpdateAc
 import { useUmtUpdateSubscription } from "../api/useUmtUpdateSubscription";
 import { useUmtUserInfo } from "../api/useUmtUserInfo";
 import { readPersistedSelectedTab, writePersistedSelectedTab } from "../lib/umtLocalState";
+import { umtPaths } from "../lib/umtPaths";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import UmtShell from "../components/UmtShell";
 import UmtUpdateDetailsGrid from "../components/UmtUpdateDetailsGrid";
@@ -64,7 +65,7 @@ export default function UmtUpdateView() {
   const { id } = useParams<{ id: string }>();
 
   return (
-    <UmtShell title="Update Information" backTo="/umt/updates">
+    <UmtShell title="Update Information" backTo={umtPaths.updates}>
       {/* React Router reuses this element across a params-only change (Back /
           Forward between two detail pages, an edited URL, or the list's own
           openUpdateOnTab while already on a detail page), so every piece of

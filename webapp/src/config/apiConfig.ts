@@ -630,7 +630,7 @@ export function isUmtBackendConfigured(): boolean {
 }
 
 export const umtServiceUrls = {
-  // GET — caller identity and UMT-local roles; this is the perspective gate.
+  // GET — caller identity and UMT-local roles; this is the UMT access gate.
   userInfo: `${umtBackendUrl}/update/user-info`,
   // GET — products, versions, issue types, lifecycles and user emails shared
   // by the update workflows. This endpoint deliberately sits outside /update.

@@ -42,6 +42,7 @@ import { useUmtUpdatesByLifecycleState } from "../api/useUmtUpdates";
 import { useUmtCreateReleaseChunk } from "../api/useUmtReleaseChunkActions";
 import { useUmtGate } from "../api/useUmtGate";
 import { umtReleaseChunkCollisionProducts } from "../lib/umtReleaseChunks";
+import { umtPaths } from "../lib/umtPaths";
 import UmtShell from "../components/UmtShell";
 import { ChunkCell, ChunkLine } from "../components/release-chunks/umtReleaseChunkGridPrimitives";
 import { UMT_CHUNK_GRID_SX } from "../components/release-chunks/umtReleaseChunkGridSx";
@@ -64,7 +65,7 @@ function selectedRowIds(
 
 export default function UmtCreateReleaseChunkPage() {
   return (
-    <UmtShell title="Create Release Chunk" backTo="/umt/release-chunks">
+    <UmtShell title="Create Release Chunk" backTo={umtPaths.releaseChunks}>
       <UmtCreateReleaseChunkBody />
     </UmtShell>
   );
@@ -110,7 +111,7 @@ function UmtCreateReleaseChunkForm() {
     try {
       await createChunk.mutateAsync(updateIds);
       showSuccess("Release chunk created successfully.");
-      navigate("/umt/release-chunks?status=pending");
+      navigate(`${umtPaths.releaseChunks}?status=pending`);
     } catch (error) {
       showError(describeError(error));
     }
@@ -191,7 +192,7 @@ function UmtCreateReleaseChunkForm() {
                 size="small"
                 aria-label={`View update ${params.row.id}`}
                 component={RouterLink}
-                to={`/umt/updates/${params.row.id}`}
+                to={umtPaths.update(params.row.id)}
               >
                 <EyeIcon size={16} />
               </IconButton>

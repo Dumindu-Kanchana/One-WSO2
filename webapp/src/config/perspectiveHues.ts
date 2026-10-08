@@ -27,8 +27,8 @@
  * the launcher is the one surface with nothing else doing that job.
  *
  * SIZING, and the constraint that will eventually break this: the registry holds
- * nine perspective hues. Infra is the ninth, kept as its own teal so the launcher
- * tile stays distinct from UMT. Hue discrimination collapses somewhere past that,
+ * eleven perspective hues, two past the nine perspectiveHues.test.ts allows. Hue
+ * discrimination collapses somewhere past nine,
  * and each new perspective wants one — at which point the answer is a different
  * encoding (hue per domain family, or back to monochrome), not a longer list.
  * perspectiveHues.test.ts caps the palette at nine so that decision is forced
@@ -128,8 +128,8 @@ export const PERSPECTIVE_HUES: Record<string, PerspectiveHue> = {
   // and Legal at 225, 18 apart). It reads as audit/caution, which suits the
   // subject, but that is a bonus rather than the reason.
   //
-  // Together with UMT below, this takes the palette to eight hues before Infra.
-  // Infra is the ninth, and the next perspective should force a different encoding.
+  // With Infra after it, the palette reaches eight hues, and the next
+  // perspective should force a different encoding.
   security: {
     hue: "#B8860B",
     light: { bg: "#F9EFD7", fg: "#7E5C07" },
@@ -139,16 +139,6 @@ export const PERSPECTIVE_HUES: Record<string, PerspectiveHue> = {
     hue: "#6C89E0",
     light: { bg: "#CFD8F3", fg: "#3854A8" },
     dark: { bg: "#262A34", fg: "#6C89E0" },
-  },
-
-  // Leaf green puts UMT between Security's gold and Finance's teal without
-  // crowding either: its 84-degree hue is 41 degrees from Security and 78 from
-  // Finance. The wash/foreground pairs retain the same contrast headroom
-  // asserted for every launcher tile below.
-  umt: {
-    hue: "#5F8F1F",
-    light: { bg: "#EFF6E6", fg: "#426A16" },
-    dark: { bg: "#20281A", fg: "#8ABF42" },
   },
 
   // Sales. Orchid at 301 degrees, and the ninth hue — see the cap note in
