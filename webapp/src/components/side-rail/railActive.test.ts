@@ -216,3 +216,46 @@ describe("visibleLeavesOf", () => {
     expect(visibleLeavesOf(anchors, () => true)).toEqual([]);
   });
 });
+
+// Download Stats is one rail row, and every screen under it — the ones the
+// tab bar offers — has to light that row. The screens are siblings, not routes
+// nested under Overview, which is why a prefix of Overview is not enough.
+window.config = {
+  ...(window.config ?? {}),
+  ONE_WSO2_PREVIEW_FEATURES: {
+    ...(window.config?.ONE_WSO2_PREVIEW_FEATURES ?? {}),
+    engineering: true,
+  },
+} as Window["config"];
+
+const { PERSPECTIVES } = await import("@constants/perspectives");
+const downloadStats = PERSPECTIVES.find((p) => p.key === "engineering")?.sections?.find(
+  (section) => section.label === "Download Stats",
+);
+
+describe("Download Stats stays selected on every screen", () => {
+  const urls = [
+    "/engineering/download-stats/overview",
+    "/engineering/download-stats/downloads",
+    "/engineering/download-stats/versions",
+    "/engineering/download-stats/packages",
+    "/engineering/download-stats/repository-stats",
+    "/engineering/download-stats/admin",
+  ];
+
+  for (const url of urls) {
+    it(`lights Download Stats on ${url}`, () => {
+      expect(downloadStats?.inTabs).toBe(true);
+      expect(
+        activeItemId({
+          sections: downloadStats ? [downloadStats] : [],
+          pathname: url,
+          overviewId: "overview",
+        }),
+      ).toBe(downloadStats?.id);
+      // A leaf has nothing to expand. Treating it as an open group asks the
+      // rail for a flyout of screens it no longer lists.
+      expect(activeGroupIds(downloadStats ? [downloadStats] : [], url).size).toBe(0);
+    });
+  }
+});

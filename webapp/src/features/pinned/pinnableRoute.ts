@@ -87,10 +87,13 @@ function findInSection(
   section: PerspectiveSection,
   pathname: string,
 ): string | undefined {
-  if (section.path === pathname) return section.label;
+  // A child wins when it shares the section's own path. Download Stats' rail
+  // row opens Overview, so that address is both the row and the screen, and
+  // the pin names the screen: "Download Stats · Overview".
   for (const child of section.children ?? []) {
     if (child.path === pathname) return qualify(section.label, child.label);
   }
+  if (section.path === pathname) return section.label;
   return undefined;
 }
 

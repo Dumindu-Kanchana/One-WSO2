@@ -96,6 +96,10 @@ export interface MenuApp {
   // right; for one that is about to grow, it teaches the wrong shape — the item
   // disappears as a concept, and reappears the day a second one lands.
   alwaysGroup?: boolean;
+  // One rail row, named for the app, opening its first item. The items stay
+  // on the section so a pin can still name each screen; the app's tab bar is
+  // what offers them. Mutually exclusive with `alwaysGroup`.
+  inTabs?: boolean;
 }
 
 // Items of an app the caller is allowed to see, given their capabilities.

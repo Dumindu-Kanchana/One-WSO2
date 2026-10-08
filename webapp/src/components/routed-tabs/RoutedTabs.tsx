@@ -38,10 +38,13 @@ export default function RoutedTabs({
   basePath,
   tabs,
   ariaLabel,
+  scrollable = false,
 }: {
   basePath: string;
   tabs: readonly RoutedTabDef[];
   ariaLabel: string;
+  /** One row that scrolls sideways when the labels do not fit. */
+  scrollable?: boolean;
 }) {
   const { pathname } = useLocation();
 
@@ -59,8 +62,13 @@ export default function RoutedTabs({
     <Tabs
       value={active ? active.segment : false}
       aria-label={ariaLabel}
+      variant={scrollable ? "scrollable" : "standard"}
+      scrollButtons={scrollable ? "auto" : undefined}
+      allowScrollButtonsMobile={scrollable}
       sx={{
         mb: 2,
+        minWidth: 0,
+        maxWidth: "100%",
         minHeight: 36,
         "& .MuiTab-root": {
           minHeight: 36,

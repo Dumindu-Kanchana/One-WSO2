@@ -86,6 +86,10 @@ export interface PerspectiveSection {
   path?: string;
   // Render as a group even with a single visible child — see MenuApp.alwaysGroup.
   alwaysGroup?: boolean;
+  // One rail row whose screens the app offers as tabs — see MenuApp.inTabs.
+  // Children stay so a pin can name each screen; the rail does not list them.
+  // The row's path is the first item, which is where choosing the app opens.
+  inTabs?: boolean;
   // When set, a leaf item leaves One WSO2 entirely: it renders as an anchor
   // that opens in a new tab, and is never route-highlighted because no route
   // of ours is active while the user is over there. Mutually exclusive with
@@ -103,6 +107,8 @@ function appsToSections(apps: readonly MenuApp[]): PerspectiveSection[] {
     label: app.name,
     icon: app.icon,
     alwaysGroup: app.alwaysGroup,
+    inTabs: app.inTabs,
+    path: app.inTabs ? app.items[0]?.path : undefined,
     children: app.items.map((it) => ({
       id: it.id,
       label: it.label,
@@ -769,11 +775,11 @@ export const PERSPECTIVES: readonly PerspectiveDef[] = [
   // Infra Portal: Infra is GitHub administration, and this is release
   // downloads, package downloads, and repository stats. It is an app inside
   // the perspective the way MIS is inside Finance — its own registry
-  // (downloadStatsApps.ts), spread in as one group — because its Admin row is
-  // gated by the Download Stats API's own user-info, not by `requires`. The
-  // perspective stays hidden until the preview flag is on. The routes stay
-  // registered either way, so a direct visit while the flag is off says
-  // Engineering is not available.
+  // (downloadStatsApps.ts), one rail row, screens in a tab bar — because its
+  // Admin screen is gated by the Download Stats API's own user-info, not by
+  // `requires`. The perspective stays hidden until the preview flag is on.
+  // The routes stay registered either way, so a direct visit while the flag
+  // is off says Engineering is not available.
   ...(isPreviewEnabled("engineering")
     ? [
         {

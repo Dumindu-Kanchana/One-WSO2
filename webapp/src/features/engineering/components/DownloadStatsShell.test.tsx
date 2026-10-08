@@ -65,7 +65,8 @@ function userInfo(answer: () => Promise<Response>) {
 
 function show(screenKey: DownloadStatsScreen, actions?: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return Object.assign(
+    render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[downloadStatsPaths[screenKey]]}>
         <Routes>
@@ -80,6 +81,8 @@ function show(screenKey: DownloadStatsScreen, actions?: React.ReactNode) {
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
+    ),
+    { client },
   );
 }
 
@@ -87,19 +90,156 @@ const theScreen = () => screen.queryByText("the real screen");
 const denial = () => screen.queryByText(/don't have access to admin/i);
 const ADMIN_DESCRIPTION = "Manage tracked repositories and review DB sync and scraper job history.";
 
-describe("a screen anyone may open", () => {
-  it("renders, with its title and description above it", () => {
+describe("the screen tabs", () => {
+  it("offers the five open screens above the description, with the open one selected", async () => {
     configure();
+    vi.stubGlobal("fetch", userInfo(async () => json({ email: "a@wso2.com", isAdmin: false })));
+    show("downloads");
+
+    const tabs = await screen.findAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      "Overview",
+      "Downloads",
+      "Versions",
+      "Packages",
+      "Repository Stats",
+    ]);
+    expect(screen.getByRole("tab", { name: "Downloads" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("href", downloadStatsPaths.overview);
+    expect(screen.getByRole("tab", { name: "Repository Stats" })).toHaveAttribute(
+      "href",
+      downloadStatsPaths.repositoryStats,
+    );
+    expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument();
+
+    const description = screen.getByText(
+      "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
+    );
+    expect(
+      screen.getByRole("tablist").compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Downloads" })).not.toBeInTheDocument();
+  });
+
+  it("adds Admin, last and selected, when the API says the reader is an Admin", async () => {
+    configure();
+    vi.stubGlobal("fetch", userInfo(async () => json({ email: "a@wso2.com", isAdmin: true })));
+    show("admin", <button type="button">Add tracked repository</button>);
+
+    expect(await screen.findByRole("tab", { name: "Admin" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Overview",
+      "Downloads",
+      "Versions",
+      "Packages",
+      "Repository Stats",
+      "Admin",
+    ]);
+    expect(screen.getByRole("tab", { name: "Admin" })).toHaveAttribute("href", downloadStatsPaths.admin);
+    expect(screen.getByRole("button", { name: "Add tracked repository" })).toBeInTheDocument();
+  });
+
+  it("keeps the five tabs and leaves them all unlit while the Admin check is running", () => {
+    configure();
+    vi.stubGlobal("fetch", userInfo(() => new Promise<Response>(() => {})));
+    show("admin");
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Overview",
+      "Downloads",
+      "Versions",
+      "Packages",
+      "Repository Stats",
+    ]);
+    expect(screen.queryByRole("tab", { selected: true })).not.toBeInTheDocument();
+    expect(screen.getByText(/checking your admin access/i)).toBeInTheDocument();
+  });
+
+  it("keeps the tabs above the description when Download Stats is not connected", () => {
+    configure({ ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "" });
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     show("overview");
-    expect(screen.getByRole("heading", { name: "Overview" })).toBeInTheDocument();
+
+    expect(screen.getAllByRole("tab")).toHaveLength(5);
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/download stats isn't connected yet/i)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the five tabs unlit on an Admin address the reader is refused", async () => {
+    configure();
+    vi.stubGlobal("fetch", userInfo(async () => json({ email: "a@wso2.com", isAdmin: false })));
+    show("admin");
+
+    expect(await screen.findByText(/don't have access to admin/i)).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { selected: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
+  });
+
+  // A later failure must not keep the previous "yes". The query still holds
+  // that answer, and lighting Admin over the error would say the check passed.
+  it("drops the Admin tab when a later check fails, and leaves the others unlit", async () => {
+    configure();
+    let fail = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (!url.includes("/user-info")) return json({}, 404);
+        if (fail) return json({ message: "gateway timed out" }, 502);
+        return json({ email: "a@wso2.com", isAdmin: true });
+      }),
+    );
+    const { client } = show("admin");
+
+    expect(await screen.findByRole("tab", { name: "Admin" })).toHaveAttribute("aria-selected", "true");
+    fail = true;
+    await client.invalidateQueries({ queryKey: ["product-download-stats", "user-info"] });
+
+    await waitFor(() => expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("tab", { selected: true })).not.toBeInTheDocument();
+    expect(screen.getByText(/couldn't check admin access/i)).toBeInTheDocument();
+  });
+
+  it("keeps the five tabs unlit when the Admin check fails", async () => {
+    configure();
+    vi.stubGlobal("fetch", userInfo(async () => json({ message: "gateway timed out" }, 502)));
+    show("admin");
+
+    expect(await screen.findByText(/couldn't check admin access/i)).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { selected: true })).not.toBeInTheDocument();
+  });
+
+  it("offers no tabs while Engineering is not available", () => {
+    configure({ ONE_WSO2_PREVIEW_FEATURES: {} });
+    show("overview");
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.getByText("Engineering isn't available yet.")).toBeInTheDocument();
+  });
+});
+
+describe("a screen anyone may open", () => {
+  it("renders the description under the tab, without a second title", async () => {
+    configure();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/user-info")) return json({ email: "a@wso2.com", isAdmin: false });
+      return json({}, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    show("overview");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
     expect(
       screen.getByText("Download activity and repository stats across all WSO2 products."),
     ).toBeInTheDocument();
     expect(theScreen()).toBeInTheDocument();
-    // Only Admin is the API's to decide, so nobody else is asked about.
-    expect(fetchMock).not.toHaveBeenCalled();
+    // The screen itself asks for nothing. The one request is the Admin tab.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      expect.stringContaining("/user-info"),
+    ]);
   });
 
   it.each<[DownloadStatsScreen, string, string]>([
@@ -124,11 +264,12 @@ describe("a screen anyone may open", () => {
       "Repository Stats",
       "Stars, forks, watchers, open issues, and clone traffic over time for each tracked repository.",
     ],
-  ])("opens %s titled %s with its sentence beneath", (key, title, description) => {
+  ])("opens %s with its sentence and no second title", (key, title, description) => {
     configure();
     vi.stubGlobal("fetch", vi.fn());
     show(key);
-    expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: title })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("heading", { name: title })).not.toBeInTheDocument();
     expect(screen.getByText(description)).toBeInTheDocument();
     expect(theScreen()).toBeInTheDocument();
   });
@@ -159,8 +300,9 @@ describe("the ladder in front of every screen", () => {
     show("admin");
     expect(screen.getByText(/download stats isn't connected yet/i)).toBeInTheDocument();
     expect(screen.getByText("ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL")).toBeInTheDocument();
-    // Still named and described: nobody has been refused anything.
-    expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
+    // The tab names the screen; the sentence describes it. Nobody has been refused.
+    expect(screen.getByRole("tab", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
     expect(screen.getByText(ADMIN_DESCRIPTION)).toBeInTheDocument();
     expect(denial()).not.toBeInTheDocument();
     expect(theScreen()).not.toBeInTheDocument();
@@ -220,7 +362,7 @@ describe("the Admin check", () => {
     show("admin", <button type="button">Add tracked repository</button>);
     expect(await screen.findByText(/don't have access to admin/i)).toBeInTheDocument();
     expect(screen.getByText(/ask someone who already manages that list/i)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
     // The description sells a screen being withheld, so it goes with the screen.
     expect(screen.queryByText(ADMIN_DESCRIPTION)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add tracked repository" })).not.toBeInTheDocument();
@@ -232,7 +374,8 @@ describe("the Admin check", () => {
     vi.stubGlobal("fetch", userInfo(async () => json({ email: "a@wso2.com", isAdmin: true })));
     show("admin", <button type="button">Add tracked repository</button>);
     expect(await screen.findByText("the real screen")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Admin" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
     expect(screen.getByText(ADMIN_DESCRIPTION)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add tracked repository" })).toBeInTheDocument();
     expect(denial()).not.toBeInTheDocument();

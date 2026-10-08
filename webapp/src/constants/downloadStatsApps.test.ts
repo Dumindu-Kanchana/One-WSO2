@@ -39,10 +39,10 @@ const app = DOWNLOAD_STATS_APPS[0];
 const items = DOWNLOAD_STATS_APPS.flatMap((entry) => entry.items);
 
 describe("the Download Stats registry", () => {
-  it("is one app named Download Stats, kept as a group even with one visible row", () => {
+  it("is one app named Download Stats, offered as one rail row", () => {
     expect(DOWNLOAD_STATS_APPS).toHaveLength(1);
     expect(app.name).toBe("Download Stats");
-    expect(app.alwaysGroup).toBe(true);
+    expect(app.inTabs).toBe(true);
     expect(app.icon).toBeDefined();
   });
 
@@ -57,7 +57,7 @@ describe("the Download Stats registry", () => {
     }
   });
 
-  it("lists the six screens in rail order, with the agreed slugs", () => {
+  it("lists the six screens in tab order, with the agreed slugs", () => {
     expect(items.map((item) => item.label)).toEqual([
       "Overview",
       "Downloads",
@@ -122,16 +122,16 @@ describe("the Download Stats registry", () => {
     expect(DOWNLOAD_STATS_SCREENS.admin.requires).toEqual(["admin"]);
   });
 
-  it("reaches the rail as a group under Engineering", () => {
+  // The rail row opens Overview. The screens stay on the section so a pin can
+  // still name each one; the rail test is what proves they are not rows.
+  it("reaches the rail as one Download Stats row that opens Overview", () => {
     const engineering = PERSPECTIVES.find((p) => p.key === "engineering");
     const group = (engineering?.sections ?? []).find((s) => s.id === `sec-app-${app.key}`);
     expect(group?.label).toBe("Download Stats");
-    expect(group?.alwaysGroup).toBe(true);
+    expect(group?.inTabs).toBe(true);
+    expect(group?.path).toBe(downloadStatsPaths.overview);
     expect(group?.icon).toBeDefined();
     expect(group?.children?.map((c) => c.label)).toEqual(items.map((item) => item.label));
-    expect(group?.children?.map((c) => c.icon)).toEqual(items.map((item) => item.icon));
-    for (const item of items) {
-      expect(item.icon, `${item.label} has no rail icon`).toBeDefined();
-    }
+    expect(group?.children?.map((c) => c.path)).toEqual(items.map((item) => item.path));
   });
 });

@@ -136,10 +136,7 @@ function Where() {
   return <div data-testid="where">{useLocation().pathname}</div>;
 }
 
-// A rail group renders its children only while it is OPEN, and a group opens
-// itself when it holds the current route. So each case starts on a Download
-// Stats screen — landing on /engineering would leave the group shut and every
-// assertion below vacuously true.
+// Each case starts on a Download Stats screen, the same place the row opens.
 function showRail(initial: string = downloadStatsPaths.overview) {
   return render(
     <MemoryRouter initialEntries={[initial]}>
@@ -170,10 +167,6 @@ async function settled(fetchMock: ReturnType<typeof vi.fn>) {
   });
 }
 
-/** The rail's rows, top to bottom, by what each one says. */
-const rowLabels = (): string[] =>
-  screen.getAllByRole("listitem").map((row) => row.textContent?.trim() ?? "");
-
 /** The row an on-screen label sits in. */
 const rowOf = (label: string): HTMLElement => {
   const row = screen.getAllByRole("listitem").find((candidate) => candidate.textContent?.trim() === label);
@@ -181,15 +174,15 @@ const rowOf = (label: string): HTMLElement => {
   return row;
 };
 
-const OPEN_SCREENS = ["Overview", "Downloads", "Versions", "Packages", "Repository Stats"];
-const DOWNLOAD_STATS_ROWS = new Set(["Download Stats", ...OPEN_SCREENS, "Admin"]);
+const SCREEN_LABELS = ["Overview", "Downloads", "Versions", "Packages", "Repository Stats", "Admin"];
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("the Engineering rail", () => {
-  it("shows one Download Stats group with the five open screens beneath it, in order", async () => {
+  // The screens live in the tab bar. The rail keeps the app, as one row.
+  it("shows one Download Stats row and none of the screens", async () => {
     const fetchMock = userInfo(false);
     vi.stubGlobal("fetch", fetchMock);
     showRail();
@@ -197,52 +190,36 @@ describe("the Engineering rail", () => {
 
     expect(screen.getByText("Download Stats")).toBeInTheDocument();
     expect(screen.queryByText("Product Download Stats")).not.toBeInTheDocument();
-    expect(rowLabels().filter((label) => DOWNLOAD_STATS_ROWS.has(label))).toEqual([
-      "Download Stats",
-      ...OPEN_SCREENS,
-    ]);
-  });
-
-  it("hides Admin from someone the API says is not an Admin", async () => {
-    const fetchMock = userInfo(false);
-    vi.stubGlobal("fetch", fetchMock);
-    showRail();
-    await settled(fetchMock);
-    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
-  });
-
-  it("offers Admin, last, to someone the API says is an Admin", async () => {
-    vi.stubGlobal("fetch", userInfo(true));
-    showRail();
-    expect(await screen.findByText("Admin")).toBeInTheDocument();
-    expect(rowLabels().filter((label) => DOWNLOAD_STATS_ROWS.has(label))).toEqual([
-      "Download Stats",
-      ...OPEN_SCREENS,
-      "Admin",
-    ]);
-  });
-
-  // Every Download Stats screen has its own icon. A row that
-  // declares one wears it; the label stays the row's text, so the collapsed
-  // flyout still reads the name.
-  it("gives the app row and every screen row an icon", async () => {
-    const fetchMock = userInfo(true);
-    vi.stubGlobal("fetch", fetchMock);
-    showRail();
-    expect(await screen.findByText("Admin")).toBeInTheDocument();
-
-    for (const label of ["Download Stats", ...OPEN_SCREENS, "Admin"]) {
-      expect(rowOf(label).querySelector("svg"), `${label} has no icon`).not.toBeNull();
-      expect(rowOf(label).textContent).toContain(label);
+    for (const label of SCREEN_LABELS) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
     }
   });
 
-  it("opens a screen at its address when its row is clicked", async () => {
+  it("still shows one Download Stats row when the API says the reader is an Admin", async () => {
+    vi.stubGlobal("fetch", userInfo(true));
+    showRail();
+    expect(await screen.findByText("Download Stats")).toBeInTheDocument();
+    for (const label of SCREEN_LABELS) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
+  });
+
+  it("gives the Download Stats row an icon", async () => {
     const fetchMock = userInfo(false);
     vi.stubGlobal("fetch", fetchMock);
     showRail();
     await settled(fetchMock);
-    await userEvent.click(screen.getByText("Downloads"));
+
+    expect(rowOf("Download Stats").querySelector("svg")).not.toBeNull();
+  });
+
+  it("opens Overview when Download Stats is chosen", async () => {
+    const fetchMock = userInfo(false);
+    vi.stubGlobal("fetch", fetchMock);
+    showRail(downloadStatsPaths.downloads);
+    await settled(fetchMock);
     expect(screen.getByTestId("where")).toHaveTextContent(downloadStatsPaths.downloads);
+    await userEvent.click(screen.getByText("Download Stats"));
+    expect(screen.getByTestId("where")).toHaveTextContent(downloadStatsPaths.overview);
   });
 });

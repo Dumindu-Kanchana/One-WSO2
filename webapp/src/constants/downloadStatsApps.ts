@@ -67,10 +67,12 @@ export type DownloadStatsScreen = keyof typeof downloadStatsPaths;
 export const ENGINEERING_ADMIN_ITEM_ID = "engineering-download-stats-admin";
 
 /**
- * The six screens. Each entry is a rail row, a route and a header: the rail
+ * The six screens. Each entry is a tab, a route and a header: the tab bar
  * reads `label` and `path`, and the app shell reads `label` as the screen's
- * title and `desc` as the one-line description beneath it. One entry, so the rail and the header
- * cannot name a screen two different ways.
+ * title and `desc` as the one-line description beneath it. One entry, so the
+ * tab and the header cannot name a screen two different ways. The same entry
+ * is what a pin qualifies, which is why the screens stay on the rail section
+ * even though the rail lists only the app.
  */
 export const DOWNLOAD_STATS_SCREENS: Readonly<Record<DownloadStatsScreen, MenuAppItem>> = {
   overview: {
@@ -128,9 +130,8 @@ export const DOWNLOAD_STATS_APPS: readonly MenuApp[] = [
     // different thing.
     icon: DownloadIcon,
     purpose: "Release downloads, package downloads and repository stats for every Product.",
-    // Stay a group: a reader who is not an Admin has five rows, an Admin six,
-    // and the app's name must not vanish from the rail for either of them.
-    alwaysGroup: true,
+    // One rail row. The screens are the tab bar inside the app, in this order.
+    inTabs: true,
     // Rail order. Overview first, because the perspective's landing forwards
     // to the first visible row.
     items: [

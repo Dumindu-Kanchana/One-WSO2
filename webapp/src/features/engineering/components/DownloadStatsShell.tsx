@@ -18,8 +18,11 @@ import type { JSX, ReactNode } from "react";
 import { Alert, Box, CircularProgress, Stack, Typography } from "@wso2/oxygen-ui";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import PerspectiveHeader from "@components/perspective-header/PerspectiveHeader";
+import RoutedTabs, { type RoutedTabDef } from "@components/routed-tabs/RoutedTabs";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import {
+  DOWNLOAD_STATS_APPS,
+  DOWNLOAD_STATS_PATH,
   DOWNLOAD_STATS_SCREENS,
   ENGINEERING_ADMIN_ITEM_ID,
   type DownloadStatsScreen,
@@ -47,7 +50,8 @@ import EngineeringUnavailable from "./EngineeringUnavailable";
 //   7. the screen
 //
 // Rungs 4–6 are Admin's alone: the other five screens are open to every
-// signed-in employee, so nobody is asked about and nothing is awaited. Rungs
+// signed-in employee. The user-info read still runs on those screens, because
+// the Admin tab is absent until that read says the caller is an Admin. Rungs
 // 5 and 6 stay distinct deliberately — both leave the client holding no
 // answer, and collapsing them tells someone whose gateway timed out that they
 // lack a role they already have.
@@ -65,6 +69,18 @@ import EngineeringUnavailable from "./EngineeringUnavailable";
 // belongs to the screen, so it appears on the last rung only: a refused reader
 // is not offered an action on a screen they cannot open.
 
+// Tab order is the registry order. Admin is last, and only present once the
+// API has said the caller is an Admin — the same rule the rail used when
+// these screens were rows.
+function screenTabs(showAdmin: boolean): RoutedTabDef[] {
+  return DOWNLOAD_STATS_APPS.flatMap((app) => app.items)
+    .filter((item) => showAdmin || item.id !== ENGINEERING_ADMIN_ITEM_ID)
+    .flatMap((item) => {
+      const segment = item.path?.slice(DOWNLOAD_STATS_PATH.length + 1);
+      return segment ? [{ segment, label: item.label }] : [];
+    });
+}
+
 export default function DownloadStatsShell({
   screen,
   actions,
@@ -80,13 +96,18 @@ export default function DownloadStatsShell({
   const configured = isProductDownloadStatsConfigured();
   // https, or http on localhost alone — see productDownloadStats.ts.
   const credentialed = isCredentialedProductDownloadStatsUrl(base);
-  // Only the row the rail's engineering adapter claims is the API's to decide,
-  // and only once there is a backend worth asking. The rail asks the same
-  // question under the same query key, so a reader who came through the rail
-  // is not asked twice.
+  // Asked on every screen, not only Admin: the tab is hidden until the answer
+  // is yes, including while the check is in flight and when it fails. The rail
+  // asks the same question under the same query key, so a reader who came
+  // through the rail is not asked twice. The ladder below still belongs to
+  // the Admin screen alone.
   const requiresAdmin = id === ENGINEERING_ADMIN_ITEM_ID;
   const reachable = configured && credentialed;
-  const gate = useEngineeringAdminGate(preview && reachable && requiresAdmin);
+  const gate = useEngineeringAdminGate(preview && reachable);
+  // A failed re-check keeps the previous answer in the query. The tab follows
+  // the latest check, so a failure or a 403 takes it down even when that
+  // answer was yes.
+  const showAdminTab = gate.isAdmin && !gate.isResolving && !gate.isError && !gate.isForbidden;
 
   // The perspective does not exist while the flag is off, so neither does the
   // screen: one sentence, with no title above it.
@@ -104,7 +125,15 @@ export default function DownloadStatsShell({
   const allowed = reachable && (!requiresAdmin || (!checking && !failed && !denied));
 
   return (
-    <Box>
+    // minWidth 0 lets the tab bar scroll inside the page. Without it this box
+    // grows to the full label row and the page scrolls sideways instead.
+    <Box sx={{ minWidth: 0, maxWidth: "100%" }}>
+      <RoutedTabs
+        basePath={DOWNLOAD_STATS_PATH}
+        tabs={screenTabs(showAdminTab)}
+        ariaLabel="Download Stats screens"
+        scrollable
+      />
       <Stack
         direction="row"
         spacing={2}
