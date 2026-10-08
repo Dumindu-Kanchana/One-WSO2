@@ -29,10 +29,11 @@ import { AddressesSection, JustificationSection, TermsSection } from "./TermsSec
  * and the Review step. One view for WSO2 staff (2026-09-28); the customer's
  * copy is the generated order form (Document Generation, later).
  */
-export default function QuoteSheet({ sheet }: { sheet: Sheet }): JSX.Element {
+export default function QuoteSheet({ sheet, withCustomer = true }: { sheet: Sheet; withCustomer?: boolean }): JSX.Element {
   return (
     <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-      <CustomerBand sheet={sheet} />
+      {/* On the quote page the customer is in the page header instead. */}
+      {withCustomer ? <CustomerBand sheet={sheet} /> : null}
       <DealSection sheet={sheet} />
       <ProductsSection sheet={sheet} />
       <DealFiguresSection sheet={sheet} />

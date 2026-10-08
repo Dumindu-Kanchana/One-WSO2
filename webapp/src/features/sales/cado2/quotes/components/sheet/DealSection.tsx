@@ -41,6 +41,13 @@ export default function DealSection({ sheet }: { sheet: QuoteSheet }): JSX.Eleme
   return (
     <SheetCard title="Deal" icon={<LandmarkIcon size={18} />}>
       <FactGrid>
+        <Fact
+          label="Deal type"
+          value={sheet.dealType === "PARTNER" ? "Partner deal" : sheet.dealType === "DIRECT" ? "Direct deal" : "Unknown"}
+          hint={sheet.dealType ? undefined : "Salesforce has no Direct / Partner value"}
+        />
+        <Fact label="Sales region" value={sheet.salesRegion || "Not set in Salesforce"} />
+        <Fact label="Sub-region" value={sheet.subRegion || "Not set"} />
         <Fact label="WSO2 legal entity" value={sheet.legalEntity?.name} hint={sheet.legalEntity?.address} />
         <Fact label={term.label} value={term.value} hint={term.hint} />
         {sheet.recurring ? <Fact label="Billing" value={sheet.billingFrequency ? BILLING[sheet.billingFrequency] : ""} /> : null}

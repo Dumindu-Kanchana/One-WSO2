@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { Link as RouterLink, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import { Box, Button, Chip, CircularProgress, Stack, Tab, Tabs } from "@wso2/oxygen-ui";
+import { Box, Button, Chip, CircularProgress, Link, Stack, Tab, Tabs, Typography } from "@wso2/oxygen-ui";
 import DeleteDraftDialog from "@features/sales/cado2/quotes/components/detail/DeleteDraftDialog";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import {
@@ -31,7 +31,7 @@ import { sheetFromVersion } from "@features/sales/cado2/quotes/sheet/sheetModel"
 import QuoteSheet from "@features/sales/cado2/quotes/components/sheet/QuoteSheet";
 import DocumentsPanel from "@features/sales/cado2/quotes/components/detail/DocumentsPanel";
 import StatusPanel from "@features/sales/cado2/quotes/components/detail/StatusPanel";
-import PageHeader from "@features/sales/cado2/components/page-header/PageHeader";
+import CustomerBand from "@features/sales/cado2/quotes/components/sheet/CustomerBand";
 import { STATUS_COLOR, quoteLabel, quoteStatusLabel } from "@features/sales/cado2/quotes/lifecycle/lifecycle";
 import LifecycleDialog from "@features/sales/cado2/quotes/components/detail/LifecycleDialog";
 import VersionsTab from "@features/sales/cado2/quotes/components/detail/VersionsTab";
@@ -45,7 +45,7 @@ import {
 import type { ApprovalOutcome, ApprovalStep } from "@features/sales/cado2/approvals/api/approvalTypes";
 import { decisionNote, repCategoryPoints } from "@features/sales/cado2/approvals/model/myApprovals";
 import YourApprovalPanel, { YOUR_APPROVAL_ANCHOR } from "@features/sales/cado2/approvals/components/YourApprovalPanel";
-import { ArrowDownIcon } from "@wso2/oxygen-ui-icons-react";
+import { ArrowDownIcon, ArrowLeftIcon } from "@wso2/oxygen-ui-icons-react";
 import { useCado2Me } from "@features/sales/cado2/api/useCado2Me";
 import { cado2Paths, type Cado2QuoteTab } from "@features/sales/cado2/cado2Paths";
 import { useDocumentTitle } from "@hooks/useDocumentTitle";
@@ -140,7 +140,9 @@ export default function QuoteDetailPage(): JSX.Element {
   // Steps the caller may decide now; usually one.
   const actionable = (workflow.data?.steps ?? []).filter((s) => s.canAct);
   const approverRoles = me.data?.approverRoles ?? [];
-  // Two steps open at once (parallel branches) need their buttons told apart.
+  const noteForThisQuote = decisionNoteState?.quoteId === quoteId ? decisionNoteState.text : null;
+  // Something to decide (or just decided): the "Your decision" band shows.
+  const hasDecision = actionable.length > 0 || noteForThisQuote !== null;
 
   const approvalProps = { isDraft, workflow, preview: approvalPreview };
   // Opens the Quote tab if needed, then scrolls to "Your approval".
@@ -159,51 +161,63 @@ export default function QuoteDetailPage(): JSX.Element {
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 1400, minWidth: 0 }}>
-      <PageHeader
-        back={fromApprovals ? { to: cado2Paths.approvals, label: "My Approvals" } : { to: cado2Paths.quotes, label: "My Quotes" }}
-        title={name}
-        chips={
-          <>
-            <Chip color={STATUS_COLOR[q.status]} label={quoteStatusLabel(q.status, v.versionNumber)} />
-            <Chip variant="outlined" label={`Version ${v.versionNumber}`} />
-          </>
-        }
-        actions={
-          <>
-            {/* Decisions are made in "Your approval", next to the reasons; this jumps there from any tab. */}
-            {actionable.length ? (
-              <Button variant="contained" endIcon={<ArrowDownIcon size={16} />} onClick={jumpToYourApproval}>
-                {actionable.length === 1 ? "Your approval" : `Your approvals (${actionable.length})`}
-              </Button>
-            ) : null}
-            {v.status === "DRAFT" && can("CLOSE") ? (
-              <Button variant="contained" component={RouterLink} to={cado2Paths.editVersion(q.id, v.versionNumber)}>
-                Continue draft v{v.versionNumber}
-              </Button>
-            ) : null}
-            {can("RECALL") ? (
-              <Button variant="contained" onClick={() => openDialog("recall")}>
-                Recall
-              </Button>
-            ) : null}
-            {can("REVISE") ? (
-              <Button variant="contained" onClick={() => openDialog("revise")}>
-                Revise
-              </Button>
-            ) : null}
-            {v.status === "DRAFT" && can("CLOSE") ? (
-              <Button color="error" variant="outlined" onClick={() => openDialog("delete")}>
-                Delete draft
-              </Button>
-            ) : null}
-            {can("CLOSE") ? (
-              <Button color="error" variant="outlined" onClick={() => openDialog("close")}>
-                Close quote
-              </Button>
-            ) : null}
-          </>
-        }
-      />
+      <Stack spacing={1.5}>
+        <Link
+          component={RouterLink}
+          to={fromApprovals ? cado2Paths.approvals : cado2Paths.quotes}
+          variant="body2"
+          sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, alignSelf: "flex-start" }}
+        >
+          <ArrowLeftIcon size={14} /> {fromApprovals ? "My Approvals" : "My Quotes"}
+        </Link>
+        {/* The record header (frontend.md, "Page titles"): the account is the
+            page's title on every tab, with everything about who and what the
+            quote is for; the deal below doesn't repeat it. */}
+        {sheet ? (
+          <CustomerBand
+            sheet={sheet}
+            header={{
+              eyebrow: `${q.quoteNumber ?? "Draft"} · Version ${v.versionNumber}`,
+              status: <Chip color={STATUS_COLOR[q.status]} label={quoteStatusLabel(q.status, v.versionNumber)} />,
+              actions: (
+                <>
+                  {/* Decisions are made in "Your decision" on the Quote tab; from another tab this goes back there. */}
+                  {actionable.length && tab !== 0 ? (
+                    <Button variant="contained" endIcon={<ArrowDownIcon size={16} />} onClick={jumpToYourApproval}>
+                      {actionable.length === 1 ? "Your approval" : `Your approvals (${actionable.length})`}
+                    </Button>
+                  ) : null}
+                  {v.status === "DRAFT" && can("CLOSE") ? (
+                    <Button variant="contained" component={RouterLink} to={cado2Paths.editVersion(q.id, v.versionNumber)}>
+                      Continue draft v{v.versionNumber}
+                    </Button>
+                  ) : null}
+                  {can("RECALL") ? (
+                    <Button variant="contained" onClick={() => openDialog("recall")}>
+                      Recall
+                    </Button>
+                  ) : null}
+                  {can("REVISE") ? (
+                    <Button variant="contained" onClick={() => openDialog("revise")}>
+                      Revise
+                    </Button>
+                  ) : null}
+                  {v.status === "DRAFT" && can("CLOSE") ? (
+                    <Button color="error" variant="outlined" onClick={() => openDialog("delete")}>
+                      Delete draft
+                    </Button>
+                  ) : null}
+                  {can("CLOSE") ? (
+                    <Button color="error" variant="outlined" onClick={() => openDialog("close")}>
+                      Close quote
+                    </Button>
+                  ) : null}
+                </>
+              ),
+            }}
+          />
+        ) : null}
+      </Stack>
 
       <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
         <Tabs value={tab} onChange={(_, t: number) => openTab(t)} aria-label="Quote sections">
@@ -214,25 +228,40 @@ export default function QuoteDetailPage(): JSX.Element {
       </Box>
       <Box role="tabpanel" aria-label={TABS[tab]}>
         {tab === 0 && sheet ? (
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", lg: "minmax(0,1fr) 320px" }, gap: 3, alignItems: "start" }}>
-            <Stack spacing={2} sx={{ minWidth: 0 }}>
-              {/* The viewer's turn: which role they act as, and why it's asked. */}
-              <YourApprovalPanel
-                steps={workflow.data?.steps ?? []}
-                actionable={actionable}
-                note={decisionNoteState?.quoteId === quoteId ? decisionNoteState.text : null}
-                repCategories={repCategoryPoints(sheet.lines)}
-                onDecide={openDecision}
+          <Stack spacing={3}>
+            {/* The approver's task first, full width and set apart from the deal below. */}
+            {hasDecision ? (
+              <Box
+                component="section"
+                aria-label="Your decision"
+                sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 2, bgcolor: "action.hover", border: 1, borderColor: "divider" }}
+              >
+                <Typography variant="overline" color="text.secondary" sx={{ display: "block", mb: 1.5, lineHeight: 1.6 }}>
+                  Your decision
+                </Typography>
+                <YourApprovalPanel
+                  steps={workflow.data?.steps ?? []}
+                  actionable={actionable}
+                  note={noteForThisQuote}
+                  repCategories={repCategoryPoints(sheet.lines)}
+                  onDecide={openDecision}
+                />
+              </Box>
+            ) : null}
+            <Box
+              sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", lg: "minmax(0,1fr) 320px" }, gap: 3, alignItems: "start" }}
+            >
+              <Box component="section" aria-label="The deal" sx={{ minWidth: 0 }}>
+                <QuoteSheet sheet={sheet} withCustomer={false} />
+              </Box>
+              <StatusPanel
+                latest={latest.data}
+                events={events.data ?? []}
+                approvals={<ApprovalSummary {...approvalProps} onOpen={() => openTab(APPROVALS_TAB)} />}
+                documents={<DocumentsPanel quoteId={q.id} version={v.versionNumber} approved={v.status === "APPROVED"} />}
               />
-              <QuoteSheet sheet={sheet} />
-            </Stack>
-            <StatusPanel
-              latest={latest.data}
-              events={events.data ?? []}
-              approvals={<ApprovalSummary {...approvalProps} onOpen={() => openTab(APPROVALS_TAB)} />}
-              documents={<DocumentsPanel quoteId={q.id} version={v.versionNumber} approved={v.status === "APPROVED"} />}
-            />
-          </Box>
+            </Box>
+          </Stack>
         ) : null}
         {tab === APPROVALS_TAB ? <QuoteApprovals {...approvalProps} /> : null}
         {tab === 2 ? <VersionsTab quote={q} currency={v.currencyIsoCode ?? ""} /> : null}

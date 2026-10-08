@@ -229,8 +229,8 @@ describe("perspectives whose landing forwards to the first rail item", () => {
     });
   });
 
-  // Engineering is the home of Product Download Stats and UMT. Same preview contract
-  // as Infra: absent means off, so the waffle, favourites, and landing choices
+  // Engineering is the home of Download Stats and UMT. Same preview contract as
+  // Infra: absent means off, so the waffle, favourites, and landing choices
   // — all of which read this registry — cannot offer it early.
   describe("the Engineering perspective", () => {
     it("is absent from the registry when the preview flag is off", async () => {
@@ -244,7 +244,7 @@ describe("perspectives whose landing forwards to the first rail item", () => {
       expect(keys(PERSPECTIVES)).not.toContain("engineering");
     });
 
-    it("lands on Product Download Stats Overview when the preview flag is on", async () => {
+    it("offers Download Stats and its six screens when the preview flag is on", async () => {
       const { PERSPECTIVES, reachablePerspectives, findPerspectiveByPath } = await load({
         engineering: true,
       });
@@ -256,7 +256,8 @@ describe("perspectives whose landing forwards to the first rail item", () => {
         section.label,
         ...(section.children ?? []).map((child) => child.label),
       ]);
-      expect(labels).toContain("Product Download Stats");
+      expect(labels).toContain("Download Stats");
+      expect(labels).not.toContain("Product Download Stats");
       expect(labels).toContain("Overview");
       expect(labels).toContain("Downloads");
       expect(labels).toContain("Versions");

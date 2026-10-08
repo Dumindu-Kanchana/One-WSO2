@@ -25,17 +25,20 @@ import type { QuoteSheet as Sheet, SheetLine } from "@features/sales/cado2/quote
 const sheet = sheetFromVersion(fullPartnerQuote);
 
 describe("QuoteSheet", () => {
-  it("puts the customer, the opportunity and the partner up front, and each contact under its address", () => {
+  it("puts the customer, the opportunity and the partner up front, the deal facts in Deal, and each contact under its address", () => {
     render(<QuoteSheet sheet={sheet} />);
     const band = screen.getByRole("region", { name: "Customer" });
 
     expect(within(band).getByText("Acme Corp")).toBeInTheDocument();
     expect(within(band).getByText("Acme APIM renewal")).toBeInTheDocument();
-    expect(within(band).getByText("Partner deal")).toBeInTheDocument();
     expect(within(band).getByText("Acme Reseller")).toBeInTheDocument();
-    expect(within(band).getByText("Renewal of 1 opportunity")).toBeInTheDocument();
-    expect(within(band).getByTitle("Sales region")).toHaveTextContent("APAC");
-    expect(within(band).getByTitle("Sub-region")).toHaveTextContent("South Asia");
+    // No chips under the name: the deal type and region are facts in the Deal section.
+    expect(within(band).queryByText("Partner deal")).toBeNull();
+    expect(within(band).queryByText("Renewal of 1 opportunity")).toBeNull();
+    const deal = screen.getByRole("region", { name: "Deal" });
+    expect(deal).toHaveTextContent("Deal typePartner deal");
+    expect(deal).toHaveTextContent("Sales regionAPAC");
+    expect(deal).toHaveTextContent("Sub-regionSouth Asia");
 
     // Two contacts, both on the order form; no primary contact.
     expect(within(band).queryByLabelText("Primary contact")).toBeNull();

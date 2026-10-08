@@ -120,7 +120,9 @@ describe("QuoteDetailPage — lifecycle", () => {
     show(submitted.quote, submitted);
     const user = userEvent.setup();
 
-    expect(screen.getByRole("heading", { level: 1, name: "Q-26-00005" })).toBeInTheDocument();
+    // The account is the title; the quote number sits on the line above it.
+    expect(screen.getByRole("heading", { level: 1, name: "Acme Corp" })).toBeInTheDocument();
+    expect(screen.getByText("Q-26-00005 · Version 1")).toBeInTheDocument();
     expect(screen.queryByText("Acme APIM renewal · Acme Corp")).toBeNull(); // nothing under the title
     expect(screen.queryByRole("button", { name: "Revise" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Close quote" })).toBeNull();
@@ -167,7 +169,8 @@ describe("QuoteDetailPage — lifecycle", () => {
     show(ready.quote, ready);
     const user = userEvent.setup();
     // Never submitted, so it has no number: it is named by customer and deal.
-    expect(screen.getByRole("heading", { level: 1, name: "Acme Corp · Acme APIM renewal" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Acme Corp" })).toBeInTheDocument();
+    expect(screen.getByText("Draft · Version 1")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete draft" }));
     const dialog = screen.getByRole("dialog", { name: "Delete this draft quote?" });
     expect(within(dialog).getByText(/only has a draft, so Acme Corp · Acme APIM renewal is removed completely\. This can't be undone/)).toBeInTheDocument();
@@ -206,7 +209,11 @@ describe("QuoteDetailPage — lifecycle", () => {
     show({ ...submitted.quote, actions: [] }, submitted);
     expect(screen.queryByRole("button", { name: "Recall" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Close quote" })).toBeNull();
-    expect(screen.getByRole("region", { name: "Customer" })).toBeInTheDocument();
+    // The customer is in the page's header band, and not repeated in the deal.
+    const header = screen.getByLabelText("About this quote");
+    expect(within(header).getByRole("heading", { level: 1, name: "Acme Corp" })).toBeInTheDocument();
+    expect(header).toHaveTextContent("Acme APIM renewal");
+    expect(screen.queryByRole("region", { name: "Customer" })).toBeNull();
     expect(screen.getByRole("table", { name: "Products" })).toBeInTheDocument();
   });
 
@@ -276,7 +283,7 @@ describe("QuoteDetailPage — lifecycle", () => {
     const reason = within(within(panel).getByRole("list", { name: "Why CRO approves" })).getByRole("listitem");
     expect(reason).toHaveTextContent("Line 2 · WSO2 API Control Plane");
     expect(within(reason).getByText("APIM")).toBeInTheDocument();
-    expect(within(reason).getByText("35% discount")).toBeInTheDocument();
+    expect(within(reason).getByText(/^35% discount/)).toBeInTheDocument();
     expect(reason).toHaveTextContent("Above the Area GM's 30% limit");
     expect(panel).not.toHaveTextContent("CRO's 32% limit"); // the CFO's reason is for the CFO
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument(); // short labels
@@ -305,6 +312,10 @@ describe("QuoteDetailPage — lifecycle", () => {
     };
     show({ ...submitted.quote, actions: [] }, allMapped);
     const panel = screen.getByRole("region", { name: "Your approval as Deal Desk" });
+    // The decision is its own full-width section above the deal; the account stays the page title.
+    expect(within(screen.getByRole("region", { name: "Your decision" })).getByRole("region", { name: "Your approval as Deal Desk" })).toBe(panel);
+    expect(within(screen.getByRole("region", { name: "The deal" })).queryByRole("region", { name: /Your approval/ })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1, name: "Acme Corp" })).toBeInTheDocument();
     expect(panel).not.toHaveTextContent("After you"); // who approves is in the Approvals tab
     const points = within(within(panel).getByRole("list", { name: "What's non-standard" })).getAllByRole("listitem");
     expect(points).toHaveLength(1);
@@ -393,7 +404,10 @@ describe("QuoteDetailPage — lifecycle", () => {
     };
     show({ ...submitted.quote, actions: [] }, submitted);
 
-    expect(screen.getByRole("button", { name: "Your approvals (2)" })).toBeInTheDocument();
+    // On the Quote tab the cards are beside the deal, so no jump button; from another tab it leads back.
+    expect(screen.queryByRole("button", { name: "Your approvals (2)" })).toBeNull();
+    await user.click(screen.getByRole("tab", { name: "Versions (1)" }));
+    await user.click(screen.getByRole("button", { name: "Your approvals (2)" }));
     expect(screen.queryByRole("button", { name: /as Legal|as Regional Director/ })).toBeNull();
     // One short set of buttons per role, inside its card.
     const rd = screen.getByRole("region", { name: "Your approval as Regional Director" });

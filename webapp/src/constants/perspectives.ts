@@ -58,6 +58,7 @@ import {
   ME_FINANCE_APPS,
 } from "@constants/financeApps";
 import { MIS_APPS } from "@constants/misApps";
+import { DOWNLOAD_STATS_APPS } from "@constants/downloadStatsApps";
 import { CLAIM_APPROVAL_PATH } from "@features/finance/approvals/claimApprovalTabs";
 import { MARKETING_OPS_APPS } from "@constants/marketingOpsApps";
 import { DUE_DILIGENCE_APPS } from "@constants/dueDiligenceApps";
@@ -105,6 +106,7 @@ function appsToSections(apps: readonly MenuApp[]): PerspectiveSection[] {
     children: app.items.map((it) => ({
       id: it.id,
       label: it.label,
+      icon: it.icon,
       requires: it.requires,
       path: it.path,
     })),
@@ -605,11 +607,6 @@ export interface PerspectiveDef {
   sections?: PerspectiveSection[];
 }
 
-// Admin under Product Download Stats, in the Engineering perspective below.
-// The rail shows this row only when the download-stats API says the caller
-// is an admin.
-export const ENGINEERING_ADMIN_ITEM_ID = "engineering-download-stats-admin";
-
 export const PERSPECTIVES: readonly PerspectiveDef[] = [
   // "Apps" (persona areas, locked or unlocked). Order here is the order
   // shown in the waffle's Apps group.
@@ -757,13 +754,15 @@ export const PERSPECTIVES: readonly PerspectiveDef[] = [
         },
       ]
     : []),
-  // Engineering holds Product Download Stats and UMT. Neither is under Infra
-  // Portal: Infra is GitHub administration, while these are release, package
-  // and repository stats, and the product update pipeline. The perspective
-  // stays hidden until the preview flag is on. Product Download Stats' routes
-  // stay registered either way, so a direct visit while the flag is off says
-  // Engineering is not available. UMT is behind its own flag as well, the
-  // same way Finance MIS is inside Finance.
+  // Download Stats is the first engineering tool (ADR 0001). It is not under
+  // Infra Portal: Infra is GitHub administration, and this is release
+  // downloads, package downloads, and repository stats. It is an app inside
+  // the perspective the way MIS is inside Finance — its own registry
+  // (downloadStatsApps.ts), spread in as one group — because its Admin row is
+  // gated by the Download Stats API's own user-info, not by `requires`. The
+  // perspective stays hidden until the preview flag is on. The routes stay
+  // registered either way, so a direct visit while the flag is off says
+  // Engineering is not available.
   ...(isPreviewEnabled("engineering")
     ? [
         {
@@ -774,44 +773,8 @@ export const PERSPECTIVES: readonly PerspectiveDef[] = [
           path: "/engineering",
           forwardsToFirstItem: true,
           sections: [
-            {
-              id: "engineering-product-download-stats",
-              label: "Product Download Stats",
-              icon: BarChart3,
-              alwaysGroup: true,
-              children: [
-                {
-                  id: "engineering-download-stats-overview",
-                  label: "Overview",
-                  path: "/engineering",
-                },
-                {
-                  id: "engineering-download-stats-downloads",
-                  label: "Downloads",
-                  path: "/engineering/downloads",
-                },
-                {
-                  id: "engineering-download-stats-versions",
-                  label: "Versions",
-                  path: "/engineering/versions",
-                },
-                {
-                  id: "engineering-download-stats-packages",
-                  label: "Packages",
-                  path: "/engineering/packages",
-                },
-                {
-                  id: "engineering-download-stats-repository-stats",
-                  label: "Repository Stats",
-                  path: "/engineering/repository-stats",
-                },
-                {
-                  id: ENGINEERING_ADMIN_ITEM_ID,
-                  label: "Admin",
-                  path: "/engineering/admin",
-                },
-              ],
-            },
+            ...appsToSections(DOWNLOAD_STATS_APPS),
+            // UMT, the second app, behind its own `umt` flag as well.
             ...(isPreviewEnabled("umt") ? [UMT_SECTION] : []),
           ],
         },

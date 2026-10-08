@@ -81,8 +81,14 @@ function Reason({ row }: { readonly row: ReasonRow }): JSX.Element {
           {row.group ? <Chip size="small" variant="outlined" label={row.group} /> : null}
         </Stack>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25, flexWrap: "wrap", rowGap: 0.5 }}>
-          {row.figure ? <Chip size="small" color="warning" label={`${row.figure} discount`} /> : null}
           <Typography variant="body2" color="text.secondary">
+            {/* The figure in bold, in the card's own colours. */}
+            {row.figure ? (
+              <Box component="strong" sx={{ color: "text.primary", fontWeight: 600 }}>
+                {`${row.figure} discount`}
+                {" · "}
+              </Box>
+            ) : null}
             {row.detail}
             {row.roles?.length ? ` · needs ${joinRoles(row.roles)}` : null}
           </Typography>
@@ -194,39 +200,51 @@ export default function YourApprovalPanel({
           {note}
         </Alert>
       ) : null}
-      {actionable.map((s) => {
-        const deskReview = s.role === "DEAL_DESK";
-        return (
-          <Paper
-            key={s.role}
-            component="section"
-            variant="outlined"
-            aria-label={`Your approval as ${s.roleLabel}`}
-            sx={{ p: 2, borderRadius: 2, borderLeft: 4, borderLeftColor: "primary.main" }}
-          >
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
-              <ShieldCheckIcon size={18} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                {deskReview ? "What's non-standard" : "Why your approval is needed"}
-              </Typography>
-              <Chip size="small" color="primary" label={s.roleLabel} />
-            </Stack>
-            {deskReview ? <DeskReview steps={steps} step={s} repCategories={repCategories} /> : <OwnReasons step={s} />}
-            {/* The decision sits with its reasons; the card already names the role. */}
-            <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2, flexWrap: "wrap", rowGap: 1 }}>
-              <Button variant="contained" color="success" onClick={() => onDecide("approve", s)}>
-                Approve
-              </Button>
-              <Button variant="outlined" onClick={() => onDecide("request-changes", s)}>
-                Request changes
-              </Button>
-              <Button variant="outlined" color="error" onClick={() => onDecide("reject", s)}>
-                Reject
-              </Button>
-            </Stack>
-          </Paper>
-        );
-      })}
+      {/* Several roles sit side by side, so they cost one card's height, not several. */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "minmax(0,1fr)", md: actionable.length > 1 ? "repeat(2, minmax(0,1fr))" : "minmax(0,1fr)" },
+          gap: 2,
+          alignItems: "stretch",
+        }}
+      >
+        {actionable.map((s) => {
+          const deskReview = s.role === "DEAL_DESK";
+          return (
+            <Paper
+              key={s.role}
+              component="section"
+              variant="outlined"
+              aria-label={`Your approval as ${s.roleLabel}`}
+              sx={{ p: 2, borderRadius: 2, borderLeft: 4, borderLeftColor: "primary.main", display: "flex", flexDirection: "column" }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
+                <ShieldCheckIcon size={18} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  {deskReview ? "What's non-standard" : "Why your approval is needed"}
+                </Typography>
+                <Chip size="small" color="primary" label={s.roleLabel} />
+              </Stack>
+              {deskReview ? <DeskReview steps={steps} step={s} repCategories={repCategories} /> : <OwnReasons step={s} />}
+              {/* The decision sits with its reasons; the card already names the role. */}
+              {/* Under the reasons, Approve first: where the eye ends after reading. Pushed
+                  to the card's foot, so side-by-side cards line their buttons up. */}
+              <Stack direction="row" spacing={1} justifyContent="flex-start" sx={{ mt: "auto", pt: 2, flexWrap: "wrap", rowGap: 1 }}>
+                <Button variant="contained" color="success" onClick={() => onDecide("approve", s)}>
+                  Approve
+                </Button>
+                <Button variant="outlined" onClick={() => onDecide("request-changes", s)}>
+                  Request changes
+                </Button>
+                <Button variant="outlined" color="error" onClick={() => onDecide("reject", s)}>
+                  Reject
+                </Button>
+              </Stack>
+            </Paper>
+          );
+        })}
+      </Box>
     </Stack>
   );
 }
