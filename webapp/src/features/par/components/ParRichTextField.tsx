@@ -129,7 +129,11 @@ export default function ParRichTextField({
       onPaste: (range: { index: number; length: number }, data: { html?: string; text?: string }) => void;
     };
     clipboard.onPaste = (range, data) => {
-      const pasted = linkifyDelta(clipboard.convert(data, quill.getFormat(range.index)));
+      // A link at the caret would otherwise be applied to the pasted text,
+      // hiding any URL in it from linkifyDelta.
+      const formats = { ...quill.getFormat(range.index) };
+      delete formats.link;
+      const pasted = linkifyDelta(clipboard.convert(data, formats));
       const delta = new Delta().retain(range.index).delete(range.length).concat(pasted);
       quill.updateContents(delta, "user");
       quill.setSelection(delta.length() - range.length, 0, "silent");

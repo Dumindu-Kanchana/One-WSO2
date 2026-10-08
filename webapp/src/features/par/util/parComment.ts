@@ -90,7 +90,20 @@ export function sanitizeParHtml(html: string): string {
 /** Quill keeps a link typed without a scheme (`www.example.com`) as-is,
  * which the browser then resolves relative to this app. */
 export function addLinkProtocol(html: string): string {
-  return html.replace(/href="(?![a-z][a-z0-9+.-]*:|[/#])/gi, 'href="https://');
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  let changed = false;
+  template.content.querySelectorAll("a[href]").forEach((anchor) => {
+    const href = anchor.getAttribute("href")!;
+    const fixed = withLinkProtocol(href);
+    if (fixed !== href) {
+      anchor.setAttribute("href", fixed);
+      changed = true;
+    }
+  });
+  // Re-serializing can differ from the editor's own markup, so the input is
+  // handed back untouched unless a link actually changed.
+  return changed ? template.innerHTML : html;
 }
 
 export function withLinkProtocol(url: string): string {

@@ -105,6 +105,11 @@ describe("addLinkProtocol", () => {
     const html = '<a href="http://a.com">a</a><a href="mailto:b@c.com">b</a>';
     expect(addLinkProtocol(html)).toBe(html);
   });
+
+  it("leaves text that only looks like an href alone", () => {
+    const html = '<p>href="example.com"</p>';
+    expect(addLinkProtocol(html)).toBe(html);
+  });
 });
 
 describe("withLinkProtocol", () => {

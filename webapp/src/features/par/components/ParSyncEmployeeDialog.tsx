@@ -37,10 +37,8 @@ import type { ParCycle } from "../api/types";
 
 type SyncOption = { name: string; workEmail: string; thumbnail?: string };
 
-// This app has no org-wide employee directory of its own, so the admin
-// picker reuses Leave's employee list — the same deviation other PAR views
-// make. With `leadEmail` set (EmployeeSyncModal's `leadonly`), it lists only
-// that lead's own reports instead.
+// With `leadEmail` set, the picker lists only that lead's own reports.
+// Without it, it lists every employee, from Leave's employee list.
 export default function ParSyncEmployeeDialog({
   open,
   onClose,

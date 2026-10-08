@@ -107,7 +107,7 @@ export default function ParLeadTeamRoster({
   const send360Reminder = useSend360Reminder();
   const ratingUpdate = useLeadRatingUpdate(cycle.parCycleId);
   const { showSuccess, showError } = useNotifications();
-  const profile = useMeProfile();
+  const leadEmail = useMeProfile().data?.userInfo.workEmail;
   // No org-wide employee directory of our own — reuses Leave's for avatars.
   const employees = useLeaveEmployees();
   const thumbnailByEmail = useMemo(
@@ -364,7 +364,7 @@ export default function ParLeadTeamRoster({
           <Button variant="contained" onClick={() => setReminderConfirmOpen(true)}>
             Send 360° Reminder
           </Button>
-          <Button variant="contained" onClick={() => setSyncEmployeeOpen(true)}>
+          <Button variant="contained" disabled={!leadEmail} onClick={() => setSyncEmployeeOpen(true)}>
             Sync an Employee
           </Button>
         </Stack>
@@ -485,12 +485,14 @@ export default function ParLeadTeamRoster({
         </DialogActions>
       </Dialog>
 
-      <ParSyncEmployeeDialog
-        open={syncEmployeeOpen}
-        onClose={() => setSyncEmployeeOpen(false)}
-        cycle={cycle}
-        leadEmail={profile.data?.userInfo.workEmail}
-      />
+      {leadEmail && (
+        <ParSyncEmployeeDialog
+          open={syncEmployeeOpen}
+          onClose={() => setSyncEmployeeOpen(false)}
+          cycle={cycle}
+          leadEmail={leadEmail}
+        />
+      )}
 
       {/* leadParBulkShare copy (config/constant.ts). Always the same
           message regardless of selection validity — the draft-only check
