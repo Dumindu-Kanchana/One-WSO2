@@ -7,7 +7,26 @@
 
 import { describe, expect, it } from "vitest";
 import { HttpError } from "./http";
-import { describeError } from "./errors";
+import { describeError, serverMessage } from "./errors";
+
+describe("serverMessage", () => {
+  it("reads a flat or nested message out of a JSON body", () => {
+    expect(serverMessage(new HttpError("/x", 400, JSON.stringify({ message: "Flat message." })))).toBe(
+      "Flat message.",
+    );
+    expect(
+      serverMessage(new HttpError("/x", 400, JSON.stringify({ error: { message: "Nested message." } }))),
+    ).toBe("Nested message.");
+  });
+
+  it("has nothing for a bodiless or non-JSON response, or for a failure that is not a response", () => {
+    expect(serverMessage(new HttpError("/x", 502, "<html>Bad gateway</html>"))).toBeUndefined();
+    expect(serverMessage(new HttpError("/x", 404, ""))).toBeUndefined();
+    expect(serverMessage(new HttpError("/x", 400, JSON.stringify({ message: "  " })))).toBeUndefined();
+    expect(serverMessage(new TypeError("Failed to fetch"))).toBeUndefined();
+    expect(serverMessage(undefined)).toBeUndefined();
+  });
+});
 
 describe("describeError", () => {
   it("prefers a flat { message } body", () => {

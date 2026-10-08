@@ -16,6 +16,7 @@
 
 import type { Capability } from "@constants/appMenu";
 import { isPreviewEnabled } from "@config/previewFeatures";
+import { ENGINEERING_ADMIN_ITEM_ID } from "@constants/downloadStatsApps";
 import { DUE_DILIGENCE_ITEM_IDS } from "@constants/dueDiligenceApps";
 import { FINANCE_ITEM_IDS } from "@constants/financeApps";
 import { MIS_ITEM_IDS } from "@constants/misApps";
@@ -24,7 +25,6 @@ import { BANKING_ITEM_IDS, LEAVE_ITEM_IDS } from "@constants/meApps";
 import { PAR_EMPLOYEE_ITEM_ID } from "@constants/parApps";
 import {
   BANKING_ADMIN_ITEM_ID,
-  ENGINEERING_ADMIN_ITEM_ID,
   PAR_ADMIN_PORTAL_ITEM_ID,
   PAR_LEAD_PORTAL_ITEM_ID,
   PROMOTION_ADMIN_PORTAL_ITEM_ID,

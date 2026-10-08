@@ -397,11 +397,24 @@ function SectionNode({
             build the collapsed-rail flyout. Any wrapper — a Link, or one of
             our own components — swallows the injected `depth` and hides the
             label from that flyout. These rows navigate via `onSelect`. */}
-        {visible.map((c) => (
-          <Sidebar.Item key={c.id} id={c.id} sx={{ pl: NESTED_LABEL_PL }}>
-            <Sidebar.ItemLabel sx={ELLIPSIS_SX}>{c.label}</Sidebar.ItemLabel>
-          </Sidebar.Item>
-        ))}
+        {visible.map((c) => {
+          // A row that names an icon wears it, starting where the parent label
+          // starts. A row that doesn't stays a plain label lined up with that
+          // word. The label itself stays a string: the collapsed flyout reads
+          // it with String(children), and an element there becomes
+          // "[object Object]".
+          const Icon = c.icon;
+          return (
+            <Sidebar.Item key={c.id} id={c.id} sx={{ pl: NESTED_LABEL_PL }}>
+              {Icon ? (
+                <Sidebar.ItemIcon>
+                  <Icon />
+                </Sidebar.ItemIcon>
+              ) : null}
+              <Sidebar.ItemLabel sx={ELLIPSIS_SX}>{c.label}</Sidebar.ItemLabel>
+            </Sidebar.Item>
+          );
+        })}
       </Sidebar.Item>
     );
   }

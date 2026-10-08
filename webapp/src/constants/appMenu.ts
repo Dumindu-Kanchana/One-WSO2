@@ -76,6 +76,9 @@ export interface MenuAppItem {
   // When set, this item is a real route (the rail navigates to it) rather
   // than a scroll-anchor on the overview page.
   path?: string;
+  // Drawn on the nested rail row. Omitted, the row is a plain label, which is
+  // what every app but Download Stats wants.
+  icon?: LucideIcon;
 }
 
 export interface MenuApp {

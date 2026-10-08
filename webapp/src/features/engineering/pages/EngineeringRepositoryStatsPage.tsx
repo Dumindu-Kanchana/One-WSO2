@@ -14,45 +14,67 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { skipToken, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   Box,
   Card,
-  CircularProgress,
-  ListingTable,
+  FormControl,
+  Grid,
+  InputLabel,
   MenuItem,
   Select,
-  Stack,
-  TextField,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { Bar, BarChart, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useState, type JSX } from "react";
+import { Info } from "@wso2/oxygen-ui-icons-react";
+import { type ChangeEvent, type JSX, useId, useState } from "react";
 import { useSearchParams } from "react-router";
-import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { isPreviewEnabled } from "@config/previewFeatures";
 import { useAccessToken } from "@hooks/useAccessToken";
 import {
-  dailyRange,
   getCloneSeries,
   getMetricSeries,
-  getRepositories,
-  isCredentialedProductDownloadStatsUrl,
-  isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
   type CloneSeriesItem,
+  type CloneSeriesResponse,
   type DailySeries,
+  type MetricSeriesResponse,
   type ReleaseDownloadGrain,
   type RepositoryMeasure,
   type RepositorySnapshot,
+  type TrackedRepository,
 } from "@features/engineering/api/productDownloadStats";
-import { dailyChartModel } from "./dailyChartModel";
-import { formatCount, productLabel } from "./display";
+import { activeRepositories, useTrackedRepositories } from "../api/useTrackedRepositories";
+import ChartCard from "../components/ChartCard";
+import DownloadStatsShell from "../components/DownloadStatsShell";
+import EmptyState from "../components/EmptyState";
+import ErrorState from "../components/ErrorState";
+import FilterBar, { type FilterUpdate } from "../components/FilterBar";
+import IntervalSelect from "../components/IntervalSelect";
+import SeriesChart from "../components/SeriesChart";
+import SkeletonRows from "../components/SkeletonRows";
+import TableHeaderSearch from "../components/TableHeaderSearch";
+import TablePager from "../components/TablePager";
+import { usePagination } from "../hooks/usePagination";
+import {
+  applyFilterChange,
+  parseFilters,
+  productNameById,
+  toChartSeries,
+  type StatsFilters,
+} from "../utils/filters";
+import { formatCompact, productLabel } from "../utils/format";
 
+// The Stat the chart plots (CONTEXT.md, "Stat"): a GitHub measure the API
+// serves as a series of its own, or one of the two clone figures, which are
+// read from the clone history instead.
 type StatKey = RepositoryMeasure | "clones" | "uniqueCloners";
-type TableMode = "total" | "month" | "day";
 
 const STAT_OPTIONS: ReadonlyArray<{ value: StatKey; label: string }> = [
   { value: "stars", label: "Stars" },
@@ -63,111 +85,26 @@ const STAT_OPTIONS: ReadonlyArray<{ value: StatKey; label: string }> = [
   { value: "uniqueCloners", label: "Unique Cloners" },
 ];
 
-const GITHUB_MEASURES: readonly RepositoryMeasure[] = ["stars", "forks", "watchers", "openIssues"];
+const MEASURES: readonly RepositoryMeasure[] = ["stars", "forks", "watchers", "openIssues"];
 
-function readGrain(value: string | null): ReleaseDownloadGrain {
-  if (value === "month" || value === "cumulative") return value;
-  return "day";
-}
+// Where a measure's latest count sits on a Tracked repository's snapshot.
+const SNAPSHOT_FIELD: Record<RepositoryMeasure, keyof RepositorySnapshot> = {
+  stars: "stargazersCount",
+  forks: "forksCount",
+  watchers: "watchersCount",
+  openIssues: "openIssuesCount",
+};
 
 function readStat(value: string | null): StatKey {
   return STAT_OPTIONS.some((option) => option.value === value) ? (value as StatKey) : "stars";
 }
 
-function readRepos(value: string | null): number[] {
-  return (value ?? "")
-    .split(",")
-    .map((part) => Number(part))
-    .filter((id) => Number.isInteger(id) && id > 0);
+function asMeasure(stat: StatKey): RepositoryMeasure | null {
+  return (MEASURES as readonly string[]).includes(stat) ? (stat as RepositoryMeasure) : null;
 }
 
-const MISSING = "—";
-
-function tableCaption(mode: TableMode, date: string): string {
-  if (mode === "day" && date !== "") return `Change on ${date}`;
-  if (mode === "month" && date !== "") return `Change in ${date}`;
-  if (mode === "day") return "Change on the selected day";
-  if (mode === "month") return "Change in the selected month";
-  return "Latest counts; clones over the range";
-}
-
-function latestActivityDate(
-  metricSeries: readonly (readonly DailySeries[] | undefined)[],
-  clones: readonly CloneSeriesItem[] | undefined,
-): string | null {
-  let latest: string | null = null;
-  for (const series of metricSeries) {
-    for (const item of series ?? []) {
-      for (const point of item.points) {
-        if (latest == null || point.date > latest) latest = point.date;
-      }
-    }
-  }
-  for (const item of clones ?? []) {
-    for (const point of item.points) {
-      if (latest == null || point.date > latest) latest = point.date;
-    }
-  }
-  return latest;
-}
-
-function isGithubMeasure(stat: StatKey): stat is RepositoryMeasure {
-  return (GITHUB_MEASURES as readonly string[]).includes(stat);
-}
-
-// Total uses the latest snapshot. Day and month read the daily change series:
-// a month is the sum of that month's changes, not the last day's change.
-function changeAt(
-  series: readonly DailySeries[] | undefined,
-  repoId: number,
-  mode: TableMode,
-  date: string,
-): number | null {
-  if (mode === "total" || series == null || date === "") return null;
-  const item = series.find((candidate) => candidate.repoId === repoId);
-  if (!item) return null;
-  if (mode === "day") {
-    return item.points.find((point) => point.date === date)?.value ?? null;
-  }
-  const points = item.points.filter((point) => point.date.startsWith(date));
-  if (points.length === 0) return null;
-  return points.reduce((sum, point) => sum + point.value, 0);
-}
-
-function snapshotCount(
-  snapshot: RepositorySnapshot | null | undefined,
-  field: keyof RepositorySnapshot,
-): number {
-  return snapshot?.[field] ?? 0;
-}
-
-function cloneFigure(
-  series: readonly CloneSeriesItem[] | null,
-  repoId: number,
-  mode: TableMode,
-  date: string,
-  field: "count" | "uniques",
-): number | null {
-  if (series == null) return null;
-  const item = series.find((candidate) => candidate.repoId === repoId);
-  if (mode === "total") {
-    return (item?.points ?? []).reduce((sum, point) => sum + point[field], 0);
-  }
-  if (item == null || date === "") return null;
-  const points =
-    mode === "day"
-      ? item.points.filter((point) => point.date === date)
-      : item.points.filter((point) => point.date.startsWith(date));
-  if (points.length === 0) return null;
-  return points.reduce((sum, point) => sum + point[field], 0);
-}
-
-function showCount(value: number | null): string {
-  return value == null ? MISSING : formatCount(value);
-}
-
-// Clone history has no grain of its own. Month sums the days, and cumulative
-// is a running total of those daily counts.
+// Clone history has no Interval of its own. Month sums the days, and
+// cumulative is a running total of those daily counts.
 function cloneChartSeries(
   series: readonly CloneSeriesItem[],
   field: "count" | "uniques",
@@ -204,469 +141,379 @@ function cloneChartSeries(
   });
 }
 
+// One GitHub measure's series at one Interval. Keyed by the request alone, so
+// the chart and the table share one fetch when they ask the same question
+// (Stars at Daily, say). Never asked for a clone Stat, which has no measure.
+function useMetricSeries(
+  query: { measure: RepositoryMeasure | null; interval: ReleaseDownloadGrain } & Pick<
+    StatsFilters,
+    "from" | "to" | "repos"
+  >,
+  enabled: boolean,
+): UseQueryResult<MetricSeriesResponse> {
+  const getToken = useAccessToken();
+  const base = productDownloadStatsBackendUrl();
+  const { measure, interval, from, to, repos } = query;
+  return useQuery({
+    queryKey: ["product-download-stats", "metric", base, measure, from, to, interval, repos.join(",")],
+    enabled,
+    // The chart and the table can ask the same series a moment apart (Stars at
+    // Daily, once the table has already read the day). A fresh answer is not
+    // stale, so the second reader does not ask again.
+    staleTime: Infinity,
+    queryFn:
+      measure == null
+        ? skipToken
+        : async () => getMetricSeries(await getToken(), { metric: measure, from, to, interval, repos }),
+  });
+}
+
 export default function EngineeringRepositoryStatsPage(): JSX.Element {
-  const preview = isPreviewEnabled("engineering");
-  const configured = isProductDownloadStatsConfigured();
+  return (
+    <DownloadStatsShell screen="repositoryStats">
+      <RepositoryStatsScreen />
+    </DownloadStatsShell>
+  );
+}
+
+// Inside the shell, so it is mounted — and asks — only once the shell has let
+// the reader through. Repository Stats: the filter
+// bar with the product picker and the Stat and Interval selects, the chart
+// card titled by the Stat, and the "Current stats" card. Products, dates, Stat
+// and Interval live in the address so a shared link reproduces the view; the
+// chart type and the table's mode are the reader's, for this visit.
+function RepositoryStatsScreen(): JSX.Element {
   const [params, setParams] = useSearchParams();
   const getToken = useAccessToken();
   const base = productDownloadStatsBackendUrl();
-  const allowed = isCredentialedProductDownloadStatsUrl(base);
-  const defaults = dailyRange();
-  const from = params.get("from") || defaults.from;
-  const to = params.get("to") || defaults.to;
-  const interval = readGrain(params.get("interval"));
-  const stat = readStat(params.get("stat"));
-  const repos = readRepos(params.get("repos"));
-  const enabled = preview && configured && allowed;
-  const rangeInverted = from > to;
-  const queryEnabled = enabled && !rangeInverted;
-  const repoKey = repos.join(",");
-  const [tableMode, setTableMode] = useState<TableMode>("total");
-  const [pickedDate, setPickedDate] = useState<string | null>(null);
-  const [productSearch, setProductSearch] = useState("");
-  const [chart, setChart] = useState<"line" | "bar">("line");
+  const statLabelId = useId();
 
-  const repositories = useQuery({
-    queryKey: ["product-download-stats", "repositories", base],
-    enabled,
-    queryFn: async () => getRepositories(await getToken()),
-  });
+  const filters = parseFilters(params);
+  const { from, to, interval, repos } = filters;
+  const stat = readStat(params.get("stat"));
+  const rangeInverted = from > to;
+
+  // The active Products name the chart's series and are the table's rows.
+  const repositories = useTrackedRepositories();
+  const products = activeRepositories(repositories.data);
+
+  // One clone request serves the chart's two clone Stats at every Interval
+  // and the table's Clones and Unique Cloners columns.
   const clones = useQuery({
-    queryKey: ["product-download-stats", "clones", base, from, to, repoKey],
-    enabled: queryEnabled,
+    queryKey: ["product-download-stats", "clones", base, from, to, repos.join(",")],
+    enabled: !rangeInverted,
     queryFn: async () => getCloneSeries(await getToken(), { from, to, repos }),
   });
-  const chartMeasure = isGithubMeasure(stat) ? stat : null;
-  const metric = useQuery({
-    queryKey: ["product-download-stats", "metric", base, chartMeasure, from, to, interval, repoKey],
-    enabled: queryEnabled && chartMeasure != null,
-    queryFn: async () => {
-      if (chartMeasure == null) throw new Error("Repository stats has no GitHub measure");
-      return getMetricSeries(await getToken(), { metric: chartMeasure, from, to, interval, repos });
-    },
-  });
-  const dailyTable = tableMode !== "total";
-  const dayEnabled = (measure: RepositoryMeasure) =>
-    queryEnabled && dailyTable && !(interval === "day" && chartMeasure === measure);
-  const starsTable = useDayMetric("stars", { base, from, to, repoKey, repos, enabled: dayEnabled("stars"), getToken });
-  const forksTable = useDayMetric("forks", { base, from, to, repoKey, repos, enabled: dayEnabled("forks"), getToken });
-  const watchersTable = useDayMetric("watchers", { base, from, to, repoKey, repos, enabled: dayEnabled("watchers"), getToken });
-  const issuesTable = useDayMetric("openIssues", { base, from, to, repoKey, repos, enabled: dayEnabled("openIssues"), getToken });
-
-  if (!preview) {
-    return <Typography>Engineering isn't available yet.</Typography>;
-  }
-  if (!configured) {
-    return (
-      <Typography>
-        Product Download Stats isn't connected yet. Set{" "}
-        <code>ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL</code> in config.js.
-      </Typography>
-    );
-  }
-  if (!allowed) {
-    return (
-      <Typography>
-        Product Download Stats needs an https address. An http address is only accepted for
-        localhost.
-      </Typography>
-    );
-  }
-
-  const replace = (updates: Record<string, string | null>) => {
-    const next = new URLSearchParams(params);
-    if (!params.get("from")) next.set("from", from);
-    if (!params.get("to")) next.set("to", to);
-    for (const [key, value] of Object.entries(updates)) {
-      if ((key === "from" || key === "to") && (value == null || value === "")) continue;
-      if (value == null || value === "") next.delete(key);
-      else next.set(key, value);
-    }
-    setParams(next, { replace: true });
-  };
-
-  const active = (repositories.data?.repositories ?? []).filter(
-    (repository) => repository.isActive !== false,
-  );
-  const names = new Map(
-    active.map((repository) => [repository.id, productLabel(repository.productName, repository.repoName)]),
-  );
-  const listed = active.filter((repository) => {
-    if (repos.length > 0 && !repos.includes(repository.id)) return false;
-    const label = productLabel(repository.productName, repository.repoName);
-    return productSearch === "" || label.toLowerCase().includes(productSearch.toLowerCase());
-  });
-
-  const daySeries = (measure: RepositoryMeasure, query: UseQueryResult<{ series: DailySeries[] }, Error>) =>
-    interval === "day" && chartMeasure === measure ? metric.data?.series : query.data?.series;
-  const starsSeries = daySeries("stars", starsTable);
-  const forksSeries = daySeries("forks", forksTable);
-  const watchersSeries = daySeries("watchers", watchersTable);
-  const issuesSeries = daySeries("openIssues", issuesTable);
-  const latest = latestActivityDate(
-    [starsSeries, forksSeries, watchersSeries, issuesSeries],
-    clones.data?.series,
-  );
-  const tableDate =
-    tableMode === "total"
-      ? ""
-      : pickedDate !== null
-        ? pickedDate
-        : latest == null
-          ? ""
-          : tableMode === "month"
-            ? latest.slice(0, 7)
-            : latest;
-
-  const chartPending = chartMeasure == null ? clones.isPending : metric.isPending;
-  const chartFailed =
-    chartMeasure == null ? clones.isError || clones.data == null : metric.isError || metric.data == null;
-  const tableQueries = [starsTable, forksTable, watchersTable, issuesTable];
-  const tableLoading = clones.isLoading || tableQueries.some((query) => query.isLoading);
-  const dailyError =
-    tableMode === "total" ? undefined : tableQueries.find((query) => query.error != null)?.error;
-  const tableError = chartMeasure != null && clones.error != null ? clones.error : dailyError;
-  const chartError = chartMeasure == null ? clones.error : metric.error;
-
-  const refetchIfFetched = (query: { isFetched: boolean; isFetching: boolean; refetch: () => Promise<unknown> }) => {
-    if (query.isFetched || query.isFetching) void query.refetch();
-  };
-  const retryChart = () => {
-    void repositories.refetch();
-    if (chartMeasure == null) void clones.refetch();
-    else void metric.refetch();
-  };
-  const retryTable = () => {
-    void clones.refetch();
-    for (const query of tableQueries) refetchIfFetched(query);
-  };
-
-  const chartSeries =
-    chartMeasure == null
+  // A GitHub measure is a series of its own; a clone Stat reads the clone
+  // history instead, reshaped to the Interval.
+  const measure = asMeasure(stat);
+  const metric = useMetricSeries({ measure, interval, from, to, repos }, !rangeInverted);
+  const chartQuery = measure == null ? clones : metric;
+  const chartSeries = toChartSeries(
+    measure == null
       ? cloneChartSeries(clones.data?.series ?? [], stat === "uniqueCloners" ? "uniques" : "count", interval)
-      : (metric.data?.series ?? []);
-  const label = STAT_OPTIONS.find((option) => option.value === stat)?.label ?? "Stars";
-  const cloneSeries = clones.data == null ? null : clones.data.series;
+      : (metric.data?.series ?? []),
+    productNameById(products),
+  );
+  const statLabel = STAT_OPTIONS.find((option) => option.value === stat)?.label ?? "Stars";
+
+  const onChange = (updates: FilterUpdate) =>
+    setParams(applyFilterChange(params, { from, to }, updates), { replace: true });
 
   return (
     <Box>
-      <Typography component="h1" variant="h5">
-        Repository Stats
-      </Typography>
-      <Typography sx={{ mt: 1 }}>
-        Unique cloners are summed per day and the same person on different days counts separately.
-      </Typography>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ my: 2, flexWrap: "wrap" }}>
-        <TextField
-          label="From"
-          type="date"
-          size="small"
-          value={from}
-          onChange={(event) => replace({ from: event.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          label="To"
-          type="date"
-          size="small"
-          value={to}
-          onChange={(event) => replace({ to: event.target.value })}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <Select
-          size="small"
-          inputProps={{ "aria-label": "Measure" }}
-          value={stat}
-          onChange={(event) => replace({ stat: event.target.value })}
-        >
-          {STAT_OPTIONS.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </Select>
-        <Select
-          size="small"
-          inputProps={{ "aria-label": "Grain" }}
-          value={interval}
-          onChange={(event) => replace({ interval: event.target.value })}
-        >
-          <MenuItem value="day">Daily</MenuItem>
-          <MenuItem value="month">Monthly</MenuItem>
-          <MenuItem value="cumulative">Cumulative</MenuItem>
-        </Select>
-        <Select
-          size="small"
-          multiple
-          displayEmpty
-          inputProps={{ "aria-label": "Products" }}
-          value={repos.map(String)}
-          onChange={(event) => {
-            const value = event.target.value;
-            const selected = (typeof value === "string" ? value.split(",") : value).filter(Boolean);
-            replace({ repos: selected.length > 0 ? selected.join(",") : null });
-          }}
-          renderValue={(selected) =>
-            selected.length === 0 ? "All products" : `${selected.length} selected`
-          }
-        >
-          {active.map((repository) => (
-            <MenuItem key={repository.id} value={String(repository.id)}>
-              {productLabel(repository.productName, repository.repoName)}
-            </MenuItem>
-          ))}
-        </Select>
-        {interval !== "month" && (
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            aria-label="Chart type"
-            value={chart}
-            onChange={(_event, value: "line" | "bar" | null) => {
-              if (value) setChart(value);
-            }}
-          >
-            <ToggleButton value="line">Line</ToggleButton>
-            <ToggleButton value="bar">Bars</ToggleButton>
-          </ToggleButtonGroup>
-        )}
-      </Stack>
+      <FilterBar
+        filters={filters}
+        onChange={onChange}
+        filterSlot={
+          <>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel id={statLabelId}>Stat</InputLabel>
+                <Select
+                  labelId={statLabelId}
+                  label="Stat"
+                  value={stat}
+                  onChange={(event) => onChange({ stat: event.target.value })}
+                >
+                  {STAT_OPTIONS.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 2 }}>
+              <IntervalSelect
+                label="Interval"
+                value={interval}
+                onChange={(chosen) => onChange({ interval: chosen })}
+              />
+            </Grid>
+          </>
+        }
+      />
 
       {rangeInverted ? (
         <Typography>From is after To.</Typography>
-      ) : repositories.isPending ? (
-        <Loading label="Loading products…" />
-      ) : repositories.isError || repositories.data == null ? (
-        <ErrorNotice onRetry={() => void repositories.refetch()} error={repositories.error}>
-          Couldn't load products.
-        </ErrorNotice>
+      ) : repositories.isError ? (
+        // A failed request is never presented as nothing to show
+        // (docs/conventions.md).
+        <ErrorState error={repositories.error} onRetry={() => void repositories.refetch()} />
       ) : (
         <>
-          {chartPending ? (
-            <Loading label="Loading repository stats…" />
-          ) : chartFailed ? (
-            <ErrorNotice onRetry={retryChart} error={chartError}>
-              Couldn't load repository stats.
-            </ErrorNotice>
-          ) : chartSeries.every((item) => item.points.length === 0) ? (
-            <Typography>No data for the selected range</Typography>
-          ) : (
-            <StatsChart
-              series={chartSeries}
-              names={names}
-              interval={interval}
-              chart={chart}
-              title={`${label} over time`}
-            />
-          )}
-          <Card sx={{ p: 2, mt: 2 }}>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              sx={{ mb: 2, justifyContent: "space-between", alignItems: { sm: "center" } }}
-            >
-              <Typography component="h2" variant="h6">
-                {tableCaption(tableMode, tableDate)}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                {tableMode !== "total" && (
-                  <TextField
-                    label={tableMode === "month" ? "Month" : "Day"}
-                    type={tableMode === "month" ? "month" : "date"}
-                    size="small"
-                    value={tableDate}
-                    onChange={(event) => setPickedDate(event.target.value)}
-                    slotProps={{
-                      inputLabel: { shrink: true },
-                      htmlInput: {
-                        min: tableMode === "month" ? from.slice(0, 7) : from,
-                        max: tableMode === "month" ? to.slice(0, 7) : to,
-                      },
-                    }}
-                  />
-                )}
-                <ToggleButtonGroup
-                  exclusive
-                  size="small"
-                  aria-label="Table range"
-                  value={tableMode}
-                  onChange={(_event, value: TableMode | null) => {
-                    if (!value) return;
-                    setTableMode(value);
-                    setPickedDate(null);
-                  }}
-                >
-                  <ToggleButton value="total">Total</ToggleButton>
-                  <ToggleButton value="month">Monthly</ToggleButton>
-                  <ToggleButton value="day">Daily</ToggleButton>
-                </ToggleButtonGroup>
-              </Stack>
-            </Stack>
-            {tableLoading ? (
-              <Loading label="Loading repository stats…" />
-            ) : !chartFailed && tableError != null ? (
-              <ErrorNotice onRetry={retryTable} error={tableError}>
-                Couldn't load repository stats.
-              </ErrorNotice>
-            ) : active.length === 0 ? null : (
-              <ListingTable.Provider searchValue={productSearch} onSearchChange={setProductSearch}>
-                <ListingTable.Container>
-                  <ListingTable.Toolbar showSearch searchPlaceholder="Search products" />
-                  {listed.length === 0 ? (
-                    <Typography>No products match your search</Typography>
-                  ) : (
-                  <ListingTable bordered>
-                    <ListingTable.Head>
-                      <ListingTable.Row>
-                        <ListingTable.Cell>Product</ListingTable.Cell>
-                        <ListingTable.Cell align="right">Stars</ListingTable.Cell>
-                        <ListingTable.Cell align="right">Forks</ListingTable.Cell>
-                        <ListingTable.Cell align="right">Watchers</ListingTable.Cell>
-                        <ListingTable.Cell align="right">Open Issues</ListingTable.Cell>
-                        <ListingTable.Cell align="right">Clones</ListingTable.Cell>
-                        <ListingTable.Cell align="right">Unique Cloners</ListingTable.Cell>
-                      </ListingTable.Row>
-                    </ListingTable.Head>
-                    <ListingTable.Body>
-                      {listed.map((repository) => {
-                        const snapshot = repository.latestSnapshot;
-                        const stars =
-                          tableMode === "total"
-                            ? snapshotCount(snapshot, "stargazersCount")
-                            : changeAt(starsSeries, repository.id, tableMode, tableDate);
-                        const forks =
-                          tableMode === "total"
-                            ? snapshotCount(snapshot, "forksCount")
-                            : changeAt(forksSeries, repository.id, tableMode, tableDate);
-                        const watchers =
-                          tableMode === "total"
-                            ? snapshotCount(snapshot, "watchersCount")
-                            : changeAt(watchersSeries, repository.id, tableMode, tableDate);
-                        const issues =
-                          tableMode === "total"
-                            ? snapshotCount(snapshot, "openIssuesCount")
-                            : changeAt(issuesSeries, repository.id, tableMode, tableDate);
-                        return (
-                          <ListingTable.Row key={repository.id}>
-                            <ListingTable.Cell>
-                              {productLabel(repository.productName, repository.repoName)}
-                            </ListingTable.Cell>
-                            <ListingTable.Cell align="right">{showCount(stars)}</ListingTable.Cell>
-                            <ListingTable.Cell align="right">{showCount(forks)}</ListingTable.Cell>
-                            <ListingTable.Cell align="right">{showCount(watchers)}</ListingTable.Cell>
-                            <ListingTable.Cell align="right">{showCount(issues)}</ListingTable.Cell>
-                            <ListingTable.Cell align="right">
-                              {showCount(cloneFigure(cloneSeries, repository.id, tableMode, tableDate, "count"))}
-                            </ListingTable.Cell>
-                            <ListingTable.Cell align="right">
-                              {showCount(cloneFigure(cloneSeries, repository.id, tableMode, tableDate, "uniques"))}
-                            </ListingTable.Cell>
-                          </ListingTable.Row>
-                        );
-                      })}
-                    </ListingTable.Body>
-                  </ListingTable>
-                  )}
-                </ListingTable.Container>
-              </ListingTable.Provider>
+          <ChartCard
+            title={`${statLabel} over time`}
+            subtitle="Repository stats and clone traffic per product"
+            showTypeToggle={interval !== "month"}
+            defaultVariant={interval === "month" ? "bar" : "line"}
+          >
+            {(variant) => (
+              <SeriesChart
+                variant={interval === "month" ? "bar" : variant}
+                series={chartSeries}
+                isLoading={repositories.isPending || chartQuery.isPending}
+                isError={chartQuery.isError}
+                error={chartQuery.error}
+                onRetry={() => void chartQuery.refetch()}
+              />
             )}
-          </Card>
+          </ChartCard>
+
+          <CurrentStatsCard
+            products={products}
+            productsPending={repositories.isPending}
+            filters={filters}
+            clones={clones}
+          />
         </>
       )}
     </Box>
   );
 }
 
-function useDayMetric(
-  metric: RepositoryMeasure,
-  args: {
-    base: string;
-    from: string;
-    to: string;
-    repoKey: string;
-    repos: number[];
-    enabled: boolean;
-    getToken: () => Promise<string>;
-  },
-): UseQueryResult<{ series: DailySeries[] }, Error> {
-  return useQuery({
-    queryKey: ["product-download-stats", "metric", "day", args.base, metric, args.from, args.to, args.repoKey],
-    enabled: args.enabled,
-    queryFn: async () =>
-      getMetricSeries(await args.getToken(), {
-        metric,
-        from: args.from,
-        to: args.to,
-        interval: "day",
-        repos: args.repos,
-      }),
-  });
+// Total, Monthly or Daily, as the "Current stats" toggles read.
+type TableMode = "total" | "month" | "day";
+
+// The day or month the table reads in Daily or Monthly mode.
+interface TableDate {
+  mode: "day" | "month";
+  value: string;
 }
 
-function Loading({ label }: { label: string }): JSX.Element {
-  return (
-    <Stack direction="row" spacing={1.25} sx={{ alignItems: "center" }}>
-      <CircularProgress size={16} />
-      <Typography>{label}</Typography>
-    </Stack>
+// Where the table opens when its mode changes: the end of the selected range,
+// so Daily and Monthly start inside the range rather than on today.
+function defaultDateFor(mode: TableMode, to: string): string {
+  if (mode === "day") return to;
+  if (mode === "month") return to.slice(0, 7);
+  return "";
+}
+
+// The points on the chosen day or in the chosen month — or every point, for
+// the whole range.
+function pointsIn<P extends { date: string }>(points: readonly P[], date: TableDate | null): readonly P[] {
+  if (date == null) return points;
+  return points.filter((point) =>
+    date.mode === "day" ? point.date === date.value : point.date.startsWith(date.value),
   );
 }
 
-function StatsChart({
-  series,
-  names,
-  interval,
-  chart,
-  title,
+// A Product's figure summed from its series over the chosen day or month (or
+// the range). A Product with no point for the chosen day or month — or with
+// no series at all — reads 0, not a dash. The missing point is shown as zero
+// so the cell is a number, the same way every other cell in the row is.
+function sumOf<P extends { date: string }>(
+  series: readonly { repoId: number; points: P[] }[] | undefined,
+  repoId: number,
+  date: TableDate | null,
+  valueOf: (point: P) => number,
+): number {
+  const item = series?.find((candidate) => candidate.repoId === repoId);
+  return pointsIn(item?.points ?? [], date).reduce((sum, point) => sum + valueOf(point), 0);
+}
+
+// The table under the chart: every listed Product's Stars, Forks, Watchers,
+// Open Issues, Clones and Unique Cloners. Total reads the latest GitHub counts
+// and the clones over the range. Monthly and Daily read the changes on the
+// chosen month or day from the daily series, which are asked for only then.
+// With that picker cleared they read the latest GitHub counts again, and the
+// clone columns still sum the range.
+// The search narrows the rows and their pages; a Product change through the
+// picker narrows them too, without forgetting the search.
+function CurrentStatsCard({
+  products,
+  productsPending,
+  filters,
+  clones,
 }: {
-  series: DailySeries[];
-  names: Map<number, string>;
-  interval: ReleaseDownloadGrain;
-  chart: "line" | "bar";
-  title: string;
+  products: TrackedRepository[];
+  productsPending: boolean;
+  filters: StatsFilters;
+  clones: UseQueryResult<CloneSeriesResponse>;
 }): JSX.Element {
-  // Plot only the dates the API returned. Filling the calendar would add days
-  // the series never had and break the line between real points.
-  const { data, lines } = dailyChartModel(series, names, { from: "", to: "" });
-  const bars = interval === "month" || chart === "bar";
+  const { from, to, repos } = filters;
+  const [mode, setMode] = useState<TableMode>("total");
+  const [pickedDate, setPickedDate] = useState("");
+  const [search, setSearch] = useState("");
+  // No chosen day or month: Total, or Daily or Monthly with the picker cleared.
+  const date: TableDate | null =
+    mode !== "total" && pickedDate !== "" ? { mode, value: pickedDate } : null;
+
+  const daily = mode !== "total";
+  const stars = useMetricSeries({ measure: "stars", interval: "day", from, to, repos }, daily);
+  const forks = useMetricSeries({ measure: "forks", interval: "day", from, to, repos }, daily);
+  const watchers = useMetricSeries({ measure: "watchers", interval: "day", from, to, repos }, daily);
+  const openIssues = useMetricSeries({ measure: "openIssues", interval: "day", from, to, repos }, daily);
+  const measures: Record<RepositoryMeasure, UseQueryResult<MetricSeriesResponse>> = {
+    stars,
+    forks,
+    watchers,
+    openIssues,
+  };
+
+  const read = [clones, ...(daily ? Object.values(measures) : [])];
+  const isLoading = productsPending || read.some((query) => query.isPending);
+  const failed = read.filter((query) => query.isError);
+  const retry = () => {
+    for (const query of failed) void query.refetch();
+  };
+
+  const needle = search.toLowerCase();
+  const listed = products.filter(
+    (product) =>
+      (repos.length === 0 || repos.includes(product.id)) &&
+      (needle === "" || productLabel(product.productName, product.repoName).toLowerCase().includes(needle)),
+  );
+  const pagination = usePagination(listed);
+
+  const figure = (product: TrackedRepository, measure: RepositoryMeasure): number =>
+    date == null
+      ? (product.latestSnapshot?.[SNAPSHOT_FIELD[measure]] ?? 0)
+      : sumOf(measures[measure].data?.series, product.id, date, (point) => point.value);
+  const cloneFigure = (product: TrackedRepository, field: "count" | "uniques"): number =>
+    sumOf(clones.data?.series, product.id, date, (point) => point[field]);
+
+  const changeMode = (next: TableMode) => {
+    setMode(next);
+    setPickedDate(defaultDateFor(next, to));
+  };
+
   return (
-    <Box>
-      <Typography component="h2" variant="h6">
-        {title}
-      </Typography>
-      <Box sx={{ width: "100%", height: 280 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          {bars ? (
-            <BarChart data={data}>
-              <XAxis dataKey="date" />
-              <YAxis tickFormatter={(value: number) => formatCount(value)} />
-              <Tooltip />
-              <Legend />
-              {lines.map((line) => (
-                <Bar key={line.repoId} name={line.name} dataKey={line.dataKey} fill={line.stroke} />
-              ))}
-            </BarChart>
-          ) : (
-            <LineChart data={data}>
-              <XAxis dataKey="date" />
-              <YAxis tickFormatter={(value: number) => formatCount(value)} />
-              <Tooltip />
-              <Legend />
-              {lines.map((line) => (
-                <Line
-                  key={line.repoId}
-                  name={line.name}
-                  type="monotone"
-                  dataKey={line.dataKey}
-                  stroke={line.stroke}
-                  dot={false}
-                  connectNulls
-                />
-              ))}
-            </LineChart>
+    <Card sx={{ p: 2, mt: 2, overflowX: "auto" }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          mb: 2,
+          flexWrap: "wrap",
+          gap: 1,
+        }}
+      >
+        <Typography variant="h6" component="h3">
+          Current stats
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {mode !== "total" && (
+            <Box
+              component="input"
+              type={mode === "month" ? "month" : "date"}
+              aria-label={mode === "month" ? "Month" : "Day"}
+              value={pickedDate}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setPickedDate(event.target.value)}
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1,
+                px: 1,
+                py: 0.5,
+                fontSize: "0.8rem",
+                color: "text.primary",
+                bgcolor: "background.paper",
+                cursor: "pointer",
+                outline: "none",
+                "&:focus": { borderColor: "primary.main" },
+              }}
+            />
           )}
-        </ResponsiveContainer>
+          <ToggleButtonGroup
+            size="small"
+            color="primary"
+            exclusive
+            value={mode}
+            onChange={(_event, next: TableMode | null) => {
+              if (next) changeMode(next);
+            }}
+          >
+            <ToggleButton value="total">Total</ToggleButton>
+            <ToggleButton value="month">Monthly</ToggleButton>
+            <ToggleButton value="day">Daily</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
       </Box>
-    </Box>
+
+      {isLoading ? (
+        <SkeletonRows />
+      ) : failed.length > 0 ? (
+        <ErrorState error={failed[0].error} onRetry={retry} minHeight={160} />
+      ) : products.length === 0 ? (
+        <EmptyState title="No products are tracked" minHeight={160} />
+      ) : (
+        <>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>
+                  <TableHeaderSearch title="Product" noun="product" value={search} onChange={setSearch} />
+                </TableCell>
+                <TableCell align="right">Stars</TableCell>
+                <TableCell align="right">Forks</TableCell>
+                <TableCell align="right">Watchers</TableCell>
+                <TableCell align="right">Open Issues</TableCell>
+                <TableCell align="right">Clones</TableCell>
+                <TableCell align="right">
+                  <Tooltip
+                    title="Unique cloners summed per day. Same person on different days counts separately."
+                    placement="top"
+                  >
+                    <Box
+                      component="span"
+                      sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, cursor: "help" }}
+                    >
+                      Unique Cloners
+                      <Info size={13} style={{ opacity: 0.5 }} />
+                    </Box>
+                  </Tooltip>
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {listed.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} sx={{ border: 0 }}>
+                    <EmptyState title="No products match your search" minHeight={120} />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pagination.paged.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>{productLabel(product.productName, product.repoName)}</TableCell>
+                    {MEASURES.map((measure) => (
+                      <TableCell key={measure} align="right">
+                        {formatCompact(figure(product, measure))}
+                      </TableCell>
+                    ))}
+                    <TableCell align="right">{formatCompact(cloneFigure(product, "count"))}</TableCell>
+                    <TableCell align="right">{formatCompact(cloneFigure(product, "uniques"))}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          <TablePager pagination={pagination} />
+        </>
+      )}
+    </Card>
   );
 }
