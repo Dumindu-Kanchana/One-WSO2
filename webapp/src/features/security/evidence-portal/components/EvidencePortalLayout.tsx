@@ -48,9 +48,9 @@ import AccessDenied from "./AccessDenied";
 //   4. Turn refetch on mount back on for this module's own query keys. The
 //      app wide client sets refetchOnMount: false, so after a submit the
 //      Evidence page kept showing its cached list until a hard reload, even
-//      though the submit had invalidated it. The source app never had that
-//      setting. Stale data now refetches when a page mounts, and staleTime
-//      still decides what counts as stale. "me" is left alone on purpose.
+//      though the submit had invalidated it. Stale data now refetches when a
+//      page mounts, and staleTime still decides what counts as stale. "me"
+//      is left alone on purpose.
 const FRESH_ON_MOUNT_KEYS = [
   "products",
   "frameworks",
