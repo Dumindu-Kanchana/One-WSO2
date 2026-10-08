@@ -44,7 +44,9 @@ const BLOCKED_IPV4_RANGES: [number[], number][] = [
   [[127, 0, 0, 0], 8], // loopback
   [[169, 254, 0, 0], 16], // link local, including 169.254.169.254
   [[172, 16, 0, 0], 12],
+  [[192, 0, 0, 0], 24], // IETF protocol assignments
   [[192, 168, 0, 0], 16],
+  [[198, 18, 0, 0], 15], // benchmarking
 ];
 
 function ipv4ToNumber(octets: number[]): number {
@@ -81,6 +83,11 @@ function parseIpv6(host: string): number[] | null {
   return groups.length === 8 && groups.every((g) => g >= 0 && g <= 0xffff) ? groups : null;
 }
 
+// Two 16 bit groups back into the four octets of the IPv4 they carry.
+function embeddedIpv4(high: number, low: number): number[] {
+  return [high >> 8, high & 0xff, low >> 8, low & 0xff];
+}
+
 function isBlockedIpv6(groups: number[]): boolean {
   const firstSixZero = groups.slice(0, 6).every((g) => g === 0);
   const firstFiveZero = groups.slice(0, 5).every((g) => g === 0);
@@ -88,8 +95,15 @@ function isBlockedIpv6(groups: number[]): boolean {
   if (firstSixZero) return true;
   // IPv4 mapped, ::ffff:a.b.c.d
   if (firstFiveZero && groups[5] === 0xffff) {
-    const embedded = [groups[6] >> 8, groups[6] & 0xff, groups[7] >> 8, groups[7] & 0xff];
-    return isBlockedIpv4(embedded);
+    return isBlockedIpv4(embeddedIpv4(groups[6], groups[7]));
+  }
+  // NAT64, 64:ff9b::a.b.c.d
+  if (groups[0] === 0x64 && groups[1] === 0xff9b && groups.slice(2, 6).every((g) => g === 0)) {
+    return isBlockedIpv4(embeddedIpv4(groups[6], groups[7]));
+  }
+  // 6to4, 2002:aabb:ccdd::/48 carries a.b.c.d
+  if (groups[0] === 0x2002) {
+    return isBlockedIpv4(embeddedIpv4(groups[1], groups[2]));
   }
   if ((groups[0] & 0xfe00) === 0xfc00) return true; // unique local, fc00::/7
   if ((groups[0] & 0xffc0) === 0xfe80) return true; // link local, fe80::/10

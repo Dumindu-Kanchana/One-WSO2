@@ -37,6 +37,10 @@ describe("validateAgentPortalUrl", () => {
     ["a public address just below 169.254.0.0/16", "https://169.253.255.255", "https://169.253.255.255/"],
     ["a public IPv6 address", "https://[2606:4700::1111]", "https://[2606:4700::1111]/"],
     ["a public IPv4 mapped IPv6 address", "https://[::ffff:8.8.8.8]", "https://[::ffff:808:808]/"],
+    ["a public address just above 192.0.0.0/24", "https://192.0.1.1", "https://192.0.1.1/"],
+    ["a public address just above 198.18.0.0/15", "https://198.20.0.1", "https://198.20.0.1/"],
+    ["a public address behind NAT64", "https://[64:ff9b::808:808]", "https://[64:ff9b::808:808]/"],
+    ["a public address behind 6to4", "https://[2002:808:808::1]", "https://[2002:808:808::1]/"],
   ])("accepts %s", (_, input, url) => {
     expect(validateAgentPortalUrl(input)).toEqual({ valid: true, url });
   });
@@ -109,6 +113,14 @@ describe("validateAgentPortalUrl", () => {
     ["IPv4 mapped loopback", "https://[::ffff:127.0.0.1]"],
     ["IPv4 mapped metadata IP", "https://[::ffff:169.254.169.254]"],
     ["IPv4 mapped private address", "https://[::ffff:10.0.0.1]"],
+    ["the bottom of 192.0.0.0/24", "https://192.0.0.0"],
+    ["the top of 192.0.0.0/24", "https://192.0.0.255"],
+    ["the bottom of 198.18.0.0/15", "https://198.18.0.0"],
+    ["the top of 198.18.0.0/15", "https://198.19.255.255"],
+    ["NAT64 loopback", "https://[64:ff9b::7f00:1]"],
+    ["NAT64 metadata IP", "https://[64:ff9b::a9fe:a9fe]"],
+    ["6to4 loopback", "https://[2002:7f00:1::]"],
+    ["6to4 private address", "https://[2002:c0a8:101::1]"],
   ])("refuses %s", (_, input) => {
     expect(validateAgentPortalUrl(input)).toEqual({ valid: false, message: BLOCKED_HOST_PORTAL_URL_MESSAGE });
   });
