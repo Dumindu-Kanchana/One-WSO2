@@ -78,17 +78,20 @@ export default function ControlPicker({
   const { data: controls = [], isLoading } = useQuery<Control[]>({
     queryKey: ["controls", frameworkId || undefined],
     queryFn: () => controlsApi.list(frameworkId || undefined),
+    refetchOnMount: true,
     enabled: !!frameworkId,
   });
 
   const { data: allEvidence = [], isFetching: isEvidenceLoading } = useQuery<Evidence[]>({
     queryKey: ["evidence"],
     queryFn: evidenceApi.list,
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   const { data: allSubmissions = [], isFetching: isSubmissionsLoading } = useQuery<Submission[]>({
     queryKey: ["submissions"],
     queryFn: submissionsApi.list,
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
   // Only fetched while the delete dialog is open, so we can warn about an
@@ -96,6 +99,7 @@ export default function ControlPicker({
   const { data: allTasks = [], isFetching: isTasksLoading } = useQuery<AgentTask[]>({
     queryKey: ["agent-tasks"],
     queryFn: () => agentApi.listTasks(500),
+    refetchOnMount: true,
     enabled: !!deleteTarget,
   });
 

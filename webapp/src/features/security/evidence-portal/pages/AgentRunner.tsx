@@ -27,6 +27,7 @@ import ProductPicker from "../components/ProductPicker";
 import FrameworkPicker from "../components/FrameworkPicker";
 import { computeAgentRunnerFormState } from "../utils/computeAgentRunnerFormState";
 import { detectChangingSteps, type ChangingStepFlag } from "../utils/detectChangingSteps";
+import { validateAgentPortalUrl } from "../utils/validateAgentPortalUrl";
 
 // ── Portal presets ────────────────────────────────────────────────────────
 
@@ -487,8 +488,9 @@ export default function AgentRunner() {
   };
 
   const handleOpenPortal = async () => {
-    if (!portalUrl.trim()) {
-      setPortalError("Please enter a URL");
+    const checked = validateAgentPortalUrl(portalUrl);
+    if (!checked.valid) {
+      setPortalError(checked.message);
       return;
     }
     setOpeningPortal(true);
@@ -496,7 +498,7 @@ export default function AgentRunner() {
     setLoginDone(false);
     setBrowserUrl(null);
     try {
-      const task: TaskOut = await agentApi.openLoginBrowser(portalUrl.trim());
+      const task: TaskOut = await agentApi.openLoginBrowser(checked.url);
       setLoginTaskId(task.id);
     } catch (err) {
       const detail = isAxiosError(err) ? (err.response?.data as { detail?: string } | undefined)?.detail : undefined;
