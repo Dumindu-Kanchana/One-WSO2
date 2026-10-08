@@ -275,12 +275,12 @@ describe("claimsForPerspective", () => {
     }
   });
 
-  it("covers infra, engineering with umt, and promotion when those preview flags are on", async () => {
+  it("covers infra, shipped Engineering with UMT, and promotion when those flags are on", async () => {
     const previous = window.config;
     vi.resetModules();
     window.config = {
       ...(previous ?? {}),
-      ONE_WSO2_PREVIEW_FEATURES: { infra: true, engineering: true, umt: true, promotion: true },
+      ONE_WSO2_PREVIEW_FEATURES: { infra: true, umt: true, promotion: true },
     } as Window["config"];
     const { PERSPECTIVES: flagged } = await import("@constants/perspectives");
     const fold = await import("./visibilityFold");

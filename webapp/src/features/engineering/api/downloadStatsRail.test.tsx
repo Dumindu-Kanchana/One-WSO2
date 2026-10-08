@@ -28,11 +28,9 @@ import { downloadStatsPaths } from "@constants/downloadStatsApps";
 // visibility hook and the REAL Admin gate, with only the HTTP answer
 // underneath mocked — the way misRail.test.tsx proves the Finance rail.
 //
-// The flag has to be on before the registry is read, which is at import.
 vi.hoisted(() => {
   window.config = {
     ...(window.config ?? {}),
-    ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
     ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "https://stats.example",
   } as Window["config"];
 });

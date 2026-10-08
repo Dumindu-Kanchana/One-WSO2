@@ -24,7 +24,7 @@
  * branching the build or holding work out of `main`.
  *
  * ```js
- * ONE_WSO2_PREVIEW_FEATURES: { engineering: true, umt: true },
+ * ONE_WSO2_PREVIEW_FEATURES: { umt: true },
  * ```
  *
  * ## Absent means off
@@ -56,11 +56,10 @@
 export type PreviewFeature =
   /**
    * Engineering → UMT, the whole app — its rail group and every route under
-   * `/engineering/umt`. Needs `engineering` on as well: UMT lives inside that
-   * perspective, so without it there is no rail to show UMT in. Held back as a
-   * whole, the same way Finance MIS is inside Finance. `useUmtGate`'s own role
-   * check against the UMT backend is unrelated and keeps working the same
-   * regardless of this flag.
+   * `/engineering/umt`. Engineering itself is shipped; this flag only hides
+   * UMT. Held back as a whole, the same way Finance MIS is inside Finance.
+   * `useUmtGate`'s own role check against the UMT backend is unrelated and
+   * keeps working the same regardless of this flag.
    */
   | "umt"
   /* The whole Infra Portal perspective. Still being ported, so the waffle
@@ -78,13 +77,6 @@ export type PreviewFeature =
    * it's ready.
    */
   | "promotion"
-  /**
-   * The whole Engineering perspective — waffle tile, rail, favourites,
-   * landing choices, and the Download Stats screens. The perspective stays
-   * hidden until this is on. A direct visit while it is off says Engineering
-   * is not available.
-   */
-  | "engineering"
   /**
    * Finance → Finance MIS — the ARR, QRR and MRR Builds and ARR Analysis,
    * rail entries and routes alike. Held back as a whole until Finance has

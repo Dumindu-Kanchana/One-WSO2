@@ -24,7 +24,11 @@ export interface PerspectiveHeaderProps {
    * page is still readable at its call site.
    */
   eyebrow?: string;
-  title: ReactNode;
+  /**
+   * Omitted when something else on the page already names it, such as a
+   * selected tab. The subtitle still renders.
+   */
+  title?: ReactNode;
   subtitle?: ReactNode;
 }
 
@@ -43,9 +47,11 @@ export interface PerspectiveHeaderProps {
 export default function PerspectiveHeader({ title, subtitle }: PerspectiveHeaderProps) {
   return (
     <>
-      <Typography variant="h5" sx={{ mb: 0.5 }}>
-        {title}
-      </Typography>
+      {title ? (
+        <Typography variant="h5" sx={{ mb: 0.5 }}>
+          {title}
+        </Typography>
+      ) : null}
       {subtitle && (
         <Typography
           variant="body2"

@@ -21,10 +21,7 @@ import { MemoryRouter, Routes, useLocation } from "react-router";
 import { downloadStatsPaths } from "@constants/downloadStatsApps";
 import { engineeringRoutes } from "./routes";
 
-// Where a Download Stats address lands, on the real route table App.tsx
-// mounts. Every screen here is behind the preview flag, which this file leaves
-// OFF: a screen reached while the perspective is hidden says so and asks for
-// nothing, so what is left to see is the address itself — which is the point.
+// Where a Download Stats address lands, on the real route table App.tsx mounts.
 
 vi.mock("@asgardeo/react", () => ({
   useAsgardeo: () => ({
@@ -83,26 +80,5 @@ describe("the Download Stats addresses", () => {
   it("keep the app's root forward's query string too", () => {
     visit("/engineering/download-stats?from=2026-01-01");
     expect(where()).toBe(`${downloadStatsPaths.overview}?from=2026-01-01`);
-  });
-
-  // The route stays registered while the flag is off, as the perspective's
-  // comment in perspectives.ts promises: a direct visit is answered, not left
-  // to the catch-all. And it is not forwarded — the Engineering perspective
-  // does not exist, so there is no first row to forward to.
-  it("answer a direct visit to /engineering while Engineering is hidden, without forwarding", () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    visit("/engineering");
-    expect(screen.getByText("Engineering isn't available yet.")).toBeInTheDocument();
-    expect(where()).toBe("/engineering");
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("say the same on every screen while Engineering is hidden", () => {
-    for (const path of Object.values(downloadStatsPaths)) {
-      const { unmount } = visit(path);
-      expect(screen.getByText("Engineering isn't available yet."), path).toBeInTheDocument();
-      unmount();
-    }
   });
 });

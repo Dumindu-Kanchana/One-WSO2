@@ -222,10 +222,14 @@ describe("Engineering Overview", () => {
 
     renderOverview();
 
-    // The shell's title is up before the figures; the first figure is the
-    // sign the summary has arrived.
+    // The description is up before the figures; the first figure is the
+    // sign the summary has arrived. The tab already names the screen.
     expect(await screen.findByText("205")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Download activity and repository stats across all WSO2 products."),
+    ).toBeInTheDocument();
 
     const yesterday = tile("Yesterday's Downloads");
     expect(yesterday.querySelector("svg.lucide-download")).not.toBeNull();

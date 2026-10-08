@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   DOWNLOAD_STATS_APPS,
   DOWNLOAD_STATS_PATH,
@@ -25,15 +25,6 @@ import {
 import { claimOf } from "@components/side-rail/visibilityFold";
 import { PERSPECTIVES } from "./perspectives";
 
-// The Engineering perspective exists only while its preview flag is on, and
-// the registry is read once, at import — so the flag has to be on before it
-// is. Its OFF half is pinned in perspectives.test.ts.
-vi.hoisted(() => {
-  window.config = {
-    ...(window.config ?? {}),
-    ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-  } as Window["config"];
-});
 
 const app = DOWNLOAD_STATS_APPS[0];
 const items = DOWNLOAD_STATS_APPS.flatMap((entry) => entry.items);

@@ -777,26 +777,20 @@ export const PERSPECTIVES: readonly PerspectiveDef[] = [
   // the perspective the way MIS is inside Finance — its own registry
   // (downloadStatsApps.ts), one rail row, screens in a tab bar — because its
   // Admin screen is gated by the Download Stats API's own user-info, not by
-  // `requires`. The perspective stays hidden until the preview flag is on.
-  // The routes stay registered either way, so a direct visit while the flag
-  // is off says Engineering is not available.
-  ...(isPreviewEnabled("engineering")
-    ? [
-        {
-          key: "engineering",
-          label: "Engineering",
-          icon: BarChart3,
-          access: true,
-          path: "/engineering",
-          forwardsToFirstItem: true,
-          sections: [
-            ...appsToSections(DOWNLOAD_STATS_APPS),
-            // UMT, the second app, behind its own `umt` flag as well.
-            ...(isPreviewEnabled("umt") ? [UMT_SECTION] : []),
-          ],
-        },
-      ]
-    : []),
+  // `requires`. UMT is the second app, and only while its own preview flag
+  // is on. Engineering itself is shipped.
+  {
+    key: "engineering",
+    label: "Engineering",
+    icon: BarChart3,
+    access: true,
+    path: "/engineering",
+    forwardsToFirstItem: true,
+    sections: [
+      ...appsToSections(DOWNLOAD_STATS_APPS),
+      ...(isPreviewEnabled("umt") ? [UMT_SECTION] : []),
+    ],
+  },
   // Held behind a preview flag, whole perspective and all, until it's ready
   // for production. With the flag off the entry does not exist, so the waffle,
   // landing options, and favourites stay clean.

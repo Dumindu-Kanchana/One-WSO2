@@ -14,17 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { isKnownRoute, pinnableRoute } from "@features/pinned/pinnableRoute";
 
-// Engineering is registered only while its preview flag is on, and the
-// registry is read at import. The Download Stats pin labels below need it.
-vi.hoisted(() => {
-  window.config = {
-    ...(window.config ?? {}),
-    ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-  } as Window["config"];
-});
 
 describe("pinnableRoute", () => {
   it("labels a perspective landing route from the registry", () => {

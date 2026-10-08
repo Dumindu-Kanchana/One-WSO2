@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 type Perspectives = typeof import("./perspectives");
 
 async function load(
-  preview: { umt?: boolean; infra?: boolean; engineering?: boolean; mis?: boolean; cado2?: boolean } = {},
+  preview: { umt?: boolean; infra?: boolean; mis?: boolean; cado2?: boolean } = {},
 ): Promise<Perspectives> {
   vi.resetModules();
   window.config = {
@@ -143,14 +143,14 @@ describe("UMT inside Engineering", () => {
     perspectives.findPerspectiveByKey("engineering")?.sections?.find((s) => s.id === "engineering-umt");
 
   it("is not a perspective of its own whatever the flags say", async () => {
-    for (const preview of [{}, { umt: true }, { engineering: true, umt: true }]) {
+    for (const preview of [{}, { umt: true }]) {
       const { PERSPECTIVES } = await load(preview);
       expect(keys(PERSPECTIVES)).not.toContain("umt");
     }
   });
 
-  it("is a group in the Engineering rail when both flags are on", async () => {
-    const perspectives = await load({ engineering: true, umt: true });
+  it("is a group in the Engineering rail when its flag is on", async () => {
+    const perspectives = await load({ umt: true });
     const group = umtGroupOf(perspectives);
     expect(group?.label).toBe("UMT");
     expect(group?.children?.map((c) => [c.label, c.path])).toEqual([
@@ -164,8 +164,8 @@ describe("UMT inside Engineering", () => {
   });
 
   it("is absent while its own flag is off or absent", async () => {
-    expect(umtGroupOf(await load({ engineering: true, umt: false }))).toBeUndefined();
-    expect(umtGroupOf(await load({ engineering: true }))).toBeUndefined();
+    expect(umtGroupOf(await load({ umt: false }))).toBeUndefined();
+    expect(umtGroupOf(await load())).toBeUndefined();
   });
 
   // usePerspectiveVisibility falls through to sectionAllowed(s.requires, caps)
@@ -176,14 +176,14 @@ describe("UMT inside Engineering", () => {
   // useFinanceGate.test.tsx's "no longer carries the retired approval ids" for
   // the same shape of guard.
   it("keeps Product Management in the UMT admin gate set", async () => {
-    const { UMT_ADMIN_ITEM_IDS } = await load({ engineering: true, umt: true });
+    const { UMT_ADMIN_ITEM_IDS } = await load({ umt: true });
     expect(UMT_ADMIN_ITEM_IDS.has("umt-products")).toBe(true);
   });
 
   // Every UMT row is decided by UMT's own roles. An id missing from this set
   // would fall back to `requires`, which none of them sets: visible to all.
   it("gates every UMT row, the group included, on UMT's roles", async () => {
-    const perspectives = await load({ engineering: true, umt: true });
+    const perspectives = await load({ umt: true });
     const group = umtGroupOf(perspectives);
     const ids = [group?.id, ...(group?.children ?? []).map((c) => c.id)];
     expect(new Set(ids)).toEqual(perspectives.UMT_ITEM_IDS);
@@ -196,7 +196,7 @@ describe("perspectives whose landing forwards to the first rail item", () => {
   // sees "Nothing here for you yet", permanently, with no way to tell that
   // from a privilege problem.
   it("only ever sits on a perspective with a route and sections", async () => {
-    const { PERSPECTIVES } = await load({ engineering: true, umt: true });
+    const { PERSPECTIVES } = await load({ umt: true });
     const forwarding = PERSPECTIVES.filter((p) => p.forwardsToFirstItem);
     expect(forwarding.length).toBeGreaterThan(0);
     for (const p of forwarding) {
@@ -209,7 +209,7 @@ describe("perspectives whose landing forwards to the first rail item", () => {
   // so it keeps its Overview row. This fails if a later pass sweeps it up with
   // the rest.
   it("leaves Me alone", async () => {
-    const { PERSPECTIVES } = await load({ engineering: true, umt: true });
+    const { PERSPECTIVES } = await load({ umt: true });
     expect(PERSPECTIVES.find((p) => p.key === "me")?.forwardsToFirstItem).toBeUndefined();
   });
 
@@ -238,25 +238,12 @@ describe("perspectives whose landing forwards to the first rail item", () => {
     });
   });
 
-  // Engineering is the home of Download Stats and UMT. Same preview contract as
-  // Infra: absent means off, so the waffle, favourites, and landing choices
-  // — all of which read this registry — cannot offer it early.
+  // Engineering shipped out of preview. Download Stats is its first app. UMT
+  // is the second, and only while its own preview flag is on. The waffle,
+  // favourites, and landing choices all read this registry.
   describe("the Engineering perspective", () => {
-    it("is absent from the registry when the preview flag is off", async () => {
-      const { PERSPECTIVES, reachablePerspectives } = await load({ engineering: false });
-      expect(keys(PERSPECTIVES)).not.toContain("engineering");
-      expect(keys(reachablePerspectives())).not.toContain("engineering");
-    });
-
-    it("is absent on an absent flag, not only on an explicit false", async () => {
-      const { PERSPECTIVES } = await load();
-      expect(keys(PERSPECTIVES)).not.toContain("engineering");
-    });
-
-    it("offers Download Stats and its six screens when the preview flag is on", async () => {
-      const { PERSPECTIVES, reachablePerspectives, findPerspectiveByPath } = await load({
-        engineering: true,
-      });
+    it("offers Download Stats and its six screens with no preview flags set", async () => {
+      const { PERSPECTIVES, reachablePerspectives, findPerspectiveByPath } = await load();
       expect(keys(PERSPECTIVES)).toContain("engineering");
       expect(keys(reachablePerspectives())).toContain("engineering");
       const engineering = findPerspectiveByPath("/engineering");

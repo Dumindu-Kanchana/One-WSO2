@@ -16,12 +16,6 @@
 
 // Every Engineering route, as one fragment for App.tsx.
 //
-// Registered even while the `engineering` preview flag is off, which is this
-// perspective's deliberate exception to hiding a preview feature's routes:
-// each screen's shell says Engineering is not available, where omitting the
-// routes would hand a direct visit to the catch-all and the person's landing
-// with no answer. See the Engineering entry in perspectives.ts.
-//
 // Access is NOT enforced here: DownloadStatsShell walks the gate ladder in
 // front of every screen, so typing an Admin address you may not use gives a
 // legible refusal rather than a redirect that leaves the reader guessing.

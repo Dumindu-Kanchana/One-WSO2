@@ -19,7 +19,6 @@ import { Alert, Box, CircularProgress, Stack, Typography } from "@wso2/oxygen-ui
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import PerspectiveHeader from "@components/perspective-header/PerspectiveHeader";
 import RoutedTabs, { type RoutedTabDef } from "@components/routed-tabs/RoutedTabs";
-import { isPreviewEnabled } from "@config/previewFeatures";
 import {
   DOWNLOAD_STATS_APPS,
   DOWNLOAD_STATS_PATH,
@@ -33,26 +32,25 @@ import {
   isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
 } from "../api/productDownloadStats";
-import EngineeringUnavailable from "./EngineeringUnavailable";
 
-// Shared page frame for every Download Stats screen: the perspective header
-// with the screen's title and its one-line description, and —
-// the reason this exists — ONE place that owns every degraded state, so no
-// screen has to remember them and none of them differs (MisShell is the
+// Shared page frame for every Download Stats screen. The tab bar names the
+// screen, and the header under it is the one-line description. The heading
+// is kept only while that screen's tab is hidden (Admin, until the API has
+// said the caller is an Admin). The shell exists so ONE place owns every
+// degraded state and no screen has to remember them (MisShell is the
 // precedent). The ladder, in order:
 //
-//   1. preview flag off            → Engineering isn't available yet
-//   2. API address not set         → say which config key is missing; ask nothing
-//   3. address is http, not local  → refuse to put the token on the wire
-//   4. Admin check still in flight → spinner, never a premature denial
-//   5. Admin check failed          → an error with Retry, NOT a denial
-//   6. the API says not an Admin   → say what Admin is for and who to ask
-//   7. the screen
+//   1. API address not set         → say which config key is missing; ask nothing
+//   2. address is http, not local  → refuse to put the token on the wire
+//   3. Admin check still in flight → spinner, never a premature denial
+//   4. Admin check failed          → an error with Retry, NOT a denial
+//   5. the API says not an Admin   → say what Admin is for and who to ask
+//   6. the screen
 //
-// Rungs 4–6 are Admin's alone: the other five screens are open to every
+// Rungs 3–5 are Admin's alone: the other five screens are open to every
 // signed-in employee. The user-info read still runs on those screens, because
 // the Admin tab is absent until that read says the caller is an Admin. Rungs
-// 5 and 6 stay distinct deliberately — both leave the client holding no
+// 4 and 5 stay distinct deliberately — both leave the client holding no
 // answer, and collapsing them tells someone whose gateway timed out that they
 // lack a role they already have.
 //
@@ -65,7 +63,7 @@ import EngineeringUnavailable from "./EngineeringUnavailable";
 // the reader is being refused. The title and description come from the
 // registry entry for `screen`, the same entry the rail reads its label from.
 //
-// `actions` (a button beside the title, as Admin's "Add tracked repository")
+// `actions` (a button beside the description, as Admin's "Add tracked repository")
 // belongs to the screen, so it appears on the last rung only: a refused reader
 // is not offered an action on a screen they cannot open.
 
@@ -91,7 +89,6 @@ export default function DownloadStatsShell({
   children: ReactNode;
 }): JSX.Element {
   const { id, label: title, desc: description } = DOWNLOAD_STATS_SCREENS[screen];
-  const preview = isPreviewEnabled("engineering");
   const base = productDownloadStatsBackendUrl();
   const configured = isProductDownloadStatsConfigured();
   // https, or http on localhost alone — see productDownloadStats.ts.
@@ -103,15 +100,14 @@ export default function DownloadStatsShell({
   // the Admin screen alone.
   const requiresAdmin = id === ENGINEERING_ADMIN_ITEM_ID;
   const reachable = configured && credentialed;
-  const gate = useEngineeringAdminGate(preview && reachable);
+  const gate = useEngineeringAdminGate(reachable);
   // A failed re-check keeps the previous answer in the query. The tab follows
   // the latest check, so a failure or a 403 takes it down even when that
   // answer was yes.
   const showAdminTab = gate.isAdmin && !gate.isResolving && !gate.isError && !gate.isForbidden;
-
-  // The perspective does not exist while the flag is off, so neither does the
-  // screen: one sentence, with no title above it.
-  if (!preview) return <EngineeringUnavailable />;
+  // The selected tab already says the screen's name. Repeat it as a heading
+  // only while that tab is absent, which is Admin until the check says yes.
+  const namedByTab = !requiresAdmin || showAdminTab;
 
   // Each of these mirrors one rung below, and every earlier rung is excluded
   // from the later ones — or someone whose check is still in flight, or whose
@@ -143,7 +139,10 @@ export default function DownloadStatsShell({
           {/* The description is dropped on the denied rung alone: it sells the
               screen, which is right on one you can use and wrong above a notice
               about to refuse you. */}
-          <PerspectiveHeader title={title} subtitle={denied ? undefined : description} />
+          <PerspectiveHeader
+            title={namedByTab ? undefined : title}
+            subtitle={denied ? undefined : description}
+          />
         </Box>
         {allowed && actions}
       </Stack>

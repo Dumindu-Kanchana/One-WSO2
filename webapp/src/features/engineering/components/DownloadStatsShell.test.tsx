@@ -175,7 +175,8 @@ describe("the screen tabs", () => {
     expect(await screen.findByText(/don't have access to admin/i)).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { selected: true })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
+    // The Admin tab is hidden here, so the heading is the only name for the screen.
+    expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
   });
 
   // A later failure must not keep the previous "yes". The query still holds
@@ -212,12 +213,6 @@ describe("the screen tabs", () => {
     expect(screen.queryByRole("tab", { selected: true })).not.toBeInTheDocument();
   });
 
-  it("offers no tabs while Engineering is not available", () => {
-    configure({ ONE_WSO2_PREVIEW_FEATURES: {} });
-    show("overview");
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
-    expect(screen.getByText("Engineering isn't available yet.")).toBeInTheDocument();
-  });
 });
 
 describe("a screen anyone may open", () => {
@@ -282,17 +277,6 @@ describe("a screen anyone may open", () => {
 });
 
 describe("the ladder in front of every screen", () => {
-  it("says Engineering is not available while the preview flag is off, and nothing else", () => {
-    configure({ ONE_WSO2_PREVIEW_FEATURES: {} });
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    show("overview");
-    expect(screen.getByText("Engineering isn't available yet.")).toBeInTheDocument();
-    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
-    expect(theScreen()).not.toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it("names the missing setting when the API address is unset, and makes no request", () => {
     configure({ ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL: "" });
     const fetchMock = vi.fn();
@@ -300,9 +284,10 @@ describe("the ladder in front of every screen", () => {
     show("admin");
     expect(screen.getByText(/download stats isn't connected yet/i)).toBeInTheDocument();
     expect(screen.getByText("ONE_WSO2_PRODUCT_DOWNLOAD_STATS_BACKEND_URL")).toBeInTheDocument();
-    // The tab names the screen; the sentence describes it. Nobody has been refused.
-    expect(screen.getByRole("tab", { name: "Admin" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
+    // The Admin tab stays hidden until the API can be asked, so the heading
+    // still names the screen, and the sentence still describes it.
+    expect(screen.queryByRole("tab", { name: "Admin" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
     expect(screen.getByText(ADMIN_DESCRIPTION)).toBeInTheDocument();
     expect(denial()).not.toBeInTheDocument();
     expect(theScreen()).not.toBeInTheDocument();
@@ -362,7 +347,7 @@ describe("the Admin check", () => {
     show("admin", <button type="button">Add tracked repository</button>);
     expect(await screen.findByText(/don't have access to admin/i)).toBeInTheDocument();
     expect(screen.getByText(/ask someone who already manages that list/i)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Admin" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Admin" })).toBeInTheDocument();
     // The description sells a screen being withheld, so it goes with the screen.
     expect(screen.queryByText(ADMIN_DESCRIPTION)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add tracked repository" })).not.toBeInTheDocument();
