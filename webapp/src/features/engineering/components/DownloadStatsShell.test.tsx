@@ -91,7 +91,7 @@ const denial = () => screen.queryByText(/don't have access to admin/i);
 const ADMIN_DESCRIPTION = "Manage tracked repositories and review DB sync and scraper job history.";
 
 describe("the screen tabs", () => {
-  it("offers the five open screens above the description, with the open one selected", async () => {
+  it("offers the five open screens under the description, with the open one selected", async () => {
     configure();
     vi.stubGlobal("fetch", userInfo(async () => json({ email: "a@wso2.com", isAdmin: false })));
     show("downloads");
@@ -116,7 +116,7 @@ describe("the screen tabs", () => {
       "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
     );
     expect(
-      screen.getByRole("tablist").compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+      description.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Downloads" })).not.toBeInTheDocument();
   });
@@ -216,7 +216,7 @@ describe("the screen tabs", () => {
 });
 
 describe("a screen anyone may open", () => {
-  it("renders the description under the tab, without a second title", async () => {
+  it("renders the description under the title and above the tabs, without a second title", async () => {
     configure();
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes("/user-info")) return json({ email: "a@wso2.com", isAdmin: false });
@@ -226,13 +226,16 @@ describe("a screen anyone may open", () => {
     show("overview");
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     const appTitle = screen.getByRole("heading", { level: 1, name: "GitHub Product Download Stats" });
+    const description = screen.getByText(
+      "Download activity and repository stats across all WSO2 products.",
+    );
     expect(
-      appTitle.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING,
+      appTitle.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      description.compareDocumentPosition(screen.getByRole("tablist")) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Overview" })).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Download activity and repository stats across all WSO2 products."),
-    ).toBeInTheDocument();
     expect(theScreen()).toBeInTheDocument();
     // The screen itself asks for nothing. The one request is the Admin tab.
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());

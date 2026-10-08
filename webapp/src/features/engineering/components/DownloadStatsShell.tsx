@@ -34,8 +34,8 @@ import {
 } from "../api/productDownloadStats";
 
 // Shared page frame for every Download Stats screen. The title above the tab
-// bar names the app, the same place the other shells put theirs. The tab bar
-// names the screen, and the header under it is the one-line description. A
+// bar names the app, and the one-line description sits under that title, the
+// same place the other shells put theirs. The tab bar names the screen. A
 // screen's own name is a heading only while its tab is hidden (Admin, until
 // the API has said the caller is an Admin). The shell exists so ONE place owns every
 // degraded state and no screen has to remember them (MisShell is the
@@ -125,21 +125,15 @@ export default function DownloadStatsShell({
     // minWidth 0 lets the tab bar scroll inside the page. Without it this box
     // grows to the full label row and the page scrolls sideways instead.
     <Box sx={{ minWidth: 0, maxWidth: "100%" }}>
-      <Typography component="h1" variant="h5" sx={{ mb: 0.5, mt: 0 }}>
-        GitHub Product Download Stats
-      </Typography>
-      <RoutedTabs
-        basePath={DOWNLOAD_STATS_PATH}
-        tabs={screenTabs(showAdminTab)}
-        ariaLabel="Download Stats screens"
-        scrollable
-      />
       <Stack
         direction="row"
         spacing={2}
         sx={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}
       >
         <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" variant="h5" sx={{ mb: 0.5, mt: 0 }}>
+            GitHub Product Download Stats
+          </Typography>
           {/* The description is dropped on the denied rung alone: it sells the
               screen, which is right on one you can use and wrong above a notice
               about to refuse you. */}
@@ -150,6 +144,12 @@ export default function DownloadStatsShell({
         </Box>
         {allowed && actions}
       </Stack>
+      <RoutedTabs
+        basePath={DOWNLOAD_STATS_PATH}
+        tabs={screenTabs(showAdminTab)}
+        ariaLabel="Download Stats screens"
+        scrollable
+      />
 
       {!configured ? (
         <Alert severity="info" sx={{ mt: 1.5 }}>
