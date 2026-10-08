@@ -119,6 +119,8 @@ describe("validateAgentPortalUrl", () => {
     ["the top of 198.18.0.0/15", "https://198.19.255.255"],
     ["NAT64 loopback", "https://[64:ff9b::7f00:1]"],
     ["NAT64 metadata IP", "https://[64:ff9b::a9fe:a9fe]"],
+    ["the NAT64 local use prefix", "https://[64:ff9b:1::7f00:1]"],
+    ["a public address in the NAT64 local use prefix", "https://[64:ff9b:1::808:808]"],
     ["6to4 loopback", "https://[2002:7f00:1::]"],
     ["6to4 private address", "https://[2002:c0a8:101::1]"],
   ])("refuses %s", (_, input) => {

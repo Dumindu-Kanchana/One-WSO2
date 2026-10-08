@@ -97,6 +97,9 @@ function isBlockedIpv6(groups: number[]): boolean {
   if (firstFiveZero && groups[5] === 0xffff) {
     return isBlockedIpv4(embeddedIpv4(groups[6], groups[7]));
   }
+  // NAT64 local use translation, 64:ff9b:1::/48, maps to whatever the
+  // network chooses, so all of it is refused
+  if (groups[0] === 0x64 && groups[1] === 0xff9b && groups[2] === 0x1) return true;
   // NAT64, 64:ff9b::a.b.c.d
   if (groups[0] === 0x64 && groups[1] === 0xff9b && groups.slice(2, 6).every((g) => g === 0)) {
     return isBlockedIpv4(embeddedIpv4(groups[6], groups[7]));
