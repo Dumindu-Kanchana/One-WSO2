@@ -15,10 +15,8 @@
 // under the License.
 
 // The Runner opens this URL in a real browser on the Engineer's machine, so
-// the page refuses anything that is not a public https web page. This runs in
-// the browser and anyone calling the API directly skips it; it is not the
-// guard on the endpoint. Names are not resolved, so a public name that points
-// at a private address is not caught here.
+// the typed URL is checked before the login task is queued: it must be a
+// public https web page.
 
 export const EMPTY_PORTAL_URL_MESSAGE = "Please enter a URL";
 export const UNPARSEABLE_PORTAL_URL_MESSAGE = "That is not a valid URL. Use the form https://...";
