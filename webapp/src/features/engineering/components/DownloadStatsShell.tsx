@@ -62,12 +62,17 @@ import {
 // a body component, and the body holds every query hook. That is load-bearing
 // rather than tidy: `children` is mounted only on the last rung, so a body
 // inside the shell cannot send a request while the API address is unset or
-// the reader is being refused. The title and description come from the
-// registry entry for `screen`, the same entry the rail reads its label from.
+// the reader is being refused. The heading is the app name from the registry,
+// the same name the rail row and a pin's qualifier use. The sentence under
+// it is the one shared description, not a per-screen label.
 //
 // `actions` (a button beside the description, as Admin's "Add tracked repository")
 // belongs to the screen, so it appears on the last rung only: a refused reader
 // is not offered an action on a screen they cannot open.
+
+// The registry holds one app. Its name is the page heading, so the rail, a
+// pin, and this title cannot spell the app two ways.
+const appName = DOWNLOAD_STATS_APPS[0].name;
 
 // Tab order is the registry order. Admin is last, and only present once the
 // API has said the caller is an Admin — the same rule the rail used when
@@ -133,7 +138,7 @@ export default function DownloadStatsShell({
       >
         <Box sx={{ minWidth: 0 }}>
           <Typography component="h1" variant="h5" sx={{ mb: 0.5, mt: 0 }}>
-            GitHub Product Download Stats
+            {appName}
           </Typography>
           <PerspectiveHeader
             title={namedByTab ? undefined : title}

@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 import { activeGroupIds, activeItemId, onPathOrBelow, visibleLeavesOf } from "./railActive";
-import type { PerspectiveSection } from "@constants/perspectives";
+import { PERSPECTIVES, type PerspectiveSection } from "@constants/perspectives";
 
 // Driven off the real registry, not a fixture: the bug this covers was a rail
 // path that stopped being a whole route, and a fixture would have been updated
@@ -220,15 +220,8 @@ describe("visibleLeavesOf", () => {
 // Download Stats is one rail row, and every screen under it — the ones the
 // tab bar offers — has to light that row. The screens are siblings, not routes
 // nested under Overview, which is why a prefix of Overview is not enough.
-window.config = {
-  ...(window.config ?? {}),
-  ONE_WSO2_PREVIEW_FEATURES: {
-    ...(window.config?.ONE_WSO2_PREVIEW_FEATURES ?? {}),
-    engineering: true,
-  },
-} as Window["config"];
-
-const { PERSPECTIVES } = await import("@constants/perspectives");
+// Engineering is not behind a preview flag, so this reads the registry as it
+// ships, with no flag set.
 const downloadStats = PERSPECTIVES.find((p) => p.key === "engineering")?.sections?.find(
   (section) => section.label === "Download Stats",
 );

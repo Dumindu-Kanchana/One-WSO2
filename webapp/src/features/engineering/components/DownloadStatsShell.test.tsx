@@ -20,6 +20,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import {
+  DOWNLOAD_STATS_APPS,
   DOWNLOAD_STATS_DESCRIPTION,
   downloadStatsPaths,
   type DownloadStatsScreen,
@@ -226,7 +227,7 @@ describe("a screen anyone may open", () => {
     vi.stubGlobal("fetch", fetchMock);
     show("overview");
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
-    const appTitle = screen.getByRole("heading", { level: 1, name: "GitHub Product Download Stats" });
+    const appTitle = screen.getByRole("heading", { level: 1, name: DOWNLOAD_STATS_APPS[0].name });
     const description = screen.getByText(DOWNLOAD_STATS_DESCRIPTION);
     expect(
       appTitle.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
