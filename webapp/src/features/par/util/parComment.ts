@@ -106,8 +106,17 @@ export function addLinkProtocol(html: string): string {
   return changed ? template.innerHTML : html;
 }
 
+const KNOWN_SCHEME_RE = /^(?:https?|mailto|tel|sms):/i;
+const EMAIL_RE = /^[^\s@/:]+@[^\s@/:]+\.[^\s@/:]+$/;
+
+/** Adds https:// to anything without a known scheme, so `localhost:3000/x`
+ * or `example.com:8080` isn't read as a scheme of its own. A bare email
+ * address becomes a mailto: link. A value starting with `/` or `#` is an
+ * in-app link and is kept as typed. */
 export function withLinkProtocol(url: string): string {
-  return /^([a-z][a-z0-9+.-]*:|[/#])/i.test(url) ? url : `https://${url}`;
+  if (KNOWN_SCHEME_RE.test(url) || /^[/#]/.test(url)) return url;
+  if (EMAIL_RE.test(url)) return `mailto:${url}`;
+  return `https://${url}`;
 }
 
 /** A Quill editor with nothing typed still returns markup (`<p><br></p>`,

@@ -15,7 +15,7 @@
 // under the License.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import ReactQuill, { Quill, type DeltaStatic } from "react-quill-new";
+import ReactQuill, { type DeltaStatic } from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import {
   Box,
@@ -30,6 +30,7 @@ import {
   useTheme,
 } from "@wso2/oxygen-ui";
 import { addLinkProtocol, sanitizeParHtml, withLinkProtocol } from "../util/parComment";
+import { Delta, linkifyDelta } from "../util/parLinkify";
 
 // Ports par-app's CustomRichTextField: same toolbar, same auto-expanding
 // editor. `react-quill-new` in place of `react-quill` — the fork that
@@ -40,28 +41,6 @@ import { addLinkProtocol, sanitizeParHtml, withLinkProtocol } from "../util/parC
 // classic trigger for Quill's caret-jump bug. decodeParComment already
 // sanitizes once at the read boundary, so `value` is safe as-is here.
 const TOOLBAR = [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], [{ indent: "-1" }, { indent: "+1" }], ["link"], ["clean"]];
-const Delta = Quill.import("delta") as typeof DeltaStatic;
-const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"]*[^\s<>".,;:!?)\]]/gi;
-
-/** Turns bare URLs in pasted text into links; text already linked is left alone. */
-function linkifyDelta(delta: DeltaStatic): DeltaStatic {
-  const out = new Delta();
-  for (const op of delta.ops) {
-    if (typeof op.insert !== "string" || op.attributes?.link) {
-      out.push(op);
-      continue;
-    }
-    let last = 0;
-    for (const match of op.insert.matchAll(URL_RE)) {
-      if (match.index > last) out.insert(op.insert.slice(last, match.index), op.attributes);
-      out.insert(match[0], { ...op.attributes, link: withLinkProtocol(match[0]) });
-      last = match.index + match[0].length;
-    }
-    if (last < op.insert.length) out.insert(op.insert.slice(last), op.attributes);
-  }
-  return out;
-}
-
 const FORMATS = ["bold", "italic", "underline", "list", "bullet", "indent", "link"];
 
 export default function ParRichTextField({
@@ -216,7 +195,7 @@ export default function ParRichTextField({
         "& .ql-snow button:hover .ql-fill, & .ql-snow button.ql-active .ql-fill": {
           fill: palette.primary.main,
         },
-        "& .ql-editor.ql-blank::before": { color: palette.text.primary },
+        "& .ql-editor.ql-blank::before": { color: palette.text.primary, opacity: 0.6 },
         "& .ql-snow .ql-tooltip": { display: "none" },
         "& .ql-snow a": { color: palette.primary.main },
       }}

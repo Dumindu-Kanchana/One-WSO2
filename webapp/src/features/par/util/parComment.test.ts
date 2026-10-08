@@ -117,4 +117,19 @@ describe("withLinkProtocol", () => {
     expect(withLinkProtocol("www.example.com")).toBe("https://www.example.com");
     expect(withLinkProtocol("http://example.com")).toBe("http://example.com");
   });
+
+  it("treats a host with a port as having no scheme", () => {
+    expect(withLinkProtocol("localhost:3000/x")).toBe("https://localhost:3000/x");
+    expect(withLinkProtocol("example.com:8080")).toBe("https://example.com:8080");
+  });
+
+  it("turns a bare email address into a mailto: link", () => {
+    expect(withLinkProtocol("user@example.com")).toBe("mailto:user@example.com");
+    expect(withLinkProtocol("mailto:user@example.com")).toBe("mailto:user@example.com");
+  });
+
+  it("keeps in-app links as typed", () => {
+    expect(withLinkProtocol("/me/performance")).toBe("/me/performance");
+    expect(withLinkProtocol("#section")).toBe("#section");
+  });
 });
