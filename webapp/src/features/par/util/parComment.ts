@@ -106,7 +106,7 @@ export function addLinkProtocol(html: string): string {
   return changed ? template.innerHTML : html;
 }
 
-const KNOWN_SCHEME_RE = /^(?:https?|mailto|tel|sms):/i;
+const KNOWN_SCHEME_RE = /^(?:https?|ftps?|mailto|tel|sms):/i;
 const EMAIL_RE = /^[^\s@/:]+@[^\s@/:]+\.[^\s@/:]+$/;
 
 /** Adds https:// to anything without a known scheme, so `localhost:3000/x`

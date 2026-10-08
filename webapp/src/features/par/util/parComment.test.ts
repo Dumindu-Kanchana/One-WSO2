@@ -128,6 +128,11 @@ describe("withLinkProtocol", () => {
     expect(withLinkProtocol("mailto:user@example.com")).toBe("mailto:user@example.com");
   });
 
+  it("keeps ftp: and ftps: links as typed", () => {
+    expect(withLinkProtocol("ftp://host/file")).toBe("ftp://host/file");
+    expect(withLinkProtocol("ftps://host/file")).toBe("ftps://host/file");
+  });
+
   it("keeps in-app links as typed", () => {
     expect(withLinkProtocol("/me/performance")).toBe("/me/performance");
     expect(withLinkProtocol("#section")).toBe("#section");
