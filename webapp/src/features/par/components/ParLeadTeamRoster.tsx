@@ -339,8 +339,8 @@ export default function ParLeadTeamRoster({
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
-        <Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
+        <Box sx={{ minWidth: 0 }}>
           {showBack && (
             <>
               <Link component="button" underline="hover" onClick={onBack} sx={{ mr: 0.5 }}>
@@ -351,11 +351,11 @@ export default function ParLeadTeamRoster({
               </Typography>
             </>
           )}
-          <Typography component="span" variant="h5">
+          <Typography component="span" variant="body1" sx={{ fontWeight: 600 }}>
             {[team.parBusinessUnit, team.parDepartment, team.parTeam, team.parSubTeam].filter(Boolean).join(" / ")}
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
           <Tooltip title="Open Cycle Dates" arrow>
             <IconButton onClick={() => setCycleDatesOpen(true)} aria-label="cycle dates">
               <CalendarIcon size={18} />
