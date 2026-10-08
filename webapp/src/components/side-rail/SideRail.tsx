@@ -358,6 +358,21 @@ function SectionNode({
   /** The perspective this section is rendered under — see RouteItem. */
   fromPerspective: string;
 }): JSX.Element | null {
+  // Screens offered as tabs stay children of the section (pins name them from
+  // there) and are not rows. The row is the app, and it opens its first screen.
+  if (section.inTabs) {
+    if (!resolveVisible(section)) return null;
+    return (
+      <LeafItem
+        id={section.id}
+        label={section.label}
+        icon={section.icon}
+        to={section.path}
+        fromPerspective={fromPerspective}
+      />
+    );
+  }
+
   if (section.children && section.children.length > 0) {
     const visible = section.children.filter((c) => resolveVisible(c));
     if (visible.length === 0) return null;

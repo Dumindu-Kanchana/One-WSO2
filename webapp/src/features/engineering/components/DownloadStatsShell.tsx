@@ -18,8 +18,11 @@ import type { JSX, ReactNode } from "react";
 import { Alert, Box, CircularProgress, Stack, Typography } from "@wso2/oxygen-ui";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import PerspectiveHeader from "@components/perspective-header/PerspectiveHeader";
-import { isPreviewEnabled } from "@config/previewFeatures";
+import RoutedTabs, { type RoutedTabDef } from "@components/routed-tabs/RoutedTabs";
 import {
+  DOWNLOAD_STATS_APPS,
+  DOWNLOAD_STATS_DESCRIPTION,
+  DOWNLOAD_STATS_PATH,
   DOWNLOAD_STATS_SCREENS,
   ENGINEERING_ADMIN_ITEM_ID,
   type DownloadStatsScreen,
@@ -30,25 +33,26 @@ import {
   isProductDownloadStatsConfigured,
   productDownloadStatsBackendUrl,
 } from "../api/productDownloadStats";
-import EngineeringUnavailable from "./EngineeringUnavailable";
 
-// Shared page frame for every Download Stats screen: the perspective header
-// with the screen's title and its one-line description, and —
-// the reason this exists — ONE place that owns every degraded state, so no
-// screen has to remember them and none of them differs (MisShell is the
+// Shared page frame for every Download Stats screen. The title above the tab
+// bar names the app, and one sentence sits under that title on every screen,
+// the way Banking does. The tab bar names the screen. A
+// screen's own name is a heading only while its tab is hidden (Admin, until
+// the API has said the caller is an Admin). The shell exists so ONE place owns every
+// degraded state and no screen has to remember them (MisShell is the
 // precedent). The ladder, in order:
 //
-//   1. preview flag off            → Engineering isn't available yet
-//   2. API address not set         → say which config key is missing; ask nothing
-//   3. address is http, not local  → refuse to put the token on the wire
-//   4. Admin check still in flight → spinner, never a premature denial
-//   5. Admin check failed          → an error with Retry, NOT a denial
-//   6. the API says not an Admin   → say what Admin is for and who to ask
-//   7. the screen
+//   1. API address not set         → say which config key is missing; ask nothing
+//   2. address is http, not local  → refuse to put the token on the wire
+//   3. Admin check still in flight → spinner, never a premature denial
+//   4. Admin check failed          → an error with Retry, NOT a denial
+//   5. the API says not an Admin   → say what Admin is for and who to ask
+//   6. the screen
 //
-// Rungs 4–6 are Admin's alone: the other five screens are open to every
-// signed-in employee, so nobody is asked about and nothing is awaited. Rungs
-// 5 and 6 stay distinct deliberately — both leave the client holding no
+// Rungs 3–5 are Admin's alone: the other five screens are open to every
+// signed-in employee. The user-info read still runs on those screens, because
+// the Admin tab is absent until that read says the caller is an Admin. Rungs
+// 4 and 5 stay distinct deliberately — both leave the client holding no
 // answer, and collapsing them tells someone whose gateway timed out that they
 // lack a role they already have.
 //
@@ -58,12 +62,29 @@ import EngineeringUnavailable from "./EngineeringUnavailable";
 // a body component, and the body holds every query hook. That is load-bearing
 // rather than tidy: `children` is mounted only on the last rung, so a body
 // inside the shell cannot send a request while the API address is unset or
-// the reader is being refused. The title and description come from the
-// registry entry for `screen`, the same entry the rail reads its label from.
+// the reader is being refused. The heading is the app name from the registry,
+// the same name the rail row and a pin's qualifier use. The sentence under
+// it is the one shared description, not a per-screen label.
 //
-// `actions` (a button beside the title, as Admin's "Add tracked repository")
+// `actions` (a button beside the description, as Admin's "Add tracked repository")
 // belongs to the screen, so it appears on the last rung only: a refused reader
 // is not offered an action on a screen they cannot open.
+
+// The registry holds one app. Its name is the page heading, so the rail, a
+// pin, and this title cannot spell the app two ways.
+const appName = DOWNLOAD_STATS_APPS[0].name;
+
+// Tab order is the registry order. Admin is last, and only present once the
+// API has said the caller is an Admin — the same rule the rail used when
+// these screens were rows.
+function screenTabs(showAdmin: boolean): RoutedTabDef[] {
+  return DOWNLOAD_STATS_APPS.flatMap((app) => app.items)
+    .filter((item) => showAdmin || item.id !== ENGINEERING_ADMIN_ITEM_ID)
+    .flatMap((item) => {
+      const segment = item.path?.slice(DOWNLOAD_STATS_PATH.length + 1);
+      return segment ? [{ segment, label: item.label }] : [];
+    });
+}
 
 export default function DownloadStatsShell({
   screen,
@@ -74,23 +95,26 @@ export default function DownloadStatsShell({
   actions?: ReactNode;
   children: ReactNode;
 }): JSX.Element {
-  const { id, label: title, desc: description } = DOWNLOAD_STATS_SCREENS[screen];
-  const preview = isPreviewEnabled("engineering");
+  const { id, label: title } = DOWNLOAD_STATS_SCREENS[screen];
   const base = productDownloadStatsBackendUrl();
   const configured = isProductDownloadStatsConfigured();
   // https, or http on localhost alone — see productDownloadStats.ts.
   const credentialed = isCredentialedProductDownloadStatsUrl(base);
-  // Only the row the rail's engineering adapter claims is the API's to decide,
-  // and only once there is a backend worth asking. The rail asks the same
-  // question under the same query key, so a reader who came through the rail
-  // is not asked twice.
+  // Asked on every screen, not only Admin: the tab is hidden until the answer
+  // is yes, including while the check is in flight and when it fails. The rail
+  // asks the same question under the same query key, so a reader who came
+  // through the rail is not asked twice. The ladder below still belongs to
+  // the Admin screen alone.
   const requiresAdmin = id === ENGINEERING_ADMIN_ITEM_ID;
   const reachable = configured && credentialed;
-  const gate = useEngineeringAdminGate(preview && reachable && requiresAdmin);
-
-  // The perspective does not exist while the flag is off, so neither does the
-  // screen: one sentence, with no title above it.
-  if (!preview) return <EngineeringUnavailable />;
+  const gate = useEngineeringAdminGate(reachable);
+  // A failed re-check keeps the previous answer in the query. The tab follows
+  // the latest check, so a failure or a 403 takes it down even when that
+  // answer was yes.
+  const showAdminTab = gate.isAdmin && !gate.isResolving && !gate.isError && !gate.isForbidden;
+  // The selected tab already says the screen's name. Repeat it as a heading
+  // only while that tab is absent, which is Admin until the check says yes.
+  const namedByTab = !requiresAdmin || showAdminTab;
 
   // Each of these mirrors one rung below, and every earlier rung is excluded
   // from the later ones — or someone whose check is still in flight, or whose
@@ -104,20 +128,31 @@ export default function DownloadStatsShell({
   const allowed = reachable && (!requiresAdmin || (!checking && !failed && !denied));
 
   return (
-    <Box>
+    // minWidth 0 lets the tab bar scroll inside the page. Without it this box
+    // grows to the full label row and the page scrolls sideways instead.
+    <Box sx={{ minWidth: 0, maxWidth: "100%" }}>
       <Stack
         direction="row"
         spacing={2}
         sx={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap" }}
       >
         <Box sx={{ minWidth: 0 }}>
-          {/* The description is dropped on the denied rung alone: it sells the
-              screen, which is right on one you can use and wrong above a notice
-              about to refuse you. */}
-          <PerspectiveHeader title={title} subtitle={denied ? undefined : description} />
+          <Typography component="h1" variant="h5" sx={{ mb: 0.5, mt: 0 }}>
+            {appName}
+          </Typography>
+          <PerspectiveHeader
+            title={namedByTab ? undefined : title}
+            subtitle={DOWNLOAD_STATS_DESCRIPTION}
+          />
         </Box>
         {allowed && actions}
       </Stack>
+      <RoutedTabs
+        basePath={DOWNLOAD_STATS_PATH}
+        tabs={screenTabs(showAdminTab)}
+        ariaLabel="Download Stats screens"
+        scrollable
+      />
 
       {!configured ? (
         <Alert severity="info" sx={{ mt: 1.5 }}>

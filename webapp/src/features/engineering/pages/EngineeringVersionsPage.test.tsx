@@ -253,7 +253,7 @@ describe("Versions filter bar", () => {
 
     renderVersions(septemberRange);
 
-    expect(await screen.findByRole("heading", { name: "Versions", level: 5 })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Versions", selected: true })).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: "Product" })).toHaveTextContent("Identity Server"),
     );

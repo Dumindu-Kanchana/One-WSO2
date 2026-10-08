@@ -226,7 +226,7 @@ describe("Downloads filter bar", () => {
 
     renderDownloads(juneRange);
 
-    expect(await screen.findByRole("heading", { name: "Downloads" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Downloads", selected: true })).toBeInTheDocument();
     const picker = screen.getByRole("combobox", { name: "Repositories" });
     expect(picker).toHaveAttribute("placeholder", "All repositories");
     expect(screen.getByLabelText("From")).toHaveValue("2026-06-01");
@@ -285,7 +285,7 @@ describe("Downloads filter bar", () => {
 
     renderDownloads();
 
-    expect(await screen.findByRole("heading", { name: "Downloads" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Downloads", selected: true })).toBeInTheDocument();
     expect(screen.getByLabelText("From")).toHaveValue("2026-05-31");
     expect(screen.getByLabelText("To")).toHaveValue("2026-06-30");
     expect(screen.getByRole("combobox", { name: "View" })).toHaveTextContent("Daily");
@@ -810,7 +810,7 @@ describe("Downloads from the Overview", () => {
     expect(await screen.findByTestId("where")).toHaveTextContent(
       "/engineering/download-stats/downloads?interval=day&from=2026-09-28&to=2026-09-28",
     );
-    expect(await screen.findByRole("heading", { name: "Downloads" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Downloads", selected: true })).toBeInTheDocument();
     expect(screen.getByLabelText("From")).toHaveValue("2026-09-28");
   });
 });

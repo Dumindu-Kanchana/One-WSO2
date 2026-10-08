@@ -22,8 +22,8 @@ import { HouseIcon } from "@wso2/oxygen-ui-icons-react";
 
 // When the rail asks UMT for the caller's roles. UMT's rows live inside
 // Engineering behind the `umt` flag, so its /update/user-info is asked only
-// while Engineering is open with both flags on — never with UMT switched off,
-// and never from another perspective. Same contract as Finance MIS
+// while Engineering is open and the `umt` flag is on — never with UMT
+// switched off, and never from another perspective. Same contract as Finance MIS
 // (misPreviewFlagOff.test.tsx).
 
 const asked = { enabled: [] as boolean[] };
@@ -133,7 +133,7 @@ function withQueries() {
 const { usePerspectiveVisibility } = await import("@components/side-rail/usePerspectiveVisibility");
 
 const originalConfig = window.config;
-function withFlags(flags: { engineering?: boolean; umt?: boolean }) {
+function withFlags(flags: { umt?: boolean }) {
   window.config = { ...(originalConfig ?? {}), ONE_WSO2_PREVIEW_FEATURES: flags } as Window["config"];
 }
 
@@ -152,23 +152,18 @@ afterEach(() => {
 });
 
 describe("the rail asking UMT for roles", () => {
-  it("asks on Engineering with both flags on", () => {
-    withFlags({ engineering: true, umt: true });
+  it("asks on Engineering when the umt flag is on", () => {
+    withFlags({ umt: true });
     expect(asksUmt()).toBe(true);
   });
 
   it("asks nothing with the umt flag off", () => {
-    withFlags({ engineering: true, umt: false });
-    expect(asksUmt()).toBe(false);
-  });
-
-  it("asks nothing with the engineering flag off", () => {
-    withFlags({ engineering: false, umt: true });
+    withFlags({ umt: false });
     expect(asksUmt()).toBe(false);
   });
 
   it("asks nothing from another perspective", () => {
-    withFlags({ engineering: true, umt: true });
+    withFlags({ umt: true });
     active.key = "finance";
     expect(asksUmt()).toBe(false);
   });

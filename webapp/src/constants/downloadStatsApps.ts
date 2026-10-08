@@ -43,6 +43,14 @@ import {
 } from "@wso2/oxygen-ui-icons-react";
 import type { MenuApp, MenuAppItem } from "@constants/appMenu";
 
+/**
+ * The one sentence under the app title, on every screen. Banking does the
+ * same: the tabs name the section, and the description does not change with
+ * them.
+ */
+export const DOWNLOAD_STATS_DESCRIPTION =
+  "Download activity and repository stats across all WSO2 products.";
+
 /** Root of every Download Stats route: perspective / app. */
 export const DOWNLOAD_STATS_PATH = "/engineering/download-stats";
 
@@ -67,52 +75,53 @@ export type DownloadStatsScreen = keyof typeof downloadStatsPaths;
 export const ENGINEERING_ADMIN_ITEM_ID = "engineering-download-stats-admin";
 
 /**
- * The six screens. Each entry is a rail row, a route and a header: the rail
- * reads `label` and `path`, and the app shell reads `label` as the screen's
- * title and `desc` as the one-line description beneath it. One entry, so the rail and the header
- * cannot name a screen two different ways.
+ * The six screens. Each entry is a tab and a route: the tab bar reads `label`
+ * and `path`. `desc` repeats the app's one sentence because the item type
+ * requires one; the shell does not read it per screen. The same entry is what
+ * a pin qualifies, which is why the screens stay on the rail section even
+ * though the rail lists only the app.
  */
 export const DOWNLOAD_STATS_SCREENS: Readonly<Record<DownloadStatsScreen, MenuAppItem>> = {
   overview: {
     id: "engineering-download-stats-overview",
     label: "Overview",
     icon: LayoutDashboardIcon,
-    desc: "Download activity and repository stats across all WSO2 products.",
+    desc: DOWNLOAD_STATS_DESCRIPTION,
     path: downloadStatsPaths.overview,
   },
   downloads: {
     id: "engineering-download-stats-downloads",
     label: "Downloads",
     icon: DownloadIcon,
-    desc: "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
+    desc: DOWNLOAD_STATS_DESCRIPTION,
     path: downloadStatsPaths.downloads,
   },
   versions: {
     id: "engineering-download-stats-versions",
     label: "Versions",
     icon: PackageIcon,
-    desc: "Per-release download breakdown and asset-level stats for each tracked product.",
+    desc: DOWNLOAD_STATS_DESCRIPTION,
     path: downloadStatsPaths.versions,
   },
   packages: {
     id: "engineering-download-stats-packages",
     label: "Packages",
     icon: BoxesIcon,
-    desc: "GitHub container package downloads per product — package totals and per-version breakdowns.",
+    desc: DOWNLOAD_STATS_DESCRIPTION,
     path: downloadStatsPaths.packages,
   },
   repositoryStats: {
     id: "engineering-download-stats-repository-stats",
     label: "Repository Stats",
     icon: StarIcon,
-    desc: "Stars, forks, watchers, open issues, and clone traffic over time for each tracked repository.",
+    desc: DOWNLOAD_STATS_DESCRIPTION,
     path: downloadStatsPaths.repositoryStats,
   },
   admin: {
     id: ENGINEERING_ADMIN_ITEM_ID,
     label: "Admin",
     icon: SettingsIcon,
-    desc: "Manage tracked repositories and review DB sync and scraper job history.",
+    desc: DOWNLOAD_STATS_DESCRIPTION,
     // RESTRICTED, nothing more — see the note at the top of the file.
     requires: ["admin"],
     path: downloadStatsPaths.admin,
@@ -128,9 +137,8 @@ export const DOWNLOAD_STATS_APPS: readonly MenuApp[] = [
     // different thing.
     icon: DownloadIcon,
     purpose: "Release downloads, package downloads and repository stats for every Product.",
-    // Stay a group: a reader who is not an Admin has five rows, an Admin six,
-    // and the app's name must not vanish from the rail for either of them.
-    alwaysGroup: true,
+    // One rail row. The screens are the tab bar inside the app, in this order.
+    inTabs: true,
     // Rail order. Overview first, because the perspective's landing forwards
     // to the first visible row.
     items: [

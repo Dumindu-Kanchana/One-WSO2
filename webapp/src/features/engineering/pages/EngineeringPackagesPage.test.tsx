@@ -285,7 +285,7 @@ describe("Packages filter bar", () => {
 
     renderPackages(septemberRange);
 
-    expect(await screen.findByRole("heading", { name: "Packages", level: 5 })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Packages", selected: true })).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: "Product" })).toHaveTextContent("Identity Server"),
     );

@@ -237,15 +237,13 @@ export default function App() {
           <Route path="me" element={<MyProfilePage />} />
           {/* Engineering → Download Stats, routed as perspective / app / screen,
               with the earlier addresses forwarding. The feature owns the
-              tree, as CadO2 and the GRC modules own theirs; see
-              @features/engineering/routes for why it is registered even while
-              the engineering preview flag is off. */}
+              tree, as CadO2 and the GRC modules own theirs. */}
           {engineeringRoutes}
           {/* Engineering → UMT. UmtShell owns its role gate. Behind the same
-              preview flags as its rail group — hiding only the rail entries
+              preview flag as its rail group — hiding only the rail entries
               would leave the routes reachable by URL. Nested under
               /engineering/ so the Engineering rail renders around them. */}
-          {isPreviewEnabled("engineering") && isPreviewEnabled("umt") && (
+          {isPreviewEnabled("umt") && (
             <>
               <Route path="engineering/umt" element={<UmtHomePage />} />
               <Route path="engineering/umt/updates" element={<UmtUpdatesPage />} />

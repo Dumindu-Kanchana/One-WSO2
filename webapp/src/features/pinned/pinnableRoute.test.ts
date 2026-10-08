@@ -17,6 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { isKnownRoute, pinnableRoute } from "@features/pinned/pinnableRoute";
 
+
 describe("pinnableRoute", () => {
   it("labels a perspective landing route from the registry", () => {
     expect(pinnableRoute("/people-ops")).toMatchObject({
@@ -44,6 +45,29 @@ describe("pinnableRoute", () => {
   it("qualifies a ported app's screen from the registry", () => {
     expect(pinnableRoute("/me/menu").label).toBe("Cafeteria · Home");
     expect(isKnownRoute("/me/menu")).toBe(true);
+  });
+
+  // The screens are tabs, not rail rows, and a pin still has to name the app
+  // and the screen. A guessed label ("Downloads") would mean the registry
+  // dropped the screen when it left the rail.
+  it("qualifies a Download Stats screen with the app", () => {
+    expect(pinnableRoute("/engineering/download-stats/overview").label).toBe(
+      "Download Stats · Overview",
+    );
+    expect(pinnableRoute("/engineering/download-stats/downloads").label).toBe(
+      "Download Stats · Downloads",
+    );
+    expect(pinnableRoute("/engineering/download-stats/versions").label).toBe(
+      "Download Stats · Versions",
+    );
+    expect(pinnableRoute("/engineering/download-stats/packages").label).toBe(
+      "Download Stats · Packages",
+    );
+    expect(pinnableRoute("/engineering/download-stats/repository-stats").label).toBe(
+      "Download Stats · Repository Stats",
+    );
+    expect(pinnableRoute("/engineering/download-stats/admin").label).toBe("Download Stats · Admin");
+    expect(isKnownRoute("/engineering/download-stats/overview")).toBe(true);
   });
 
   // Detail routes aren't in the registry — one entry cannot enumerate every

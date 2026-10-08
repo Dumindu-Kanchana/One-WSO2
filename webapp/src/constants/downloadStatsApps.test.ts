@@ -14,9 +14,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   DOWNLOAD_STATS_APPS,
+  DOWNLOAD_STATS_DESCRIPTION,
   DOWNLOAD_STATS_PATH,
   DOWNLOAD_STATS_SCREENS,
   ENGINEERING_ADMIN_ITEM_ID,
@@ -25,24 +26,15 @@ import {
 import { claimOf } from "@components/side-rail/visibilityFold";
 import { PERSPECTIVES } from "./perspectives";
 
-// The Engineering perspective exists only while its preview flag is on, and
-// the registry is read once, at import — so the flag has to be on before it
-// is. Its OFF half is pinned in perspectives.test.ts.
-vi.hoisted(() => {
-  window.config = {
-    ...(window.config ?? {}),
-    ONE_WSO2_PREVIEW_FEATURES: { engineering: true },
-  } as Window["config"];
-});
 
 const app = DOWNLOAD_STATS_APPS[0];
 const items = DOWNLOAD_STATS_APPS.flatMap((entry) => entry.items);
 
 describe("the Download Stats registry", () => {
-  it("is one app named Download Stats, kept as a group even with one visible row", () => {
+  it("is one app named Download Stats, offered as one rail row", () => {
     expect(DOWNLOAD_STATS_APPS).toHaveLength(1);
     expect(app.name).toBe("Download Stats");
-    expect(app.alwaysGroup).toBe(true);
+    expect(app.inTabs).toBe(true);
     expect(app.icon).toBeDefined();
   });
 
@@ -57,7 +49,7 @@ describe("the Download Stats registry", () => {
     }
   });
 
-  it("lists the six screens in rail order, with the agreed slugs", () => {
+  it("lists the six screens in tab order, with the agreed slugs", () => {
     expect(items.map((item) => item.label)).toEqual([
       "Overview",
       "Downloads",
@@ -77,27 +69,11 @@ describe("the Download Stats registry", () => {
     expect(Object.values(downloadStatsPaths).sort()).toEqual(items.map((item) => item.path).sort());
   });
 
-  // The shell reads the title and the one-line description off the same entry
-  // the rail reads its label from, so the two cannot drift.
-  it("carries a description for every screen", () => {
-    expect(DOWNLOAD_STATS_SCREENS.overview.desc).toBe(
-      "Download activity and repository stats across all WSO2 products.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.downloads.desc).toBe(
-      "Daily, monthly, and cumulative download trends across tracked products and date ranges.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.versions.desc).toBe(
-      "Per-release download breakdown and asset-level stats for each tracked product.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.packages.desc).toBe(
-      "GitHub container package downloads per product — package totals and per-version breakdowns.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.repositoryStats.desc).toBe(
-      "Stars, forks, watchers, open issues, and clone traffic over time for each tracked repository.",
-    );
-    expect(DOWNLOAD_STATS_SCREENS.admin.desc).toBe(
-      "Manage tracked repositories and review DB sync and scraper job history.",
-    );
+  // One sentence for the app. The tabs name the screen; the description does not.
+  it("gives every screen the same description", () => {
+    for (const item of items) {
+      expect(item.desc).toBe(DOWNLOAD_STATS_DESCRIPTION);
+    }
   });
 
   // Admin is the one row the Download Stats API decides. The rail's visibility
@@ -122,16 +98,16 @@ describe("the Download Stats registry", () => {
     expect(DOWNLOAD_STATS_SCREENS.admin.requires).toEqual(["admin"]);
   });
 
-  it("reaches the rail as a group under Engineering", () => {
+  // The rail row opens Overview. The screens stay on the section so a pin can
+  // still name each one; the rail test is what proves they are not rows.
+  it("reaches the rail as one Download Stats row that opens Overview", () => {
     const engineering = PERSPECTIVES.find((p) => p.key === "engineering");
     const group = (engineering?.sections ?? []).find((s) => s.id === `sec-app-${app.key}`);
     expect(group?.label).toBe("Download Stats");
-    expect(group?.alwaysGroup).toBe(true);
+    expect(group?.inTabs).toBe(true);
+    expect(group?.path).toBe(downloadStatsPaths.overview);
     expect(group?.icon).toBeDefined();
     expect(group?.children?.map((c) => c.label)).toEqual(items.map((item) => item.label));
-    expect(group?.children?.map((c) => c.icon)).toEqual(items.map((item) => item.icon));
-    for (const item of items) {
-      expect(item.icon, `${item.label} has no rail icon`).toBeDefined();
-    }
+    expect(group?.children?.map((c) => c.path)).toEqual(items.map((item) => item.path));
   });
 });

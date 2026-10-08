@@ -286,7 +286,7 @@ describe("Repository Stats filter bar", () => {
 
     renderStats(septemberRange);
 
-    expect(await screen.findByRole("heading", { name: "Repository Stats" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Repository Stats", selected: true })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Repositories" })).toHaveAttribute(
       "placeholder",
       "All repositories",
@@ -339,7 +339,7 @@ describe("Repository Stats filter bar", () => {
 
     renderStats();
 
-    expect(await screen.findByRole("heading", { name: "Repository Stats" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Repository Stats", selected: true })).toBeInTheDocument();
     expect(screen.getByLabelText("From")).toHaveValue("2026-08-31");
     expect(screen.getByLabelText("To")).toHaveValue("2026-09-30");
     expect(screen.getByRole("combobox", { name: "Stat" })).toHaveTextContent("Stars");

@@ -16,22 +16,13 @@
 
 import type { JSX } from "react";
 import PerspectiveLanding from "@components/perspective-landing/PerspectiveLanding";
-import { isPreviewEnabled } from "@config/previewFeatures";
-import EngineeringUnavailable from "../components/EngineeringUnavailable";
 
 /**
- * The Engineering landing, at /engineering.
- *
- * With the flag on, this is the same landing every perspective without an
- * overview has: it forwards to the first rail row the reader can open, which
- * is Download Stats → Overview (`forwardsToFirstItem` in perspectives.ts).
- *
- * With the flag off it cannot be: the Engineering perspective is absent from
- * the registry, so `PerspectiveLanding` would resolve the active perspective
- * to Me and forward a visitor there — a silent bounce for someone who typed
- * an address they were given. The route stays registered to answer them.
+ * The Engineering landing, at /engineering. The same landing every perspective
+ * without an overview has: it forwards to the first rail row the reader can
+ * open, which is Download Stats → Overview (`forwardsToFirstItem` in
+ * perspectives.ts).
  */
 export default function EngineeringLanding(): JSX.Element {
-  if (!isPreviewEnabled("engineering")) return <EngineeringUnavailable />;
   return <PerspectiveLanding />;
 }
