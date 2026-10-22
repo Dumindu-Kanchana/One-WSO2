@@ -250,7 +250,9 @@ export default function SubmitEntryDialog({
                     : `${whereDetail.length}/${TIL_WHERE_DETAIL_MAX_LENGTH}`
                 }
                 fullWidth
-                slotProps={{ htmlInput: { maxLength: TIL_WHERE_DETAIL_MAX_LENGTH } }}
+                slotProps={{
+                  htmlInput: { maxLength: TIL_WHERE_DETAIL_MAX_LENGTH, "aria-label": whereDetailCopy(where).label },
+                }}
               />
             </Stack>
           )}
