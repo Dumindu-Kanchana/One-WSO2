@@ -19,6 +19,7 @@ import { Avatar, Box, Breadcrumbs, Button, Chip, Divider, IconButton, Link, Stac
 import { ArrowLeftIcon } from "@wso2/oxygen-ui-icons-react";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { useParRating } from "../api/useParData";
+import { useParShowsPar2 } from "../api/useReview360";
 import ParLeadReviewPanel from "./ParLeadReviewPanel";
 import ParLead360ReviewsTab from "./ParLead360ReviewsTab";
 import ParLeadF2fPanel from "./ParLeadF2fPanel";
@@ -41,6 +42,7 @@ export default function ParLeadReviewTabs({
   isAdminView?: boolean;
 }) {
   const rating = useParRating(cycle.parCycleId, employeeEmail);
+  const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
   const thumbnails = useLeaveEmployees();
   const [tab, setTab] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -89,7 +91,7 @@ export default function ParLeadReviewTabs({
           {isAdminView ? (
             <Tab label="Update Status" />
           ) : (
-            [<Tab key="360" label="360 Reviews" />, <Tab key="f2f" label="F2F" />]
+            [<Tab key="360" label={showsPar2 ? "360° feedback" : "360 Reviews"} />, <Tab key="f2f" label="F2F" />]
           )}
         </Tabs>
         {!isAdminView && (
@@ -109,6 +111,7 @@ export default function ParLeadReviewTabs({
                 employeeEmail={employeeEmail}
                 leadStatus={rating.data?.parLeadStatus}
                 leadStatusKnown={rating.isSuccess}
+                structured={showsPar2}
               />
             )}
         {!isAdminView && tab === 2 && <ParLeadF2fPanel cycle={cycle} employeeEmail={employeeEmail} />}

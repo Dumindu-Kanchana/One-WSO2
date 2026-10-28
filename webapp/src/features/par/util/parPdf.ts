@@ -17,6 +17,9 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Par360Review, ParLegacyHistory, ParLegacyQuestionAnswer, ParRating } from "../api/types";
+import type { FormDefinition } from "../api/leadership360Types";
+import type { Review360Summary } from "../api/review360Types";
+import type { SelfReviewAnswers } from "../api/selfReviewTypes";
 import { decodeParComment, sanitizeParHtml } from "./parComment";
 import { pdfRatingText } from "./parLabels";
 import {
@@ -90,6 +93,86 @@ export function downloadParPdf(rating: ParRating, selfComment: string, leadComme
     startY: 30,
     styles: { fontSize: 9, cellPadding: 4, overflow: "linebreak", valign: "top" },
     columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 60 }, 2: { cellWidth: "auto" } },
+  });
+
+  doc.save(`${rating.parEmployeeEmail}_par_summary.pdf`);
+}
+
+const SECTION_ROW = { fontStyle: "bold", fillColor: [225, 225, 225], halign: "left" } as const;
+const TEXT_CELL = { textColor: [50, 50, 50], cellPadding: 6 } as const;
+
+// The finished PAR of a PAR 2.0 cycle: the lead's feedback, the guided
+// self-review section by section, and (when the employee may see it) the
+// anonymised 360° summary — averages and comments, never names.
+export function downloadPar2Pdf({
+  rating,
+  leadComment,
+  selfReview,
+  review360,
+}: {
+  rating: ParRating;
+  leadComment: string;
+  selfReview: { definition: FormDefinition; answers: SelfReviewAnswers };
+  review360?: Review360Summary;
+}): void {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const rows: PdfRow[] = [];
+  const section = (title: string) => rows.push([{ content: title, colSpan: 2, styles: SECTION_ROW }]);
+
+  if (leadComment) {
+    section("Lead's feedback");
+    rows.push(["Lead comment", { content: htmlToPdfText(leadComment), styles: TEXT_CELL }]);
+  }
+
+  section("Self-review");
+  for (const s of selfReview.definition.sections) {
+    for (const q of s.questions) {
+      const answer = selfReview.answers[q.id];
+      const text = Array.isArray(answer)
+        ? answer
+            .map((g) => `• ${g.title}${g.status ? ` (${q.options?.find((o) => o.value === g.status)?.label ?? g.status})` : ""}`)
+            .join("\n")
+        : (answer ?? "");
+      rows.push([s.title, { content: text || "-", styles: TEXT_CELL }]);
+    }
+  }
+
+  if (review360?.available) {
+    const definition = review360.template.definition;
+    const questions = definition.sections.flatMap((s) => s.questions);
+    section(`360° summary (anonymised, ${review360.responseCount} responses)`);
+    rows.push(["360° index", { content: review360.index?.toFixed(1) ?? "-", styles: TEXT_CELL }]);
+    for (const a of review360.questionAverages) {
+      const q = questions.find((x) => x.id === a.questionId);
+      rows.push([q?.text ?? a.questionId, { content: `${a.average.toFixed(1)} (${a.ratingCount} ratings)`, styles: TEXT_CELL }]);
+    }
+    for (const q of questions.filter((x) => x.type === "TEXT")) {
+      const comments = review360.comments[q.id] ?? [];
+      if (comments.length > 0) {
+        rows.push([q.text, { content: comments.map((c) => `• ${c}`).join("\n"), styles: TEXT_CELL }]);
+      }
+    }
+  }
+
+  autoTable(doc, {
+    head: [
+      [
+        {
+          content:
+            ` - Employee: ${rating.parEmployeeEmail}\n` +
+            ` - PAR Rating: ${pdfRatingText(rating.parRating)}\n` +
+            ` - Top 5%/20% Rating: ${pdfRatingText(rating.parSpecialRating)}\n` +
+            ` - PAR Shared By: ${rating.parRatingSharedBy || "Not Provided"}`,
+          colSpan: 2,
+          styles: { halign: "left", fontSize: 12, cellPadding: 10 },
+        },
+      ],
+    ],
+    showHead: "firstPage",
+    body: rows,
+    startY: 30,
+    styles: { fontSize: 9, cellPadding: 4, overflow: "linebreak", valign: "top" },
+    columnStyles: { 0: { cellWidth: 160 }, 1: { cellWidth: "auto" } },
   });
 
   doc.save(`${rating.parEmployeeEmail}_par_summary.pdf`);

@@ -106,6 +106,12 @@ const ParAdminGlobalConfigTab = lazy(() => import("@features/par/pages/ParAdminG
 const ParLeadership360Tab = lazy(() => import("@features/par/pages/ParLeadership360Tab"));
 const ParAdminLeadership360Tab = lazy(() => import("@features/par/pages/ParAdminLeadership360Tab"));
 const ParLeadLeadership360Tab = lazy(() => import("@features/par/pages/ParLeadLeadership360Tab"));
+const ParHomeTab = lazy(() => import("@features/par/pages/ParHomeTab"));
+const Par360HubTab = lazy(() => import("@features/par/pages/Par360HubTab"));
+const ParOkrsPage = lazy(() => import("@features/par/pages/ParOkrsPage"));
+const ParRequiresOkrManagerRoute = lazy(() =>
+  import("@features/par/pages/ParOkrsPage").then((m) => ({ default: m.ParRequiresOkrManagerRoute })),
+);
 import EmailGroupsPage from "@features/my/email-groups/pages/EmailGroupsPage";
 import EmailSignaturePage from "@features/my/email-signature/pages/EmailSignaturePage";
 import BankingRoute from "@features/my/banking/components/BankingRoute";
@@ -633,6 +639,34 @@ export default function App() {
                 </Suspense>
               }
             />
+            {/* PAR 2.0 cycles: Home and the 360° hub (ParGroupPage shows
+                their tabs only for a cycle with the structured 360° form). */}
+            {isPreviewEnabled("par2") && (
+              <Route
+                path="home"
+                element={
+                  <ParRequiresActiveCycleRoute>
+                    <ParRequiresLeadRoute>
+                      <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                        <ParHomeTab />
+                      </Suspense>
+                    </ParRequiresLeadRoute>
+                  </ParRequiresActiveCycleRoute>
+                }
+              />
+            )}
+            {isPreviewEnabled("par2") && (
+              <Route
+                path="360"
+                element={
+                  <ParRequiresActiveCycleRoute>
+                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                      <Par360HubTab />
+                    </Suspense>
+                  </ParRequiresActiveCycleRoute>
+                }
+              />
+            )}
             {/* Leadership 360° runs on its own survey dates, so unlike the
                 cycle tabs it needs neither an active cycle nor a lead. */}
             {isPreviewEnabled("leadership360") && (
@@ -760,6 +794,20 @@ export default function App() {
               />
             )}
           </Route>
+          {/* People Ops → PAR → OKRs: OKR managers (the backend's OKR manager
+              group) set objectives for people. PAR 2.0 preview only. */}
+          {isPreviewEnabled("par2") && (
+            <Route
+              path="people-ops/performance/okrs"
+              element={
+                <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                  <ParRequiresOkrManagerRoute>
+                    <ParOkrsPage />
+                  </ParRequiresOkrManagerRoute>
+                </Suspense>
+              }
+            />
+          )}
           {/* People Ops → Promotion (Lead/Team History/Functional Lead/
               Board/Admin/Cycle History portals). Each portal's own role guard
               (PromotionRequires*Route) decides who can open it. */}

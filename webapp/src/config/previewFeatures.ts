@@ -93,7 +93,13 @@ export type PreviewFeature =
    * surveys and reading results). Held back until the PAR backend's
    * `/leadership-360` endpoints are deployed.
    */
-  | "leadership360";
+  | "leadership360"
+  /**
+   * PAR 2.0 in a PAR 2.0 cycle: the Home tab under Me → Performance, the
+   * structured 360° feedback hub, and the 360° evidence in the Lead View.
+   * Held back until the PAR backend's structured 360 endpoints are deployed.
+   */
+  | "par2";
 
 /**
  * Whether a preview feature should be shown.

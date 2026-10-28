@@ -177,6 +177,8 @@ export interface Par360Reviewer {
   reviewStatus: Par360ReviewStatus;
   isLeadRequested: boolean;
   isEmployeeRequested: boolean;
+  // PAR 2.0 cycles only.
+  reviewerName?: string;
 }
 
 // Body for POST .../employees/{email}/reviewers.
@@ -192,6 +194,8 @@ export interface Par360ReviewRequest {
   reviewStatus: Par360ReviewStatus;
   isEmployeeRequested: boolean;
   isLeadRequested: boolean;
+  // PAR 2.0 cycles only.
+  employeeName?: string;
 }
 
 // Your own review of one employee. GET .../employees/{email}/review.
@@ -479,6 +483,8 @@ export interface ParCycleCreate {
   parEmployeeDeadline: string;
   parLeadDeadline: string;
   parCycleConfigurations: ParCycleConfigurations;
+  // PAR 2.0: the cycle uses the guided self-review and structured 360° forms.
+  par2Forms?: boolean;
 }
 
 export type ParCycleConfigurationsOptionalized = Partial<ParCycleConfigurations>;

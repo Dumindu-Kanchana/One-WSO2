@@ -266,6 +266,14 @@ export const parServiceUrls = {
   // parEmployeeStatus / parLeadStatus we use for the chip + copy).
   parRating: (parCycleId: number, workEmail: string) =>
     `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/par-ratings`,
+  // GET (the employee, their leads, PAR admins) and PUT (the employee's
+  // draft) a cycle's guided self-review; 404 for a cycle without one.
+  parSelfReview: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/self-review`,
+  // POST — share the saved self-review with the lead. Unsharing is the
+  // par-ratings PATCH back to DRAFT.
+  parSelfReviewShare: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/self-review/share`,
   // PATCH .../par-ratings/{parRatingId} — save a draft or submit the
   // self-review (parEmployeeStatus: DRAFT | SHARED). Backend enforces which
   // fields the caller may set for their own record — see ParRatingModify.
@@ -291,6 +299,40 @@ export const parServiceUrls = {
   // GET/PATCH .../review — the caller's own review OF `employeeWorkEmail`.
   par360Review: (parCycleId: number, employeeWorkEmail: string) =>
     `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(employeeWorkEmail)}/review`,
+
+  // ---- PAR 2.0 structured 360° ------------------------------------------------
+  //
+  // GET — the PAR 2.0 forms a cycle uses (SELF_REVIEW, PEER_360); empty for a
+  // cycle that keeps the single comment, rating and 360.
+  parCycleForms: (parCycleId: number) => `${parBackendUrl}/par-cycles/${parCycleId}/forms`,
+  // GET/PUT — the caller's own structured feedback ON `employeeWorkEmail`.
+  parReviewForm: (parCycleId: number, employeeWorkEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(employeeWorkEmail)}/review-form`,
+  // POST — submit it.
+  parReviewFormSubmission: (parCycleId: number, employeeWorkEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(employeeWorkEmail)}/review-form/submission`,
+  // GET — every response about an employee with names (their leads, report chain, PAR admins).
+  parReviewResponses: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/review-responses`,
+  // GET — the caller's own anonymised summary.
+  parReviewSummary: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/review-summary`,
+  // GET — a lead's members' 360° indexes and the team average.
+  parReviewIndexes: (parCycleId: number, leadEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/review-indexes?leadEmail=${encodeURIComponent(leadEmail)}`,
+
+  // ---- OKRs ---------------------------------------------------------------------
+  //
+  // GET — one person's OKRs (them, the people they report to, PAR admins), or
+  // everyone's for an OKR manager when `ownerEmail` is left out. POST — set one.
+  okrs: (ownerEmail?: string) =>
+    `${parBackendUrl}/okrs${ownerEmail ? `?ownerEmail=${encodeURIComponent(ownerEmail)}` : ""}`,
+  // GET — what the caller may do with OKRs ({ canManage }).
+  okrAccess: () => `${parBackendUrl}/okrs/access`,
+  // GET — the people OKRs can be set for: the leadership team (OKR managers only).
+  okrEligibleOwners: () => `${parBackendUrl}/okrs/eligible-owners`,
+  // PUT — change one, including completing or reopening it. DELETE — remove it.
+  okr: (okrId: number) => `${parBackendUrl}/okrs/${okrId}`,
 
   // GET /par-cycles/{cycleId}/participants — the people IN THIS CYCLE (name +
   // email only), leadEmail omitted (par-app's OfferFeedbackView.tsx always

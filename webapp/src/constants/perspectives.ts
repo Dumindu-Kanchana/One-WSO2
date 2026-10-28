@@ -242,6 +242,13 @@ export const PEOPLE_OPS_SECTIONS: PerspectiveSection[] = [
         label: "Admin View",
         path: "/people-ops/performance/admin",
       },
+      // OKR managers only (PAR_OKRS_ITEM_ID / useParIsOkrManager), and only
+      // while the par2 preview flag is on.
+      {
+        id: "par-okrs",
+        label: "OKRs",
+        path: "/people-ops/performance/okrs",
+      },
     ],
   },
   // promotion-app's Lead Portal ("Time Based Promotions") — reviewing and
@@ -402,6 +409,9 @@ export const PAR_LEAD_PORTAL_ITEM_ID = "par-lead-portal";
 
 /** Same idea, for the Admin Portal — gated via useParIsAdmin. */
 export const PAR_ADMIN_PORTAL_ITEM_ID = "par-admin-portal";
+
+/** Same idea, for the OKRs page — gated via useParIsOkrManager. */
+export const PAR_OKRS_ITEM_ID = "par-okrs";
 
 /**
  * promotion-app's Lead Portal rail id — gated via usePromotionPrivileges

@@ -27,6 +27,7 @@ import { PROMOTION_EMPLOYEE_ITEM_ID } from "@constants/promotionApps";
 import {
   BANKING_ADMIN_ITEM_ID,
   PAR_ADMIN_PORTAL_ITEM_ID,
+  PAR_OKRS_ITEM_ID,
   PAR_LEAD_PORTAL_ITEM_ID,
   PROMOTION_ADMIN_PORTAL_ITEM_ID,
   PROMOTION_BOARD_PORTAL_ITEM_ID,
@@ -176,7 +177,7 @@ const ids = (values: readonly string[]): SectionClaim => ({ kind: "sections", id
 export function claimOf(name: AdapterName): SectionClaim {
   switch (name) {
     case "par":
-      return ids([PAR_ADMIN_PORTAL_ITEM_ID, PAR_LEAD_PORTAL_ITEM_ID, PAR_EMPLOYEE_ITEM_ID]);
+      return ids([PAR_ADMIN_PORTAL_ITEM_ID, PAR_LEAD_PORTAL_ITEM_ID, PAR_OKRS_ITEM_ID, PAR_EMPLOYEE_ITEM_ID]);
     case "marketing":
       // People-app capabilities must not answer these sections. `requires: ["admin"]`
       // on a Marketing Ops section means "restricted", and this adapter decides who.

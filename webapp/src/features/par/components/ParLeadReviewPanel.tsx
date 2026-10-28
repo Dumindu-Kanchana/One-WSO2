@@ -38,6 +38,8 @@ import {
   Link,
   Skeleton,
   Stack,
+  Tab,
+  Tabs,
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
@@ -64,8 +66,13 @@ import { ParCommentView } from "./ParContent";
 import { ParAutoAssignedChip } from "./ParChips";
 import ParDriveFileChip from "./ParDriveFileChip";
 import ParEmptyState from "./ParEmptyState";
+import ParSelfReviewView from "./ParSelfReviewView";
 import ParHistoryReviewSection from "./ParHistoryReviewSection";
 import type { ParCycle } from "../api/types";
+import { useSelfReview } from "../api/useSelfReview";
+import { useParShowsPar2 } from "../api/useReview360";
+import ParLead360Evidence, { ParLead360Guidance } from "./ParLead360Evidence";
+import { ParOkrEvidence } from "./ParOkrPanel";
 
 type SpecialRatingUi = "NONE" | "TOP5P" | "TOP20P";
 
@@ -94,6 +101,13 @@ export default function ParLeadReviewPanel({
   const rating = useParRating(cycle.parCycleId, employeeEmail);
   const ratingUpdate = useLeadRatingUpdate(cycle.parCycleId);
   const reviews = useParEmployeeReviews(cycle.parCycleId, employeeEmail);
+  // A PAR 2.0 cycle's guided self-review (null for a cycle that keeps the
+  // single comment). Its answers arrive empty until the employee shares.
+  const selfReview = useSelfReview(cycle.parCycleId, employeeEmail);
+  // A PAR 2.0 cycle puts the evidence (self-review, 360° summary) beside the
+  // assessment, with the 360° guidance under the rating.
+  const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
+  const [evidenceTab, setEvidenceTab] = useState(0);
   const { showSuccess, showError } = useNotifications();
 
   // Cycle-scoped value first (not on the wire yet — always undefined until
@@ -320,9 +334,21 @@ export default function ParLeadReviewPanel({
       fileCount: driveFiles.length,
     });
 
+  const selfReviewContent = selfReview.data ? (
+    Object.keys(selfReview.data.answers).length > 0 ? (
+      <ParSelfReviewView definition={selfReview.data.template.definition} answers={selfReview.data.answers} framed={false} />
+    ) : (
+      <ParEmptyState text="The employee hasn't shared their self-review yet" />
+    )
+  ) : employeeComment ? (
+    <ParCommentView html={employeeComment} />
+  ) : (
+    <ParEmptyState text="Employee's Feedback hasn't been shared" />
+  );
+
   return (
     <Grid container spacing={2}>
-      <Grid size={12}>
+      <Grid size={12} sx={showsPar2 ? { order: 0 } : undefined}>
         <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
           <Box flex={1}>
             {statusAlert}
@@ -354,20 +380,18 @@ export default function ParLeadReviewPanel({
         </Box>
       </Grid>
 
-      <Grid size={12}>
-        <Card variant="outlined" sx={{ height: "100%" }}>
-          <CardHeader title={<Typography variant="h6">Employee's Feedback</Typography>} />
-          <CardContent>
-            {employeeComment ? (
-              <ParCommentView html={employeeComment} />
-            ) : (
-              <ParEmptyState text="Employee's Feedback hasn't been shared" />
-            )}
-          </CardContent>
-        </Card>
-      </Grid>
+      {!showsPar2 && (
+        <Grid size={12}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
+            <CardHeader
+              title={<Typography variant="h6">{selfReview.data ? "Employee's Self-review" : "Employee's Feedback"}</Typography>}
+            />
+            <CardContent>{selfReviewContent}</CardContent>
+          </Card>
+        </Grid>
+      )}
 
-      <Grid size={12}>
+      <Grid size={showsPar2 ? { xs: 12, md: 7 } : 12} sx={showsPar2 ? { order: { xs: 2, md: 1 } } : undefined}>
         <Card variant="outlined" sx={{ height: "100%" }}>
           <CardHeader title={<Typography variant="h6">Lead's Feedback</Typography>} />
           <CardContent>
@@ -452,6 +476,8 @@ export default function ParLeadReviewPanel({
                     </ComplexSelect>
                   )}
                 </Box>
+
+                {showsPar2 && <ParLead360Guidance parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} />}
 
                 {parRatingValue === top5p20pEnabledRating && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -621,8 +647,35 @@ export default function ParLeadReviewPanel({
         </Card>
       </Grid>
 
+      {showsPar2 && (
+        <Grid size={{ xs: 12, md: 5 }} sx={{ order: { xs: 1, md: 2 } }}>
+          <Card variant="outlined">
+            <Tabs
+              value={evidenceTab}
+              onChange={(_e, value) => setEvidenceTab(value)}
+              aria-label="Evidence"
+              sx={{ px: 1, borderBottom: 1, borderColor: "divider" }}
+            >
+              <Tab label="Self-review" />
+              <Tab label="360° summary" />
+              {/* OKRs are set for the leadership team only. */}
+              {isLeadership && <Tab label="OKRs" />}
+            </Tabs>
+            <CardContent>
+              {evidenceTab === 0 ? (
+                selfReviewContent
+              ) : evidenceTab === 1 ? (
+                <ParLead360Evidence parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} framed={false} />
+              ) : (
+                <ParOkrEvidence ownerEmail={employeeEmail} cycleEndDate={cycle.parCycleEndDate} />
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      )}
+
       {isAdminView && (
-        <Grid size={12}>
+        <Grid size={12} sx={showsPar2 ? { order: 3 } : undefined}>
           <Accordion variant="outlined" defaultExpanded={Boolean(savedAdminComment)}>
             <AccordionSummary expandIcon={<ChevronDownIcon size={18} />}>
               <Typography variant="h6">Admin Comment</Typography>
@@ -642,7 +695,8 @@ export default function ParLeadReviewPanel({
         </Grid>
       )}
 
-      {!(reviews.isSuccess && reviews.data.length === 0) && (
+      {/* A PAR 2.0 cycle shows its 360° responses in the evidence column. */}
+      {!showsPar2 && !(reviews.isSuccess && reviews.data.length === 0) && (
         <Grid size={12}>
           {reviews.isLoading ? (
             <Skeleton variant="rectangular" height={72} sx={{ borderRadius: 1.5 }} />

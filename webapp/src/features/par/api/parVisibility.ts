@@ -16,7 +16,7 @@
 
 import type { VisibilityAnswer } from "@components/side-rail/visibilityFold";
 import { PAR_EMPLOYEE_ITEM_ID } from "@constants/parApps";
-import { PAR_ADMIN_PORTAL_ITEM_ID, PAR_LEAD_PORTAL_ITEM_ID } from "@constants/perspectives";
+import { PAR_ADMIN_PORTAL_ITEM_ID, PAR_LEAD_PORTAL_ITEM_ID, PAR_OKRS_ITEM_ID } from "@constants/perspectives";
 
 /**
  * One PAR answer for the rail and the landing.
@@ -27,18 +27,20 @@ export function parVisibility(input: {
   admin: { isAdmin: boolean; isLoading: boolean };
   lead: { canSee: boolean; isLoading: boolean };
   employee: { canSee: boolean; isLoading: boolean };
+  okrs?: { isOkrManager: boolean; isLoading: boolean };
   profileFailed: boolean;
 }): VisibilityAnswer {
   return {
     canSee: (id) => {
       if (id === PAR_ADMIN_PORTAL_ITEM_ID) return input.admin.isAdmin;
       if (id === PAR_LEAD_PORTAL_ITEM_ID) return input.lead.canSee;
+      if (id === PAR_OKRS_ITEM_ID) return input.okrs?.isOkrManager ?? false;
       if (id === PAR_EMPLOYEE_ITEM_ID) {
         return input.employee.canSee && !input.employee.isLoading && !input.profileFailed;
       }
       return false;
     },
-    resolving: input.admin.isLoading || input.lead.isLoading || input.employee.isLoading,
+    resolving: input.admin.isLoading || input.lead.isLoading || input.employee.isLoading || Boolean(input.okrs?.isLoading),
     retry: () => undefined,
   };
 }

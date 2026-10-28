@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Box, Button, Card, Chip, Stack, Typography } from "@wso2/oxygen-ui";
 import { FileDownIcon } from "@wso2/oxygen-ui-icons-react";
 import type { ParCycle, ParRating } from "../api/types";
@@ -34,9 +34,15 @@ import { employeeDisplayName } from "@features/leave/util/employeeName";
 export default function ParRatingSummary({
   cycle,
   rating,
+  selfReview,
+  onDownloadPdf,
 }: {
   cycle: Pick<ParCycle, "parCycleConfigurations">;
   rating: ParRating;
+  // A cycle with a guided self-review shows it here instead of the single
+  // employee comment, and builds its own PDF.
+  selfReview?: ReactNode;
+  onDownloadPdf?: () => void;
 }) {
   const selfComment = decodeParComment(rating.parEmployeeComment);
   // Presence, not parLeadStatus, is the visibility rule here: the backend's
@@ -66,7 +72,14 @@ export default function ParRatingSummary({
     <Stack spacing={1.75}>
       {leadShared && (
         <Card variant="outlined" sx={{ p: 2 }}>
-          <Typography sx={{ fontWeight: 600, mb: 1 }}>Lead's feedback</Typography>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+            <Typography sx={{ fontWeight: 600 }}>Lead's feedback</Typography>
+            {selfReview && onDownloadPdf && (
+              <Button size="small" variant="outlined" startIcon={<FileDownIcon size={14} />} onClick={onDownloadPdf}>
+                Download PDF
+              </Button>
+            )}
+          </Box>
           <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: "wrap" }}>
             {rating.parRating && (
               <Chip
@@ -88,24 +101,26 @@ export default function ParRatingSummary({
         </Card>
       )}
 
-      <Card variant="outlined" sx={{ p: 2 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-          <ParQuestionText
-            html={cycle.parCycleConfigurations?.employeeParQuestion}
-            fallback="Employee feedback"
-          />
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<FileDownIcon size={14} />}
-            onClick={() => downloadParPdf(rating, selfComment, leadComment)}
-            sx={{ flexShrink: 0, ml: 1.5 }}
-          >
-            Download PDF
-          </Button>
-        </Box>
-        <ParCommentView html={selfComment} />
-      </Card>
+      {selfReview ?? (
+        <Card variant="outlined" sx={{ p: 2 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+            <ParQuestionText
+              html={cycle.parCycleConfigurations?.employeeParQuestion}
+              fallback="Employee feedback"
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FileDownIcon size={14} />}
+              onClick={() => downloadParPdf(rating, selfComment, leadComment)}
+              sx={{ flexShrink: 0, ml: 1.5 }}
+            >
+              Download PDF
+            </Button>
+          </Box>
+          <ParCommentView html={selfComment} />
+        </Card>
+      )}
     </Stack>
   );
 }

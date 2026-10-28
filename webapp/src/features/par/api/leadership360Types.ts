@@ -14,15 +14,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Shapes of the PAR backend's Leadership 360° endpoints (modules/types/forms.bal).
+// Shapes of the PAR backend's form and Leadership 360° endpoints (modules/types/forms.bal).
 
-export type FormQuestionType = "RATING" | "TEXT" | "CHOICE";
+export type FormQuestionType = "RATING" | "TEXT" | "CHOICE" | "GOALS";
 
 export interface FormScale {
   min: number;
   max: number;
   minLabel?: string;
   maxLabel?: string;
+  // A label for every rating from min to max.
+  labels?: string[];
   allowNotObserved?: boolean;
 }
 
@@ -35,10 +37,16 @@ export interface FormQuestion {
   id: string;
   type: FormQuestionType;
   text: string;
+  // Short explanation under the question.
+  hint?: string;
   required?: boolean;
   scale?: string;
   options?: FormChoiceOption[];
   maxLength?: number;
+  // Example text shown in an empty answer (TEXT).
+  placeholder?: string;
+  // Most goals accepted (GOALS); a goal's statuses are its `options`.
+  maxItems?: number;
   // Reported only in aggregate, never per response.
   aggregateOnly?: boolean;
 }

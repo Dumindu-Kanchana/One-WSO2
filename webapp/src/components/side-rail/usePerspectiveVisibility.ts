@@ -36,6 +36,7 @@ import { subscriptionVisibility, useSubscriptionGate } from "@features/subscript
 import { parVisibility } from "@features/par/api/parVisibility";
 import { useParCanSeeLeadPortal, useParEmployeeItemVisible } from "@features/par/api/useParData";
 import { useParIsAdmin } from "@features/par/api/useParIsAdmin";
+import { useParIsOkrManager } from "@features/par/api/useOkrs";
 import { promotionVisibility, usePromotionPrivileges } from "@features/promotion/api/usePromotionRoles";
 import { promotionEmployeeAccess } from "@features/promotion/util/promotionEmployeeAccess";
 import { umtVisibility, useUmtGate } from "@features/umt/api/useUmtGate";
@@ -226,6 +227,8 @@ export function usePerspectiveVisibility(): PerspectiveVisibility {
   // Admin Portal's own gate — a JWT decode, not a backend call, so unlike
   // every gate above there's no per-perspective fetch to avoid by disabling it.
   const parAdminPortalGate = useParIsAdmin();
+  // The OKRs page: OKR managers only, read off the same self-lookup.
+  const parOkrsGate = useParIsOkrManager();
 
   // The employee-facing "PAR" item under Me — see useParEmployeeItemVisible
   // for why this hides for interns. `useMeProfile` (not `useUserInfo`)
@@ -299,6 +302,7 @@ export function usePerspectiveVisibility(): PerspectiveVisibility {
           admin: parAdminPortalGate,
           lead: parLeadPortalGate,
           employee: parEmployeeItemGate,
+          okrs: parOkrsGate,
           profileFailed: meProfile.isError,
         });
       case "marketing":

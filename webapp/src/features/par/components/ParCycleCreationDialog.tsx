@@ -26,11 +26,14 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  FormControlLabel,
   Grid,
+  Switch,
   TextField,
   Typography,
 } from "@wso2/oxygen-ui";
 import { describeError } from "@api/errors";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import ParDateField from "./ParDateField";
 import ConfirmationDialog, { type ConfirmationContent } from "@components/confirmation-dialog/ConfirmationDialog";
 import { useParGlobalConfig } from "../api/useParAdmin";
@@ -88,6 +91,8 @@ export default function ParCycleCreationDialog({
   const [employeeQuestion, setEmployeeQuestion] = useState("");
   const [reviewQuestion, setReviewQuestion] = useState("");
   const [ratingsSeeded, setRatingsSeeded] = useState(false);
+  // PAR 2.0: the guided self-review and structured 360° replace the two single questions.
+  const [par2Forms, setPar2Forms] = useState(isPreviewEnabled("par2"));
   const [confirmContent, setConfirmContent] = useState<ConfirmationContent | null>(null);
 
   // globalConfig only resolves once the dialog is open and the request
@@ -112,6 +117,7 @@ export default function ParCycleCreationDialog({
     setEmployeeQuestion("");
     setReviewQuestion("");
     setRatingsSeeded(false);
+    setPar2Forms(isPreviewEnabled("par2"));
     onClose(created);
   };
 
@@ -151,6 +157,7 @@ export default function ParCycleCreationDialog({
       parRatings: ratings,
       threeSixtyReviewRatings: reviewRatings,
     },
+    ...(par2Forms ? { par2Forms: true } : {}),
   });
 
   const handleSubmit = () => {
@@ -310,30 +317,42 @@ export default function ParCycleCreationDialog({
                 Cycle configuration
               </Typography>
             </Grid>
-            <Grid size={12}>
-              <TextField
-                label="Employee PAR question"
-                size="small"
-                fullWidth
-                multiline
-                minRows={3}
-                aria-label="Employee PAR question"
-                value={employeeQuestion}
-                onChange={(e) => setEmployeeQuestion(e.target.value)}
-              />
-            </Grid>
-            <Grid size={12}>
-              <TextField
-                label="360° feedback question"
-                size="small"
-                fullWidth
-                multiline
-                minRows={3}
-                aria-label="360 feedback question"
-                value={reviewQuestion}
-                onChange={(e) => setReviewQuestion(e.target.value)}
-              />
-            </Grid>
+            {isPreviewEnabled("par2") && (
+              <Grid size={12}>
+                <FormControlLabel
+                  control={<Switch checked={par2Forms} onChange={(e) => setPar2Forms(e.target.checked)} />}
+                  label="Use PAR 2.0 forms: the guided self-review and structured 360° feedback"
+                />
+              </Grid>
+            )}
+            {!par2Forms && (
+              <>
+                <Grid size={12}>
+                  <TextField
+                    label="Employee PAR question"
+                    size="small"
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    aria-label="Employee PAR question"
+                    value={employeeQuestion}
+                    onChange={(e) => setEmployeeQuestion(e.target.value)}
+                  />
+                </Grid>
+                <Grid size={12}>
+                  <TextField
+                    label="360° feedback question"
+                    size="small"
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    aria-label="360 feedback question"
+                    value={reviewQuestion}
+                    onChange={(e) => setReviewQuestion(e.target.value)}
+                  />
+                </Grid>
+              </>
+            )}
             <Grid size={{ xs: 12, sm: 6 }}>
               <Box sx={{ mb: 0.5 }}>
                 <Typography variant="body2" color="text.secondary">

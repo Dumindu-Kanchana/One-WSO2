@@ -27,6 +27,7 @@ import {
   useParHasActiveCycle,
   useParHasLead,
 } from "../api/useParData";
+import { useParShowsPar2 } from "../api/useReview360";
 
 // Tab labels and order match par-app's own OngoingCycleView.tsx tab bar
 // (Employee Feedback / Request 360° / Provide 360° / F2F). History is
@@ -53,6 +54,16 @@ const LEADLESS_TABS: RoutedTabDef[] = [
 // the only one left, regardless of lead presence.
 const HISTORY_ONLY_TABS: RoutedTabDef[] = [{ segment: "history", label: "PAR History" }];
 
+// A PAR 2.0 cycle (one with the structured 360° form, behind the `par2`
+// preview flag): Home first, and one 360° tab in place of Request/Provide.
+const PAR2_TABS: RoutedTabDef[] = [
+  { segment: "home", label: "Home" },
+  { segment: "employee-feedback", label: "Self-review" },
+  { segment: "360", label: "360° feedback" },
+  { segment: "f2f", label: "F2F" },
+  { segment: "history", label: "PAR History" },
+];
+
 // Leadership 360° runs on its own survey dates, not a PAR cycle, so it joins
 // every tab set above — lead or no lead, active cycle or not.
 const LEADERSHIP_360_TAB: RoutedTabDef = { segment: "leadership-360", label: "Leadership 360°" };
@@ -67,8 +78,9 @@ export default function ParGroupPage() {
   const cycleName = activeCycles.data?.[0]?.parCycleName;
   const { hasLead, isLoading } = useParHasLead(workEmail, profile.isLoading);
   const { isActive, isLoading: isActiveLoading } = useParHasActiveCycle(workEmail, profile.isLoading);
+  const { showsPar2, isLoading: isPar2Loading } = useParShowsPar2(activeCycles.data?.[0]?.parCycleId);
 
-  const cycleTabs = !isActive ? HISTORY_ONLY_TABS : hasLead ? FULL_TABS : LEADLESS_TABS;
+  const cycleTabs = !isActive ? HISTORY_ONLY_TABS : !hasLead ? LEADLESS_TABS : showsPar2 ? PAR2_TABS : FULL_TABS;
   const tabs = isPreviewEnabled("leadership360") ? [...cycleTabs, LEADERSHIP_360_TAB] : cycleTabs;
 
   return (
@@ -79,7 +91,7 @@ export default function ParGroupPage() {
       {/* The active cycle's own name/period, not the page's title — this
           page is "Performance Appraisal Review" regardless of which cycle is running. */}
       {cycleName && <Chip label={cycleName} size="small" color="primary" variant="outlined" sx={{ mb: 2, fontWeight: 600 }} />}
-      {isLoading || isActiveLoading ? (
+      {isLoading || isActiveLoading || isPar2Loading ? (
         <Skeleton variant="rectangular" height={36} sx={{ borderRadius: 1, mb: 2, maxWidth: 640 }} />
       ) : (
         <>
@@ -101,8 +113,11 @@ export function ParGroupIndex() {
   const workEmail = profile.data?.userInfo.workEmail;
   const { hasLead, isLoading } = useParHasLead(workEmail, profile.isLoading);
   const { isActive, isLoading: isActiveLoading } = useParHasActiveCycle(workEmail, profile.isLoading);
-  if (isLoading || isActiveLoading) return null; // ParGroupPage already holds the Outlet behind its own gate
+  const activeCycles = useActiveParCycle(workEmail);
+  const { showsPar2, isLoading: isPar2Loading } = useParShowsPar2(activeCycles.data?.[0]?.parCycleId);
+  if (isLoading || isActiveLoading || activeCycles.isLoading || isPar2Loading) return null; // ParGroupPage already holds the Outlet behind its own gate
   if (!isActive) return <Navigate to="/me/performance/history" replace />;
+  if (hasLead && showsPar2) return <Navigate to="/me/performance/home" replace />;
   return <Navigate to={`/me/performance/${hasLead ? "employee-feedback" : "provide-360"}`} replace />;
 }
 

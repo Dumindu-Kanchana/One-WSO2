@@ -43,6 +43,7 @@ import { useReviewers, useRequestReviewers } from "../api/usePar360";
 import { useParEmployeeReviews } from "../api/useLeadHistory";
 import Par360RequestDialog from "./Par360RequestDialog";
 import ParEmptyState from "./ParEmptyState";
+import ParLead360Evidence from "./ParLead360Evidence";
 import { Par360StatusChip } from "./ParChips";
 import { ParCommentView } from "./ParContent";
 import { decodeParComment } from "../util/parComment";
@@ -58,6 +59,7 @@ export default function ParLead360ReviewsTab({
   employeeEmail,
   leadStatus,
   leadStatusKnown,
+  structured = false,
 }: {
   cycle: ParCycle;
   employeeEmail: string;
@@ -67,6 +69,9 @@ export default function ParLead360ReviewsTab({
    * is still loading or failed to load, the Request action must not open
    * just because `leadStatus` reads as `undefined !== "SHARED"`. */
   leadStatusKnown: boolean;
+  /** A PAR 2.0 cycle: the structured responses show above the reviewer list,
+   * which then has nothing of its own to open. */
+  structured?: boolean;
 }) {
   const profile = useMeProfile();
   const leadEmail = profile.data?.userInfo.workEmail;
@@ -102,7 +107,13 @@ export default function ParLead360ReviewsTab({
 
   return (
     <Box sx={{ pt: 0.5 }}>
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+      {structured && (
+        <Box sx={{ mb: 3 }}>
+          <ParLead360Evidence parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} />
+        </Box>
+      )}
+      <Box sx={{ display: "flex", justifyContent: structured ? "space-between" : "flex-end", alignItems: "center", mb: 2 }}>
+        {structured && <Typography sx={{ fontWeight: 600 }}>Reviewers</Typography>}
         <Tooltip title={requestBlocked ? "Action not available" : ""} arrow>
           <span>
             <Button
@@ -142,7 +153,7 @@ export default function ParLead360ReviewsTab({
                     />
                     <Box>
                       <Typography variant="body2">
-                        {nameByEmail.get(reviewer.reviewerEmail) || reviewer.reviewerEmail}
+                        {nameByEmail.get(reviewer.reviewerEmail) || reviewer.reviewerName || reviewer.reviewerEmail}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {reviewer.reviewerEmail}
@@ -162,7 +173,7 @@ export default function ParLead360ReviewsTab({
                   )}
                 </TableCell>
                 <TableCell align="right">
-                  {(reviewer.reviewStatus === "SHARED" || reviewer.reviewStatus === "REJECTED") && (
+                  {!structured && (reviewer.reviewStatus === "SHARED" || reviewer.reviewStatus === "REJECTED") && (
                     <Button size="small" onClick={() => setViewingReviewerEmail(reviewer.reviewerEmail)}>
                       View
                     </Button>
