@@ -17,13 +17,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 
-// Captures the query useLegacyParHistoryByCycle builds, so tests can run its
-// own queryFn and assert on the real fallback logic.
-let capturedQuery: { queryFn: () => Promise<unknown> } | undefined;
+// Captures the queries useLegacyParHistoryByCycles builds, so tests can run
+// their own queryFn and assert on the real fallback logic.
+type Query = { queryKey: unknown[]; queryFn: () => Promise<unknown> };
+let capturedQueries: Query[] = [];
+let combine: ((results: unknown[]) => unknown) | undefined;
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (options: { queryFn: () => Promise<unknown> }) => {
-    capturedQuery = options;
-    return { data: undefined, isLoading: true, isError: false };
+  useQuery: () => ({ data: undefined, isLoading: true, isError: false }),
+  useQueries: (options: { queries: Query[]; combine: (results: unknown[]) => unknown }) => {
+    capturedQueries = options.queries;
+    combine = options.combine;
+    return {};
   },
 }));
 vi.mock("@asgardeo/react", () => ({ useAsgardeo: () => ({ isSignedIn: true }) }));
@@ -34,14 +38,14 @@ vi.mock("@api/http", async (importOriginal) => {
 });
 
 const { authedGet, HttpError } = await import("@api/http");
-const { useLegacyParHistoryByCycle } = await import("./useParAdmin");
+const { useLegacyParHistoryByCycles } = await import("./useParAdmin");
 
 const CYCLE = "2016 Quarterly Review - Q3/Q4";
 const rows = [{ legacyHeaderId: 1 }];
 
 function runQuery() {
-  renderHook(() => useLegacyParHistoryByCycle(CYCLE));
-  return capturedQuery!.queryFn();
+  renderHook(() => useLegacyParHistoryByCycles([CYCLE]));
+  return capturedQueries[0].queryFn();
 }
 
 const calledUrls = () => vi.mocked(authedGet).mock.calls.map(([url]) => new URL(url, "http://x"));
@@ -50,7 +54,7 @@ beforeEach(() => {
   vi.mocked(authedGet).mockReset();
 });
 
-describe("useLegacyParHistoryByCycle", () => {
+describe("useLegacyParHistoryByCycles", () => {
   it("asks the query-parameter route, with the cycle name in the query string", async () => {
     vi.mocked(authedGet).mockResolvedValueOnce(rows);
     await expect(runQuery()).resolves.toEqual(rows);
@@ -83,5 +87,29 @@ describe("useLegacyParHistoryByCycle", () => {
       .mockRejectedValueOnce(new HttpError("url", 404, ""))
       .mockRejectedValueOnce(new HttpError("url", 404, "path"));
     await expect(runQuery()).rejects.toMatchObject({ status: 404, responseBody: "path" });
+  });
+
+  it("asks for every stored spelling, one query each", () => {
+    const names = ["(3) ANNUAL PERFORMANCE REVIEW - Engineering Employees", "2015 ANNUAL PERFORMANCE REVIEW for Engineering Employees"];
+    renderHook(() => useLegacyParHistoryByCycles(names));
+    expect(capturedQueries.map((q) => q.queryKey)).toEqual(names.map((n) => ["par-admin-legacy-cycle-participants", n]));
+  });
+
+  it("combines the spellings into one roster, only once every one has loaded", () => {
+    const refetch = vi.fn();
+    const result = (over: object) => ({ data: undefined, isLoading: false, isError: false, error: null, isFetching: false, refetch, ...over });
+    renderHook(() => useLegacyParHistoryByCycles(["a", "b"]));
+
+    expect(combine!([result({ data: [{ legacyHeaderId: 1 }] }), result({ data: [{ legacyHeaderId: 2 }] })])).toMatchObject({
+      data: [{ legacyHeaderId: 1 }, { legacyHeaderId: 2 }],
+      isLoading: false,
+      isError: false,
+    });
+    expect(combine!([result({ data: [{ legacyHeaderId: 1 }] }), result({ isLoading: true })])).toMatchObject({ data: undefined, isLoading: true });
+    const failure = new Error("Failed to fetch");
+    const failed = combine!([result({ data: [] }), result({ isError: true, error: failure })]) as { isError: boolean; error: Error; refetch: () => void };
+    expect(failed).toMatchObject({ isError: true, error: failure });
+    failed.refetch();
+    expect(refetch).toHaveBeenCalledTimes(2);
   });
 });

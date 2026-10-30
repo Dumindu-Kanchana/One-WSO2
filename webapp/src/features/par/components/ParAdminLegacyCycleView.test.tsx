@@ -35,8 +35,8 @@ const history: {
 
 const requestedCycles = vi.hoisted(() => [] as string[]);
 vi.mock("../api/useParAdmin", () => ({
-  useLegacyParHistoryByCycle: (cycleName: string) => {
-    requestedCycles.push(cycleName);
+  useLegacyParHistoryByCycles: (cycleNames: string[]) => {
+    requestedCycles.push(...cycleNames);
     return history;
   },
 }));
@@ -87,8 +87,8 @@ function seed(cycleName: string) {
   ];
 }
 
-function show(cycleName: string, onBack: () => void = () => {}) {
-  return render(<ParAdminLegacyCycleView cycleName={cycleName} onBack={onBack} />);
+function show(cycleName: string, onBack: () => void = () => {}, storedCycleNames?: string[]) {
+  return render(<ParAdminLegacyCycleView cycleName={cycleName} storedCycleNames={storedCycleNames} onBack={onBack} />);
 }
 
 function openTeam(index: number) {
@@ -139,6 +139,23 @@ describe("ParAdminLegacyCycleView", () => {
     openTeam(0);
     expect(screen.getByText("2015 Annual Performance Evaluation - Team Leads")).toBeInTheDocument();
     expect(screen.queryByText(stored)).not.toBeInTheDocument();
+  });
+
+  it("loads every stored spelling of a merged cycle and shows one roster", () => {
+    const raw = "(3) ANNUAL PERFORMANCE REVIEW - Engineering Employees";
+    const canonical = "2015 ANNUAL PERFORMANCE REVIEW for Engineering Employees";
+    history.data = [
+      legacyRecord({ legacyHeaderId: 1, cycleName: raw }),
+      legacyRecord({ legacyHeaderId: 2, cycleName: canonical, employeeEmail: "sam@wso2.com", employeeName: "Sam Lee" }),
+    ];
+    requestedCycles.length = 0;
+    show(canonical, () => {}, [raw, canonical]);
+
+    expect(new Set(requestedCycles)).toEqual(new Set([raw, canonical]));
+    expect(screen.getByText("2015 Annual Performance Evaluation - Engineering Employees")).toBeInTheDocument();
+    openTeam(0);
+    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    expect(screen.getByText("Sam Lee")).toBeInTheDocument();
   });
 
   it("titles any other cycle exactly as stored", () => {

@@ -19,10 +19,10 @@ import { Avatar, Box, Button, Card, Chip, DataGrid, IconButton, InputAdornment, 
 import { ArrowLeftIcon, ArrowRightIcon, EyeIcon, SearchIcon, UserIcon, UsersIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
-import { useLegacyParHistoryByCycle } from "../api/useParAdmin";
+import { useLegacyParHistoryByCycles } from "../api/useParAdmin";
 import { useParLegacyHistory } from "../api/useLeadHistory";
 import { formatShortDate } from "../util/parDate";
-import { deriveLegacyCycleDates, legacyCycleLabel } from "../util/parLegacyHistory";
+import { deriveLegacyCycleDates, formatLegacyCycleName, legacyCycleLabel } from "../util/parLegacyHistory";
 import {
   groupLegacyParticipantsByTeam,
   isLegacyEmployeeParDone,
@@ -90,7 +90,7 @@ function Breadcrumb({ items, current }: { items: { label: string; onClick: () =>
 // Same header as ParOrgSummary's historyMode: a Back button, then the
 // History link, the cycle as a chip, its date range, plus the Legacy marker.
 function CycleHeader({ cycleName, onBack }: { cycleName: string; onBack: () => void }) {
-  const { startDate, endDate } = deriveLegacyCycleDates(cycleName);
+  const { startDate, endDate } = deriveLegacyCycleDates(formatLegacyCycleName(cycleName));
   return (
     <Stack spacing={1}>
       <Button size="small" startIcon={<ArrowLeftIcon size={14} />} onClick={onBack} sx={{ alignSelf: "flex-start" }}>
@@ -122,8 +122,19 @@ function CycleHeader({ cycleName, onBack }: { cycleName: string; onBack: () => v
 // DataGrids throughout rather than plain MUI tables, matching how every
 // other legacy-table screen in this port (e.g. ParOrgTeamViewTab.tsx) has
 // already upgraded from source's plain tables.
-export default function ParAdminLegacyCycleView({ cycleName, onBack }: { cycleName: string; onBack: () => void }) {
-  const history = useLegacyParHistoryByCycle(cycleName);
+// storedCycleNames: every spelling the cycle is stored under (one admin
+// History row can merge several, see buildAdminHistoryRows); the roster is
+// all of them together. Defaults to cycleName itself.
+export default function ParAdminLegacyCycleView({
+  cycleName,
+  storedCycleNames = [cycleName],
+  onBack,
+}: {
+  cycleName: string;
+  storedCycleNames?: string[];
+  onBack: () => void;
+}) {
+  const history = useLegacyParHistoryByCycles(storedCycleNames);
   const hasSpecialRatings = legacyCycleListHasSpecialRatings(cycleName);
   // Leave's employee directory is used for avatars only (the legacy table has
   // no photos), same deviation ParOrgTeamRoster.tsx/ParLeadTeamRoster.tsx make.
@@ -135,7 +146,7 @@ export default function ParAdminLegacyCycleView({ cycleName, onBack }: { cycleNa
 
   const [selection, setSelection] = useState<Selection>({ level: "groups" });
   // The roster/grouping fetch above is summary-only (see
-  // useLegacyParHistoryByCycle's own comment) -- once a specific record is
+  // fetchLegacyCycleParticipants' comment) -- once a specific record is
   // opened, fetch that one employee's FULL legacy history (same endpoint
   // the self-view uses; admins are authorized for any employee) and pick out
   // the one cycle being viewed, rather than rendering the summary row with

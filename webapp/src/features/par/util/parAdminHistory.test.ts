@@ -101,6 +101,27 @@ describe("buildAdminHistoryRows", () => {
   it("is empty for no cycles at all", () => {
     expect(buildAdminHistoryRows([], [])).toEqual([]);
   });
+
+  it("merges stored spellings of one legacy cycle into a single row carrying all of them", () => {
+    const raw = "(3) ANNUAL PERFORMANCE REVIEW - Engineering Employees";
+    const canonical = "2015 ANNUAL PERFORMANCE REVIEW for Engineering Employees";
+    const rows = buildAdminHistoryRows([], [legacyCycle({ cycleName: raw }), legacyCycle({ cycleName: canonical }), legacyCycle({ cycleName: raw })]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ key: `legacy-${canonical}`, cycleName: canonical, storedCycleNames: [raw, canonical] });
+    expect(rows[0].endDate).not.toBeNull();
+  });
+
+  it("keeps a cycle stored under one spelling under that exact name", () => {
+    for (const name of ["Quarterly Review - Q3/Q4", "2019  Performance Evaluation - Q2", "ANNUAL PERFORMANCE REVIEW -2015"]) {
+      const [row] = buildAdminHistoryRows([], [legacyCycle({ cycleName: name })]);
+      expect(row).toMatchObject({ cycleName: name, storedCycleNames: [name] });
+    }
+  });
+
+  it("dates a raw 2015 spelling with no year in it from its canonical name", () => {
+    const [row] = buildAdminHistoryRows([], [legacyCycle({ cycleName: "(3) ANNUAL PERFORMANCE REVIEW - Engineering Employees" })]);
+    expect(row.startDate?.startsWith("2015")).toBe(true);
+  });
 });
 
 describe("groupLegacyParticipantsByTeam", () => {
