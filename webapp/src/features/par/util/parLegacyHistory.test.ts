@@ -22,6 +22,7 @@ import {
   getLegacySharedByName,
   isThreeSixtyConfirmation,
   legacyCycleHasSpecialRatings,
+  legacyCycleLabel,
   parseLegacyFeedback360,
   parseLegacyQuestionAnswers,
 } from "./parLegacyHistory";
@@ -61,6 +62,40 @@ describe("formatLegacyCycleName", () => {
   it("passes through an already-canonical or genuinely-uncatalogued name unchanged", () => {
     expect(formatLegacyCycleName("2022 Performance Evaluation - H1")).toBe("2022 Performance Evaluation - H1");
     expect(formatLegacyCycleName("2099 Some Future Cycle")).toBe("2099 Some Future Cycle");
+  });
+});
+
+describe("legacyCycleLabel", () => {
+  it.each([
+    ["ANNUAL PERFORMANCE REVIEW -2015", "2015 Annual Performance Evaluation"],
+    ["2015 ANNUAL PERFORMANCE REVIEW", "2015 Annual Performance Evaluation"],
+    ["ANNUAL PERFORMANCE REVIEW for Engineering Employees - 2015", "2015 Annual Performance Evaluation - Engineering Employees"],
+    ["2015 ANNUAL PERFORMANCE REVIEW for Engineering Employees", "2015 Annual Performance Evaluation - Engineering Employees"],
+    ["(3) ANNUAL PERFORMANCE REVIEW - Engineering Employees", "2015 Annual Performance Evaluation - Engineering Employees"],
+    ["ANNUAL PERFORMANCE REVIEW for Engineering Team Leads - 2015", "2015 Annual Performance Evaluation - Engineering Team Leads"],
+    ["2015 ANNUAL PERFORMANCE REVIEW for Engineering Team Leads", "2015 Annual Performance Evaluation - Engineering Team Leads"],
+    ["ANNUAL PERFORMANCE REVIEW for Team Leads -2015", "2015 Annual Performance Evaluation - Team Leads"],
+    ["2015 ANNUAL PERFORMANCE REVIEW for Team Leads", "2015 Annual Performance Evaluation - Team Leads"],
+  ])("shows %s as %s", (stored, label) => {
+    expect(legacyCycleLabel(stored)).toBe(label);
+  });
+
+  it("leaves the canonical name used for lookups unchanged", () => {
+    expect(formatLegacyCycleName("ANNUAL PERFORMANCE REVIEW -2015")).toBe("2015 ANNUAL PERFORMANCE REVIEW");
+  });
+
+  it.each([
+    "Quarterly Review - Q3/Q4",
+    "2016 Quarterly Review - Q3/Q4",
+    "2019  Performance Evaluation - Q2",
+    "2022 Performance Evaluation - H1",
+    "2099 Some Future Cycle",
+  ])("returns any other name exactly as given: %s", (name) => {
+    expect(legacyCycleLabel(name)).toBe(name);
+  });
+
+  it("matches a 2015 name with stray spacing", () => {
+    expect(legacyCycleLabel("  2015 ANNUAL PERFORMANCE REVIEW for  Team Leads ")).toBe("2015 Annual Performance Evaluation - Team Leads");
   });
 });
 

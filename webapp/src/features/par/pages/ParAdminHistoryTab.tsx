@@ -35,12 +35,15 @@ import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useDistinctLegacyParCycles, useParCyclesByStatus } from "../api/useParAdmin";
 import { buildAdminHistoryRows, type AdminHistoryRow } from "../util/parAdminHistory";
 import { formatShortDate } from "../util/parDate";
+import { legacyCycleLabel } from "../util/parLegacyHistory";
 import ParEmptyState from "../components/ParEmptyState";
 import ParOrgSummary from "../components/ParOrgSummary";
 import ParAdminLegacyCycleView from "../components/ParAdminLegacyCycleView";
 import type { ParCycle } from "../api/types";
 
-type Selection = { kind: "none" } | { kind: "real"; cycle: ParCycle } | { kind: "legacy"; cycleName: string };
+type Selection = { kind: "none" } | { kind: "real"; cycle: ParCycle } | { kind: "legacy"; cycleName: string; storedCycleNames: string[] };
+
+const cycleLabel = (row: AdminHistoryRow) => (row.isLegacy ? legacyCycleLabel(row.cycleName) : row.cycleName);
 
 // Admin Portal's History tab: every closed real cycle merged with every
 // distinct legacy (pre-par-app) cycle, org-wide, latest first. Selecting a
@@ -68,7 +71,13 @@ export default function ParAdminHistoryTab() {
     return <ParOrgSummary cycle={selection.cycle} historyMode onBack={() => setSelection({ kind: "none" })} />;
   }
   if (selection.kind === "legacy") {
-    return <ParAdminLegacyCycleView cycleName={selection.cycleName} onBack={() => setSelection({ kind: "none" })} />;
+    return (
+      <ParAdminLegacyCycleView
+        cycleName={selection.cycleName}
+        storedCycleNames={selection.storedCycleNames}
+        onBack={() => setSelection({ kind: "none" })}
+      />
+    );
   }
 
   if (closedCycles.isLoading || legacyCycles.isLoading) {
@@ -96,12 +105,17 @@ export default function ParAdminHistoryTab() {
     return <ParEmptyState text="No past PAR cycles found." />;
   }
 
-  const filteredRows = searchText ? rows.filter((row) => row.cycleName.toLowerCase().includes(searchText.toLowerCase())) : rows;
+  // Matches the shown title or any stored spelling, so the names admins
+  // knew before the 2015 relabel still find their cycle.
+  const search = searchText.trim().toLowerCase();
+  const filteredRows = search
+    ? rows.filter((row) => [cycleLabel(row), ...(row.storedCycleNames ?? [row.cycleName])].some((name) => name.toLowerCase().includes(search)))
+    : rows;
 
   const handleOpen = (row: AdminHistoryRow) => {
     if (row.isLegacy) {
       setLastOpenedKey(row.key);
-      setSelection({ kind: "legacy", cycleName: row.cycleName });
+      setSelection({ kind: "legacy", cycleName: row.cycleName, storedCycleNames: row.storedCycleNames ?? [row.cycleName] });
     } else {
       const cycle = closedCycles.data?.find((c) => c.parCycleId === row.parCycleId);
       if (cycle) {
@@ -167,14 +181,14 @@ export default function ParAdminHistoryTab() {
                       component="button"
                       underline="hover"
                       color="inherit"
-                      aria-label={`Open ${row.cycleName}`}
+                      aria-label={`Open ${cycleLabel(row)}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpen(row);
                       }}
                       sx={{ textAlign: "left", font: "inherit" }}
                     >
-                      {row.cycleName}
+                      {cycleLabel(row)}
                     </Link>
                     {row.isLegacy && <Chip label="Legacy" size="small" color="warning" variant="outlined" sx={{ ml: 1 }} />}
                   </TableCell>

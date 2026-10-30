@@ -25,6 +25,7 @@ import {
   hasLegacyContent,
   isThreeSixtyConfirmation,
   legacyCycleHasSpecialRatings,
+  legacyCycleLabel,
   parseLegacyFeedback360,
   stripRedundantRatingPrefix,
 } from "./parLegacyHistory";
@@ -231,7 +232,7 @@ export function downloadLegacyParPdf(
   const isLegacy2015Cycle = cycleName.startsWith("2015 ");
   const headerLines = [
     ` - Employee: ${record.employeeEmail}`,
-    ` - Cycle: ${cycleName} (Legacy - PeopleHR)`,
+    ` - Cycle: ${legacyCycleLabel(cycleName)} (Legacy - PeopleHR)`,
     ...(isLegacy2015Cycle ? [] : [` - PAR Rating: ${pdfRatingText(rating ?? undefined)}`]),
     ...(hideSpecialRating ? [] : [` - Top 5%/20% Rating: ${pdfRatingText(special ?? undefined)}`]),
     ` - PAR Shared By: ${sharedByName ?? "-"}`,
@@ -348,7 +349,7 @@ export function downloadLegacyParPdf(
   // file. Sanitized for the filesystem: spaces/slashes/other punctuation
   // in a real cycle name (e.g. "2017 Quarterly Review - Q1") replaced
   // with underscores, collapsed, and trimmed.
-  const safeCycleName = cycleName
+  const safeCycleName = legacyCycleLabel(cycleName)
     .replace(/[^a-zA-Z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   doc.save(`${record.employeeEmail}_${safeCycleName}_legacy_par_summary.pdf`);

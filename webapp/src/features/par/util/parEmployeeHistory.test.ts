@@ -133,6 +133,15 @@ describe("buildMergedCycleOptions", () => {
     expect(options[0].label).toBe("2023 Performance Evaluation - H1 (Legacy)");
   });
 
+  it("labels a 2015 cycle with its display name but keeps the canonical name as its value", () => {
+    const byEmail: ParLegacyHistoryByEmail = {
+      "a@example.com": [legacyRecord({ cycleName: "ANNUAL PERFORMANCE REVIEW for Team Leads -2015" })],
+    };
+    const [option] = buildMergedCycleOptions([], byEmail);
+    expect(option.label).toBe("2015 Annual Performance Evaluation - Team Leads (Legacy)");
+    expect(option.cycleName).toBe("2015 ANNUAL PERFORMANCE REVIEW for Team Leads");
+  });
+
   it("sorts latest first, real and legacy cycles interleaved by date", () => {
     const real = realCycle({ parCycleId: 1, parCycleName: "2024 H2", parCycleStartDate: "2024-07-01" });
     const byEmail: ParLegacyHistoryByEmail = {

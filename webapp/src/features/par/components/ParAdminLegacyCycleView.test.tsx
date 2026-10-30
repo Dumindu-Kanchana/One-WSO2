@@ -18,13 +18,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ParLegacyHistory } from "../api/types";
 
-const history: { data?: ParLegacyHistory[]; isLoading: boolean; isError: boolean } = {
+const history: {
+  data?: ParLegacyHistory[];
+  isLoading: boolean;
+  isError: boolean;
+  error?: Error;
+  isFetching: boolean;
+  refetch: () => void;
+} = {
   data: [],
   isLoading: false,
   isError: false,
+  isFetching: false,
+  refetch: () => {},
 };
 
-vi.mock("../api/useParAdmin", () => ({ useLegacyParHistoryByCycle: () => history }));
+const requestedCycles = vi.hoisted(() => [] as string[]);
+vi.mock("../api/useParAdmin", () => ({
+  useLegacyParHistoryByCycles: (cycleNames: string[]) => {
+    requestedCycles.push(...cycleNames);
+    return history;
+  },
+}));
 vi.mock("../api/useLeadHistory", () => ({
   useParLegacyHistory: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
@@ -72,8 +87,8 @@ function seed(cycleName: string) {
   ];
 }
 
-function show(cycleName: string) {
-  return render(<ParAdminLegacyCycleView cycleName={cycleName} onBack={() => {}} />);
+function show(cycleName: string, onBack: () => void = () => {}, storedCycleNames?: string[]) {
+  return render(<ParAdminLegacyCycleView cycleName={cycleName} storedCycleNames={storedCycleNames} onBack={onBack} />);
 }
 
 function openTeam(index: number) {
@@ -83,9 +98,72 @@ function openTeam(index: number) {
 beforeEach(() => {
   history.isLoading = false;
   history.isError = false;
+  history.error = undefined;
 });
 
 describe("ParAdminLegacyCycleView", () => {
+  it.each([
+    ["the cycle fails to load", () => {
+      history.isError = true;
+      history.error = new Error("Failed to fetch");
+    }],
+    ["the cycle is still loading", () => {
+      history.isLoading = true;
+    }],
+  ])("keeps Back and the History link when %s", (_, setState) => {
+    const cycle = "2016 Quarterly Review - Q3/Q4";
+    seed(cycle);
+    setState();
+    const onBack = vi.fn();
+    show(cycle, onBack);
+
+    expect(screen.getByText(cycle)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    expect(onBack).toHaveBeenCalledTimes(2);
+    if (history.isError) {
+      expect(screen.getByText(/Couldn't load this legacy cycle's PAR history/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    }
+  });
+
+  it("titles a 2015 cycle with its new name but still loads it by the stored name", () => {
+    const stored = "2015 ANNUAL PERFORMANCE REVIEW for Team Leads";
+    seed(stored);
+    requestedCycles.length = 0;
+    show(stored);
+    expect(screen.getByText("2015 Annual Performance Evaluation - Team Leads")).toBeInTheDocument();
+    expect(screen.queryByText(stored)).not.toBeInTheDocument();
+    expect(new Set(requestedCycles)).toEqual(new Set([stored]));
+
+    openTeam(0);
+    expect(screen.getByText("2015 Annual Performance Evaluation - Team Leads")).toBeInTheDocument();
+    expect(screen.queryByText(stored)).not.toBeInTheDocument();
+  });
+
+  it("loads every stored spelling of a merged cycle and shows one roster", () => {
+    const raw = "(3) ANNUAL PERFORMANCE REVIEW - Engineering Employees";
+    const canonical = "2015 ANNUAL PERFORMANCE REVIEW for Engineering Employees";
+    history.data = [
+      legacyRecord({ legacyHeaderId: 1, cycleName: raw }),
+      legacyRecord({ legacyHeaderId: 2, cycleName: canonical, employeeEmail: "sam@wso2.com", employeeName: "Sam Lee" }),
+    ];
+    requestedCycles.length = 0;
+    show(canonical, () => {}, [raw, canonical]);
+
+    expect(new Set(requestedCycles)).toEqual(new Set([raw, canonical]));
+    expect(screen.getByText("2015 Annual Performance Evaluation - Engineering Employees")).toBeInTheDocument();
+    openTeam(0);
+    expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    expect(screen.getByText("Sam Lee")).toBeInTheDocument();
+  });
+
+  it("titles any other cycle exactly as stored", () => {
+    seed("2016 Quarterly Review - Q3/Q4");
+    show("2016 Quarterly Review - Q3/Q4");
+    expect(screen.getByText("2016 Quarterly Review - Q3/Q4")).toBeInTheDocument();
+  });
+
   it("shows the 5%/20% slot columns from 2021 on", () => {
     seed("2024 Performance Evaluation - H1");
     show("2024 Performance Evaluation - H1");

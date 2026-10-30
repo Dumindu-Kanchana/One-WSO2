@@ -420,7 +420,7 @@ export const parServiceUrls = {
   legacyParHistoryCyclesParticipants: (cycleName: string, summary = false) =>
     `${parBackendUrl}/legacy-par-history-cycles/participants?cycleName=${encodeURIComponent(cycleName)}${summary ? "&summary=true" : ""}`,
   // The older path form of the same request, for a backend that doesn't
-  // have the query-parameter route yet (see useLegacyParHistoryByCycle).
+  // have the query-parameter route yet (see fetchLegacyCycleParticipants in useParAdmin.ts).
   legacyParHistoryCyclesParticipantsByPath: (cycleName: string, summary = false) =>
     `${parBackendUrl}/legacy-par-history-cycles/${encodeURIComponent(cycleName)}/participants${summary ? "?summary=true" : ""}`,
 };

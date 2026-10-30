@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { deriveLegacyCycleDates, deriveLegacyRatingFromScore, formatLegacyCycleName } from "./parLegacyHistory";
+import { deriveLegacyCycleDates, deriveLegacyRatingFromScore, formatLegacyCycleName, legacyCycleLabel } from "./parLegacyHistory";
 import type { ParCycle, ParEmployee } from "../api/types";
 import type { ParLegacyHistoryByEmail, ParRatingByEmail } from "../api/useLeadHistory";
 
@@ -70,7 +70,7 @@ export function buildMergedCycleOptions(
     })),
     ...Array.from(legacyCycleMap.values()).map((cycleName) => ({
       key: `legacy-${cycleName}`,
-      label: `${cycleName} (Legacy)`,
+      label: `${legacyCycleLabel(cycleName)} (Legacy)`,
       isLegacy: true,
       cycleName,
       sortDate: deriveLegacyCycleDates(cycleName).startDate,

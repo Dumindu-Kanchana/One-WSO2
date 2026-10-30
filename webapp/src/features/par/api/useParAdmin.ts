@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useAsgardeo } from "@asgardeo/react";
 import { authedGet, defaultQueryRetry, HttpError } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
@@ -212,34 +212,56 @@ export function useDistinctLegacyParCycles(enabled = true) {
 // Employee PAR / Lead's Feedback completion checks rely on.
 // ParAdminLegacyCycleView.tsx fetches one record's full detail
 // separately, via useParLegacyHistory below, only once it's actually opened.
-export function useLegacyParHistoryByCycle(cycleName: string | undefined, enabled = true) {
+async function fetchLegacyCycleParticipants(cycleName: string, accessToken: string): Promise<ParLegacyHistory[]> {
+  try {
+    return await authedGet<ParLegacyHistory[]>(
+      parServiceUrls.legacyParHistoryCyclesParticipants(cycleName, true),
+      accessToken,
+      digiopsHeaders(),
+    );
+  } catch (e) {
+    // A backend without the query-parameter route yet answers 404
+    // (through the gateway) or 405 (directly). Fall back to the path
+    // form so this works whichever of the two is deployed first.
+    if (e instanceof HttpError && (e.status === 404 || e.status === 405)) {
+      return authedGet<ParLegacyHistory[]>(
+        parServiceUrls.legacyParHistoryCyclesParticipantsByPath(cycleName, true),
+        accessToken,
+        digiopsHeaders(),
+      );
+    }
+    throw e;
+  }
+}
+
+// The same cycle can be stored under more than one spelling (e.g. a raw and
+// the canonical 2015 name). Fetches every stored spelling -- one query each,
+// under the same per-name cache key -- and combines them as one
+// roster: data only once every spelling has loaded, an error if any fails.
+export function useLegacyParHistoryByCycles(cycleNames: string[]) {
   const { isSignedIn, getAccessToken, backendConfigured } = useParBaseline();
-  return useQuery<ParLegacyHistory[]>({
-    queryKey: ["par-admin-legacy-cycle-participants", cycleName],
-    enabled: enabled && isSignedIn && backendConfigured && Boolean(cycleName),
-    queryFn: async () => {
-      const accessToken = await getAccessToken();
-      try {
-        return await authedGet<ParLegacyHistory[]>(
-          parServiceUrls.legacyParHistoryCyclesParticipants(cycleName!, true),
-          accessToken,
-          digiopsHeaders(),
-        );
-      } catch (e) {
-        // A backend without the query-parameter route yet answers 404
-        // (through the gateway) or 405 (directly). Fall back to the path
-        // form so this works whichever of the two is deployed first.
-        if (e instanceof HttpError && (e.status === 404 || e.status === 405)) {
-          return authedGet<ParLegacyHistory[]>(
-            parServiceUrls.legacyParHistoryCyclesParticipantsByPath(cycleName!, true),
-            accessToken,
-            digiopsHeaders(),
-          );
-        }
-        throw e;
-      }
-    },
-    staleTime: 60 * 1000,
-    retry: defaultQueryRetry,
+  return useQueries({
+    queries: cycleNames.map((cycleName) => ({
+      queryKey: ["par-admin-legacy-cycle-participants", cycleName],
+      enabled: isSignedIn && backendConfigured && Boolean(cycleName),
+      queryFn: async () => fetchLegacyCycleParticipants(cycleName, await getAccessToken()),
+      staleTime: 60 * 1000,
+      retry: defaultQueryRetry,
+    })),
+    combine: combineLegacyCycleParticipants,
   });
+}
+
+// Module-level so its reference is stable: useQueries only re-runs combine
+// when a result changes, keeping the combined roster array stable between
+// renders.
+function combineLegacyCycleParticipants(results: UseQueryResult<ParLegacyHistory[]>[]) {
+  return {
+    data: results.every((r) => r.data) ? results.flatMap((r) => r.data!) : undefined,
+    isLoading: results.some((r) => r.isLoading),
+    isError: results.some((r) => r.isError),
+    error: results.find((r) => r.error)?.error ?? null,
+    isFetching: results.some((r) => r.isFetching),
+    refetch: () => results.forEach((r) => void r.refetch()),
+  };
 }
