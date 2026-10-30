@@ -22,7 +22,7 @@ import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { useLegacyParHistoryByCycle } from "../api/useParAdmin";
 import { useParLegacyHistory } from "../api/useLeadHistory";
 import { formatShortDate } from "../util/parDate";
-import { deriveLegacyCycleDates } from "../util/parLegacyHistory";
+import { deriveLegacyCycleDates, legacyCycleLabel } from "../util/parLegacyHistory";
 import {
   groupLegacyParticipantsByTeam,
   isLegacyEmployeeParDone,
@@ -103,7 +103,7 @@ function CycleHeader({ cycleName, onBack }: { cycleName: string; onBack: () => v
         <Typography component="span" sx={{ mx: 0.5 }}>
           /
         </Typography>
-        <Chip label={cycleName} size="small" color="primary" variant="outlined" />
+        <Chip label={legacyCycleLabel(cycleName)} size="small" color="primary" variant="outlined" />
         {startDate && endDate && (
           <Typography component="span" variant="caption" color="text.secondary">
             ({formatShortDate(startDate)} - {formatShortDate(endDate)})
@@ -388,7 +388,7 @@ export default function ParAdminLegacyCycleView({ cycleName, onBack }: { cycleNa
         <Breadcrumb
           items={[
             { label: "History", onClick: onBack },
-            { label: cycleName, onClick: () => setSelection({ level: "groups" }) },
+            { label: legacyCycleLabel(cycleName), onClick: () => setSelection({ level: "groups" }) },
             ...(group ? [{ label: group.parLeadEmail, onClick: () => setSelection({ level: "roster", group }) }] : []),
           ]}
           current={legacyEmployeeName(record)}
@@ -423,7 +423,7 @@ export default function ParAdminLegacyCycleView({ cycleName, onBack }: { cycleNa
         <Breadcrumb
           items={[
             { label: "History", onClick: onBack },
-            { label: cycleName, onClick: () => setSelection({ level: "groups" }) },
+            { label: legacyCycleLabel(cycleName), onClick: () => setSelection({ level: "groups" }) },
           ]}
           current={group.parLeadEmail}
         />

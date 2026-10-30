@@ -35,6 +35,7 @@ import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useDistinctLegacyParCycles, useParCyclesByStatus } from "../api/useParAdmin";
 import { buildAdminHistoryRows, type AdminHistoryRow } from "../util/parAdminHistory";
 import { formatShortDate } from "../util/parDate";
+import { legacyCycleLabel } from "../util/parLegacyHistory";
 import ParEmptyState from "../components/ParEmptyState";
 import ParOrgSummary from "../components/ParOrgSummary";
 import ParAdminLegacyCycleView from "../components/ParAdminLegacyCycleView";
@@ -47,6 +48,8 @@ type Selection = { kind: "none" } | { kind: "real"; cycle: ParCycle } | { kind: 
 // real cycle reopens ParOrgSummary in its read-only historyMode; selecting a
 // legacy cycle opens the legacy-only drill-down, since legacy data has no
 // real cycle/team model to reuse ParOrgSummary for.
+const cycleLabel = (row: AdminHistoryRow) => (row.isLegacy ? legacyCycleLabel(row.cycleName) : row.cycleName);
+
 export default function ParAdminHistoryTab() {
   const closedCycles = useParCyclesByStatus("CLOSED");
   const legacyCycles = useDistinctLegacyParCycles();
@@ -96,7 +99,7 @@ export default function ParAdminHistoryTab() {
     return <ParEmptyState text="No past PAR cycles found." />;
   }
 
-  const filteredRows = searchText ? rows.filter((row) => row.cycleName.toLowerCase().includes(searchText.toLowerCase())) : rows;
+  const filteredRows = searchText ? rows.filter((row) => cycleLabel(row).toLowerCase().includes(searchText.toLowerCase())) : rows;
 
   const handleOpen = (row: AdminHistoryRow) => {
     if (row.isLegacy) {
@@ -167,14 +170,14 @@ export default function ParAdminHistoryTab() {
                       component="button"
                       underline="hover"
                       color="inherit"
-                      aria-label={`Open ${row.cycleName}`}
+                      aria-label={`Open ${cycleLabel(row)}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpen(row);
                       }}
                       sx={{ textAlign: "left", font: "inherit" }}
                     >
-                      {row.cycleName}
+                      {cycleLabel(row)}
                     </Link>
                     {row.isLegacy && <Chip label="Legacy" size="small" color="warning" variant="outlined" sx={{ ml: 1 }} />}
                   </TableCell>

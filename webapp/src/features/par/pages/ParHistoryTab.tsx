@@ -34,7 +34,7 @@ import { ArrowLeftIcon, ChevronRightIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import { formatShortDate } from "../util/parDate";
-import { deriveLegacyCycleDates, formatLegacyCycleName } from "../util/parLegacyHistory";
+import { deriveLegacyCycleDates, formatLegacyCycleName, legacyCycleLabel } from "../util/parLegacyHistory";
 import { useParLegacyHistory } from "../api/useLeadHistory";
 import { useClosedParCycles, useParRating } from "../api/useParData";
 import ParRatingSummary from "../components/ParRatingSummary";
@@ -50,6 +50,8 @@ type Row =
 // in the employee's own legacy PAR history (2015+) alongside current-system
 // cycles, in the same table-row layout this tab always had. The backend
 // permits this for the signed-in user's own email (or an admin).
+const rowLabel = (row: Row) => (row.kind === "legacy" ? legacyCycleLabel(row.cycleName) : row.cycleName);
+
 export default function ParHistoryTab() {
   const profile = useMeProfile();
   const workEmail = profile.data?.userInfo.workEmail;
@@ -112,7 +114,7 @@ export default function ParHistoryTab() {
         </Button>
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
           <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 600 }}>
-            {opened.cycleName}
+            {rowLabel(opened)}
           </Typography>
           {opened.kind === "legacy" && (
             <Chip
@@ -194,7 +196,7 @@ function HistoryTable({ rows, onOpen }: { rows: Row[]; onOpen: (row: Row) => voi
               hover
               tabIndex={0}
               role="button"
-              aria-label={`Open ${row.cycleName} review`}
+              aria-label={`Open ${rowLabel(row)} review`}
               sx={{ cursor: "pointer" }}
               onClick={() => onOpen(row)}
               onKeyDown={(e) => {
@@ -205,7 +207,7 @@ function HistoryTable({ rows, onOpen }: { rows: Row[]; onOpen: (row: Row) => voi
               }}
             >
               <TableCell>
-                {row.cycleName}
+                {rowLabel(row)}
                 {row.kind === "legacy" && (
                   <Chip
                     label="Legacy"
