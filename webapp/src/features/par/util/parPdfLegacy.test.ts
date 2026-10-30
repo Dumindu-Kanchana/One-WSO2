@@ -121,4 +121,28 @@ describe("downloadLegacyParPdf", () => {
     docs.length = 0;
     expect(render(baseRecord, answers, true)).not.toContain("Peer Reviewer");
   });
+
+  it("2017 Q1: promotion questions only under Lead's Feedback; feedback title without its full stop", () => {
+    const q1Answers: ParLegacyQuestionAnswer[] = [
+      { title: "Your feedback and observations on the quarter in review.", employeeAnswer: "Employee words", managerFeedback: "Lead words" },
+      { title: "Promotion confirmed?", employeeAnswer: "Employee typed yes", managerFeedback: "No" },
+      { title: "Revised Designation ( if recommended for promotion )", employeeAnswer: "Employee typed title", managerFeedback: "N/A" },
+    ];
+    for (const hide360 of [false, true]) {
+      docs.length = 0;
+      const lines = [...render({ ...baseRecord, cycleName: "2017 Quarterly Review - Q1" }, q1Answers, hide360).matchAll(/\((.*?)\) Tj/g)].map(
+        (m) => m[1],
+      );
+      const leadAt = lines.indexOf("Lead's Feedback");
+      const employeePart = lines.slice(0, leadAt).join(" ");
+      const leadPart = lines.slice(leadAt).join(" ");
+      expect(leadAt).toBeGreaterThan(0);
+      expect(employeePart).not.toMatch(/Promotion confirmed|Revised Designation|Employee typed/);
+      expect(employeePart).toContain("Employee words");
+      expect(leadPart).toContain("Promotion confirmed?");
+      expect(leadPart).toContain("Revised Designation");
+      expect(lines.join(" ")).toMatch(/quarter in\s+review(?!\.)/);
+      expect(lines.join(" ")).not.toMatch(/quarter in\s+review\./);
+    }
+  });
 });

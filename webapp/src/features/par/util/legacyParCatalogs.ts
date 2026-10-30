@@ -40,11 +40,19 @@ export interface LegacyCatalogQuestion {
   // promotion questions, which are genuinely lead-only despite the
   // original catalog never distinguishing sides for 2015).
   leadOnly?: boolean;
+  // Stricter than leadOnly: never shown on the Employee's Feedback panel,
+  // whatever the employee typed (explicit request -- an employee's answer
+  // to "Promotion confirmed?"/"Revised Designation" is not part of their
+  // own feedback).
+  hiddenFromEmployee?: boolean;
   // Explicit local request: some flat-display prompts (2020's "SHARE
   // FEEDBACK..." criteria list) read as one continuous instructional
   // paragraph rather than a short question label -- italicize the label
   // too instead of the usual bold, matching that reading.
   italicLabel?: boolean;
+  // Shown instead of label, which still has to match the stored question
+  // title exactly -- e.g. to drop a stored title's trailing full stop.
+  displayLabel?: string;
 }
 
 export interface LegacyCatalogCategory {
@@ -59,6 +67,12 @@ export interface LegacyCatalogCategory {
 
 const t = (label: string, subtext: string): LegacyCatalogQuestion => ({ label, subtext });
 const leadOnly = (label: string, subtext: string): LegacyCatalogQuestion => ({ label, subtext, leadOnly: true });
+const promotionQuestion = (label: string): LegacyCatalogQuestion => ({
+  label,
+  subtext: "",
+  leadOnly: true,
+  hiddenFromEmployee: true,
+});
 // Every employeeOnly question in this catalog turned out to also want the
 // italic-label treatment (the 2017-2019 "feedback on the quarter"-style
 // prompts, same request as 2020's SHARE FEEDBACK question) -- no plain
@@ -279,20 +293,23 @@ export const LEGACY_2017_CATALOG: Record<string, LegacyCatalogQuestion[]> = {
       "Any specific areas you want to discuss?",
       "Basically all you need to write here is list (or detail) down anything in particular you would like addressed in the discussions with your TL (for e.g: Career progression, plans for higher studies etc or anything else you want to talk about or address).",
     ),
-    t(
-      "Your feedback and observations on the quarter in review.",
-      "The purpose is to get input from each of you on how we can do things better. It does not necessarily have to be directly related to your work, and could be feedback in general. This is an opportunity for you to give feedback on everything and is not related to your performance rating. This feedback will be shared with everyone anonymously at the end of the quarter.",
-    ),
-    leadOnly("Promotion confirmed?", ""),
-    leadOnly("Revised Designation ( if recommended for promotion )", ""),
+    {
+      ...t(
+        "Your feedback and observations on the quarter in review.",
+        "The purpose is to get input from each of you on how we can do things better. It does not necessarily have to be directly related to your work, and could be feedback in general. This is an opportunity for you to give feedback on everything and is not related to your performance rating. This feedback will be shared with everyone anonymously at the end of the quarter.",
+      ),
+      displayLabel: "Your feedback and observations on the quarter in review",
+    },
+    promotionQuestion("Promotion confirmed?"),
+    promotionQuestion("Revised Designation ( if recommended for promotion )"),
   ],
   "2017 Quarterly Review - Q2": [
     t(
       "Any specific areas you want to discuss?",
       "Basically all you need to write here is list (or detail) down anything in particular you would like addressed in the discussions with your Team Lead.",
     ),
-    leadOnly("Promotion confirmed?", ""),
-    leadOnly("Revised Designation ( if recommended for promotion )", ""),
+    promotionQuestion("Promotion confirmed?"),
+    promotionQuestion("Revised Designation ( if recommended for promotion )"),
   ],
   "2017 Quarterly Review - Q3": [
     leadOnly(
@@ -307,8 +324,8 @@ export const LEGACY_2017_CATALOG: Record<string, LegacyCatalogQuestion[]> = {
       "Is the employee performing at the next level?",
       "Employees - Please type N/A\nTeam Leads - Yes/No. If Yes, please give details on the stage of the next level the employee is at. If No, provide details on how they can move to the next level.",
     ),
-    leadOnly("Promotion confirmed?", ""),
-    leadOnly("Revised Designation ( if recommended for promotion )", ""),
+    promotionQuestion("Promotion confirmed?"),
+    promotionQuestion("Revised Designation ( if recommended for promotion )"),
   ],
   "2017 Quarterly Review - Q4": [
     leadOnly(
@@ -323,8 +340,8 @@ export const LEGACY_2017_CATALOG: Record<string, LegacyCatalogQuestion[]> = {
       "Is the employee performing at the next level?",
       "Employees - Please type N/A\nTeam Leads - Yes/No. If Yes, please give details on the stage of the next level the employee is at. If No, provide details on how they can move to the next level.",
     ),
-    leadOnly("Promotion confirmed?", ""),
-    leadOnly("Revised Designation ( if recommended for promotion )", ""),
+    promotionQuestion("Promotion confirmed?"),
+    promotionQuestion("Revised Designation ( if recommended for promotion )"),
   ],
 };
 
@@ -339,8 +356,8 @@ const Q1_Q2_2018: LegacyCatalogQuestion[] = [
     "Is the employee performing at the next level?",
     "If Yes, please give details on the stage of the next level the employee is at. If No, provide details on how they can move to the next level.",
   ),
-  leadOnly("Promotion confirmed?", ""),
-  leadOnly("Revised Designation ( if recommended for promotion ).", ""),
+  promotionQuestion("Promotion confirmed?"),
+  promotionQuestion("Revised Designation ( if recommended for promotion )."),
 ];
 const Q3_Q4_2018: LegacyCatalogQuestion[] = [
   employeeOnlyItalic(
@@ -515,10 +532,11 @@ export function getLegacyQuestionGroups(
   // employeeOnly/leadOnly hide a question's other side only when that side
   // is genuinely empty -- the stored data can carry a lead's own answer on
   // some "employee-only" prompts (e.g. 2020+'s SHARE FEEDBACK question), and
-  // that answer must not be silently dropped.
+  // that answer must not be silently dropped. hiddenFromEmployee questions
+  // are never shown on the employee side, answered or not.
   const showOnSide = (question: LegacyCatalogQuestion, answer: ParLegacyQuestionAnswer | undefined) =>
     side === "employee"
-      ? !question.leadOnly || hasData(answer?.employeeAnswer, true)
+      ? !question.hiddenFromEmployee && (!question.leadOnly || hasData(answer?.employeeAnswer, true))
       : !question.employeeOnly || hasData(answer?.managerFeedback, true);
 
   const categories = LEGACY_2015_CATALOG[cycleName];
@@ -533,7 +551,7 @@ export function getLegacyQuestionGroups(
           .filter(({ question, answer }) => showOnSide(question, answer))
           .map(({ question, answer }) => {
             return {
-              label: question.label,
+              label: question.displayLabel ?? question.label,
               subtext: question.subtext,
               employeeAnswer: answer?.employeeAnswer ?? null,
               managerFeedback: answer?.managerFeedback ?? null,
@@ -569,7 +587,7 @@ export function getLegacyQuestionGroups(
     .filter(({ question, answer }) => showOnSide(question, answer))
     .map(({ question, answer }) => {
       return {
-        label: question.label,
+        label: question.displayLabel ?? question.label,
         subtext: question.subtext,
         employeeAnswer: answer?.employeeAnswer ?? null,
         managerFeedback: answer?.managerFeedback ?? null,

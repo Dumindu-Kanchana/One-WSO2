@@ -65,12 +65,62 @@ describe("getLegacyQuestionGroups", () => {
     });
 
     it("shows a leadOnly question on the employee side when the employee gave a real answer", () => {
-      const answers: ParLegacyQuestionAnswer[] = [
-        { title: "Promotion confirmed?", employeeAnswer: "Yes, discussed", managerFeedback: "No" },
-      ];
-      const employeeGroups = getLegacyQuestionGroups("2017 Quarterly Review - Q1", answers, "employee");
-      expect(labels(employeeGroups)).toEqual(["Promotion confirmed?"]);
+      const question = "Is the employee performing at the next level?";
+      const answers: ParLegacyQuestionAnswer[] = [{ title: question, employeeAnswer: "Yes, discussed", managerFeedback: "No" }];
+      const employeeGroups = getLegacyQuestionGroups("2017 Quarterly Review - Q3", answers, "employee");
+      expect(labels(employeeGroups)).toEqual([question]);
       expect(employeeGroups?.[0].rows[0].employeeAnswer).toBe("Yes, discussed");
+    });
+
+    describe.each([
+      ["2017 Quarterly Review - Q1", "Revised Designation ( if recommended for promotion )"],
+      ["2017 Quarterly Review - Q2", "Revised Designation ( if recommended for promotion )"],
+      ["2017 Quarterly Review - Q3", "Revised Designation ( if recommended for promotion )"],
+      ["2017 Quarterly Review - Q4", "Revised Designation ( if recommended for promotion )"],
+      ["2018 Performance Evaluation - Q1", "Revised Designation ( if recommended for promotion )."],
+      ["2018 Performance Evaluation - Q2", "Revised Designation ( if recommended for promotion )."],
+    ])("%s promotion questions", (cycle, designation) => {
+      const answers: ParLegacyQuestionAnswer[] = [
+        { title: "Promotion confirmed?", employeeAnswer: "Yes", managerFeedback: "No" },
+        { title: designation, employeeAnswer: "Senior Software Engineer", managerFeedback: "Software Engineer" },
+      ];
+
+      it("never shows them on the employee side, whatever the employee answered", () => {
+        expect(getLegacyQuestionGroups(cycle, answers, "employee")).toBeNull();
+      });
+
+      it("still shows them, with the lead's answers, on the lead side", () => {
+        const rows = getLegacyQuestionGroups(cycle, answers, "lead")?.[0].rows ?? [];
+        expect(rows.map((row) => [row.label, row.managerFeedback])).toEqual([
+          ["Promotion confirmed?", "No"],
+          [designation, "Software Engineer"],
+        ]);
+      });
+    });
+
+    it("shows the 2017 Q1 feedback question without its stored full stop, on both sides", () => {
+      const answers: ParLegacyQuestionAnswer[] = [
+        {
+          title: "Your feedback and observations on the quarter in review.",
+          employeeAnswer: "Employee text",
+          managerFeedback: "Lead text",
+        },
+      ];
+      const shown = "Your feedback and observations on the quarter in review";
+      const employeeRows = getLegacyQuestionGroups("2017 Quarterly Review - Q1", answers, "employee")?.[0].rows ?? [];
+      const leadRows = getLegacyQuestionGroups("2017 Quarterly Review - Q1", answers, "lead")?.[0].rows ?? [];
+      expect(employeeRows.map((row) => [row.label, row.employeeAnswer])).toEqual([[shown, "Employee text"]]);
+      expect(leadRows.map((row) => [row.label, row.managerFeedback])).toEqual([[shown, "Lead text"]]);
+    });
+
+    it("keeps the employee's other 2017 Q1 answers when hiding the promotion ones", () => {
+      const answers: ParLegacyQuestionAnswer[] = [
+        { title: "Any specific areas you want to discuss?", employeeAnswer: "Career growth", managerFeedback: null },
+        { title: "Promotion confirmed?", employeeAnswer: "Yes", managerFeedback: "No" },
+      ];
+      expect(labels(getLegacyQuestionGroups("2017 Quarterly Review - Q1", answers, "employee"))).toEqual([
+        "Any specific areas you want to discuss?",
+      ]);
     });
 
     it("hides an employeeOnly question on the lead side unless the lead gave a real answer", () => {
