@@ -84,10 +84,18 @@ describe("legacyCycleLabel", () => {
     expect(formatLegacyCycleName("ANNUAL PERFORMANCE REVIEW -2015")).toBe("2015 ANNUAL PERFORMANCE REVIEW");
   });
 
-  it("shows every other cycle under its normal name", () => {
-    expect(legacyCycleLabel("Quarterly Review - Q3/Q4")).toBe("2016 Quarterly Review - Q3/Q4");
-    expect(legacyCycleLabel("2019  Performance Evaluation - Q2")).toBe("2019 Performance Evaluation - Q2");
-    expect(legacyCycleLabel("2022 Performance Evaluation - H1")).toBe("2022 Performance Evaluation - H1");
+  it.each([
+    "Quarterly Review - Q3/Q4",
+    "2016 Quarterly Review - Q3/Q4",
+    "2019  Performance Evaluation - Q2",
+    "2022 Performance Evaluation - H1",
+    "2099 Some Future Cycle",
+  ])("returns any other name exactly as given: %s", (name) => {
+    expect(legacyCycleLabel(name)).toBe(name);
+  });
+
+  it("matches a 2015 name with stray spacing", () => {
+    expect(legacyCycleLabel("  2015 ANNUAL PERFORMANCE REVIEW for  Team Leads ")).toBe("2015 Annual Performance Evaluation - Team Leads");
   });
 });
 

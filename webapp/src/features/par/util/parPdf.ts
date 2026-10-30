@@ -24,8 +24,8 @@ import {
   getLegacySharedByName,
   hasLegacyContent,
   isThreeSixtyConfirmation,
-  legacyCycleLabel,
   legacyCycleHasSpecialRatings,
+  legacyCycleLabel,
   parseLegacyFeedback360,
   stripRedundantRatingPrefix,
 } from "./parLegacyHistory";

@@ -45,13 +45,13 @@ type Row =
   | { kind: "real"; cycle: ParCycle; cycleName: string; start: string | null; end: string | null }
   | { kind: "legacy"; record: ParLegacyHistory; cycleName: string; start: string | null; end: string | null };
 
+const rowLabel = (row: Row) => (row.kind === "legacy" ? legacyCycleLabel(row.cycleName) : row.cycleName);
+
 // People Ops → Performance → History: "My History" tab (the lead-only
 // "Report Chain" tab belongs with the Lead Portal work, not here). Merges
 // in the employee's own legacy PAR history (2015+) alongside current-system
 // cycles, in the same table-row layout this tab always had. The backend
 // permits this for the signed-in user's own email (or an admin).
-const rowLabel = (row: Row) => (row.kind === "legacy" ? legacyCycleLabel(row.cycleName) : row.cycleName);
-
 export default function ParHistoryTab() {
   const profile = useMeProfile();
   const workEmail = profile.data?.userInfo.workEmail;

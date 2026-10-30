@@ -43,13 +43,13 @@ import type { ParCycle } from "../api/types";
 
 type Selection = { kind: "none" } | { kind: "real"; cycle: ParCycle } | { kind: "legacy"; cycleName: string };
 
+const cycleLabel = (row: AdminHistoryRow) => (row.isLegacy ? legacyCycleLabel(row.cycleName) : row.cycleName);
+
 // Admin Portal's History tab: every closed real cycle merged with every
 // distinct legacy (pre-par-app) cycle, org-wide, latest first. Selecting a
 // real cycle reopens ParOrgSummary in its read-only historyMode; selecting a
 // legacy cycle opens the legacy-only drill-down, since legacy data has no
 // real cycle/team model to reuse ParOrgSummary for.
-const cycleLabel = (row: AdminHistoryRow) => (row.isLegacy ? legacyCycleLabel(row.cycleName) : row.cycleName);
-
 export default function ParAdminHistoryTab() {
   const closedCycles = useParCyclesByStatus("CLOSED");
   const legacyCycles = useDistinctLegacyParCycles();

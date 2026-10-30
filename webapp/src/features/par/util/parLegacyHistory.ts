@@ -79,7 +79,8 @@ export const formatLegacyCycleName = (cycleName: string): string => {
 
 // On-screen titles for the 2015 cycles. Text only: catalog, rating and
 // roster lookups keep using formatLegacyCycleName's canonical name, and the
-// stored par_cycle_name is untouched.
+// stored par_cycle_name is untouched. Any other name is returned exactly as
+// given, so non-2015 cycles display as they did before.
 const LEGACY_CYCLE_LABELS: Record<string, string> = {
   "2015 ANNUAL PERFORMANCE REVIEW": "2015 Annual Performance Evaluation",
   "2015 ANNUAL PERFORMANCE REVIEW for Engineering Employees": "2015 Annual Performance Evaluation - Engineering Employees",
@@ -87,10 +88,8 @@ const LEGACY_CYCLE_LABELS: Record<string, string> = {
   "2015 ANNUAL PERFORMANCE REVIEW for Team Leads": "2015 Annual Performance Evaluation - Team Leads",
 };
 
-export const legacyCycleLabel = (cycleName: string): string => {
-  const canonical = formatLegacyCycleName(cycleName);
-  return LEGACY_CYCLE_LABELS[canonical] ?? canonical;
-};
+export const legacyCycleLabel = (cycleName: string): string =>
+  LEGACY_CYCLE_LABELS[formatLegacyCycleName(cycleName)] ?? cycleName;
 
 // Top 5%/20% was only introduced starting 2021 -- every earlier era
 // (2015-2020) never captured it, so anything showing it there (a "Not

@@ -24,7 +24,13 @@ const history: { data?: ParLegacyHistory[]; isLoading: boolean; isError: boolean
   isError: false,
 };
 
-vi.mock("../api/useParAdmin", () => ({ useLegacyParHistoryByCycle: () => history }));
+const requestedCycles = vi.hoisted(() => [] as string[]);
+vi.mock("../api/useParAdmin", () => ({
+  useLegacyParHistoryByCycle: (cycleName: string) => {
+    requestedCycles.push(cycleName);
+    return history;
+  },
+}));
 vi.mock("../api/useLeadHistory", () => ({
   useParLegacyHistory: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
@@ -86,6 +92,26 @@ beforeEach(() => {
 });
 
 describe("ParAdminLegacyCycleView", () => {
+  it("titles a 2015 cycle with its new name but still loads it by the stored name", () => {
+    const stored = "2015 ANNUAL PERFORMANCE REVIEW for Team Leads";
+    seed(stored);
+    requestedCycles.length = 0;
+    show(stored);
+    expect(screen.getByText("2015 Annual Performance Evaluation - Team Leads")).toBeInTheDocument();
+    expect(screen.queryByText(stored)).not.toBeInTheDocument();
+    expect(new Set(requestedCycles)).toEqual(new Set([stored]));
+
+    openTeam(0);
+    expect(screen.getByText("2015 Annual Performance Evaluation - Team Leads")).toBeInTheDocument();
+    expect(screen.queryByText(stored)).not.toBeInTheDocument();
+  });
+
+  it("titles any other cycle exactly as stored", () => {
+    seed("2016 Quarterly Review - Q3/Q4");
+    show("2016 Quarterly Review - Q3/Q4");
+    expect(screen.getByText("2016 Quarterly Review - Q3/Q4")).toBeInTheDocument();
+  });
+
   it("shows the 5%/20% slot columns from 2021 on", () => {
     seed("2024 Performance Evaluation - H1");
     show("2024 Performance Evaluation - H1");
