@@ -532,7 +532,8 @@ export function getLegacyQuestionGroups(
   // employeeOnly/leadOnly hide a question's other side only when that side
   // is genuinely empty -- the stored data can carry a lead's own answer on
   // some "employee-only" prompts (e.g. 2020+'s SHARE FEEDBACK question), and
-  // that answer must not be silently dropped.
+  // that answer must not be silently dropped. hiddenFromEmployee questions
+  // are never shown on the employee side, answered or not.
   const showOnSide = (question: LegacyCatalogQuestion, answer: ParLegacyQuestionAnswer | undefined) =>
     side === "employee"
       ? !question.hiddenFromEmployee && (!question.leadOnly || hasData(answer?.employeeAnswer, true))
