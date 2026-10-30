@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useAsgardeo } from "@asgardeo/react";
 import { authedGet, defaultQueryRetry, HttpError } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
@@ -248,13 +248,20 @@ export function useLegacyParHistoryByCycles(cycleNames: string[]) {
       staleTime: 60 * 1000,
       retry: defaultQueryRetry,
     })),
-    combine: (results) => ({
-      data: results.every((r) => r.data) ? results.flatMap((r) => r.data!) : undefined,
-      isLoading: results.some((r) => r.isLoading),
-      isError: results.some((r) => r.isError),
-      error: results.find((r) => r.error)?.error ?? null,
-      isFetching: results.some((r) => r.isFetching),
-      refetch: () => results.forEach((r) => void r.refetch()),
-    }),
+    combine: combineLegacyCycleParticipants,
   });
+}
+
+// Module-level so its reference is stable: useQueries only re-runs combine
+// when a result changes, keeping the combined roster array stable between
+// renders.
+function combineLegacyCycleParticipants(results: UseQueryResult<ParLegacyHistory[]>[]) {
+  return {
+    data: results.every((r) => r.data) ? results.flatMap((r) => r.data!) : undefined,
+    isLoading: results.some((r) => r.isLoading),
+    isError: results.some((r) => r.isError),
+    error: results.find((r) => r.error)?.error ?? null,
+    isFetching: results.some((r) => r.isFetching),
+    refetch: () => results.forEach((r) => void r.refetch()),
+  };
 }
