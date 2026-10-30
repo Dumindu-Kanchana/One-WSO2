@@ -37,9 +37,10 @@ export function stripRedundantRatingPrefix(text: string): string {
 // legacy cycle's "<year> ..." convention (e.g. "2016 Quarterly Review -
 // Q2") -- real data has been seen with BOTH this raw form and the
 // translated one, depending on which import path produced the row.
-// Display-only -- does not touch par_cycle_name as stored. Every catalog/
-// rating lookup and cycle-name display in this feature should normalize
-// through this first.
+// Does not touch par_cycle_name as stored. This gives the canonical name
+// that every catalog/rating lookup in this feature should normalize through
+// first; it is not the on-screen title -- show a cycle name with
+// legacyCycleLabel (below), which also applies the 2015 display names.
 const LEGACY_CYCLE_DISPLAY_NAMES: Record<string, string> = {
   "ANNUAL PERFORMANCE REVIEW -2015": "2015 ANNUAL PERFORMANCE REVIEW",
   "ANNUAL PERFORMANCE REVIEW for Team Leads -2015": "2015 ANNUAL PERFORMANCE REVIEW for Team Leads",
