@@ -370,14 +370,24 @@ export default function ParAdminLegacyCycleView({ cycleName, onBack }: { cycleNa
     [openRoster, hasSpecialRatings],
   );
 
+  // The header (Back + "History" link) stays while loading and on an error,
+  // so a cycle that fails to load can still be left.
   if (history.isLoading) {
-    return <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 1.5 }} />;
+    return (
+      <Stack spacing={2}>
+        <CycleHeader cycleName={cycleName} onBack={onBack} />
+        <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 1.5 }} />
+      </Stack>
+    );
   }
   if (history.isError) {
     return (
-      <ErrorNotice error={history.error} onRetry={() => history.refetch()} retrying={history.isFetching}>
-        Couldn't load this legacy cycle's PAR history.
-      </ErrorNotice>
+      <Stack spacing={2}>
+        <CycleHeader cycleName={cycleName} onBack={onBack} />
+        <ErrorNotice error={history.error} onRetry={() => history.refetch()} retrying={history.isFetching}>
+          Couldn't load this legacy cycle's PAR history.
+        </ErrorNotice>
+      </Stack>
     );
   }
 
