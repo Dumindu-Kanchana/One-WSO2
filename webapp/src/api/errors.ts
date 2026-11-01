@@ -73,3 +73,13 @@ export function httpRetry(failureCount: number, error: unknown): boolean {
   if (error instanceof HttpError && error.status >= 400 && error.status < 500) return false;
   return failureCount < 1;
 }
+
+// The browser's own failure to reach a server: fetch rejects with "Failed to
+// fetch", "NetworkError when attempting to fetch resource.", "Load failed" or
+// the like, and nothing a person can use. That includes a refusal on the way
+// that carries no CORS headers, which the browser won't hand to the page. By
+// the words, not by the type: a TypeError from a bug in the page must not be
+// reported as a lost connection.
+export function isNetworkFailure(error: unknown): boolean {
+  return error instanceof Error && /failed to fetch|networkerror|load failed|network request failed/i.test(error.message);
+}

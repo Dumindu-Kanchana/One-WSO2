@@ -42,7 +42,7 @@ import {
   type TilSubmission,
   type TilWhere,
 } from "../api/tilTypes";
-import { describeError } from "../util/tilError";
+import { describeError, isNetworkFailure, unsentEntryMessage } from "../util/tilError";
 import { isEmptyTilHtml, isSameTilHtml, normalizeTilSpaces, tilPlainTextLength } from "../util/tilRichText";
 import TilRichTextField from "./TilRichTextField";
 
@@ -170,6 +170,13 @@ export default function SubmitEntryDialog({
   const [customerFieldFocused, setCustomerFieldFocused] = useState(false);
   const customerFieldOpen = customerFieldFocused;
   const { showSuccess, showError } = useNotifications();
+  // A save that never reached the server is explained under the editor
+  // (`unsent`) rather than in a toast: the toast closes before that much can
+  // be read, and the dialog stays open with the entry still in it.
+  const showSaveError = (err: Error) => {
+    if (!isNetworkFailure(err)) showError(describeError(err));
+  };
+  const unsent = unsentEntryMessage(entry ? update.error : create.error);
 
   // The byline is the signed-in user's own name — never typed, so it can't
   // be used to credit (or blame) someone else. Name only, not "(email)" --
@@ -231,7 +238,7 @@ export default function SubmitEntryDialog({
             showSuccess("Entry updated");
             close();
           },
-          onError: (err) => showError(describeError(err)),
+          onError: showSaveError,
         },
       );
       return;
@@ -249,7 +256,7 @@ export default function SubmitEntryDialog({
           showSuccess("Thanks for sharing what you learned!");
           close();
         },
-        onError: (err) => showError(describeError(err)),
+        onError: showSaveError,
       },
     );
   };
@@ -485,6 +492,11 @@ export default function SubmitEntryDialog({
               <Link component="button" type="button" variant="caption" onClick={whatLimit.retry}>
                 Try again
               </Link>
+            </Typography>
+          )}
+          {unsent && (
+            <Typography variant="caption" color="error">
+              {unsent}
             </Typography>
           )}
         </Box>

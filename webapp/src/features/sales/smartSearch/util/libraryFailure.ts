@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { isNetworkFailure } from "@api/errors";
 import { HttpError } from "@api/http";
 
 /** What the Library was doing when it failed: the words used for it depend on that. */
@@ -60,12 +61,6 @@ const WORDS: Record<LibraryTask, { slow: string; busy: string; down: string; oth
     missing: "These results aren't in your search any more. Search again, then try this.",
   },
 };
-
-/** The browser's own failure to reach a server: it says "Failed to fetch" or the like, and nothing a person can use. */
-function isNetworkFailure(error: unknown): boolean {
-  // By the words, not by the type: a TypeError from a bug in the page must not be reported as a lost connection.
-  return error instanceof Error && /failed to fetch|networkerror|load failed|network request failed/i.test(error.message);
-}
 
 /**
  * Turns whatever went wrong into one plain sentence, so a slow or unreachable service is told to the reader in words

@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import { HttpError } from "./http";
-import { describeError, serverMessage } from "./errors";
+import { describeError, isNetworkFailure, serverMessage } from "./errors";
 
 describe("serverMessage", () => {
   it("reads a flat or nested message out of a JSON body", () => {
@@ -66,5 +66,24 @@ describe("describeError", () => {
 
   it("falls back to a generic message for an unrecognized value", () => {
     expect(describeError("nope")).toBe("Something went wrong.");
+  });
+});
+
+describe("isNetworkFailure", () => {
+  it("recognizes each browser's own words for a request that never got an answer", () => {
+    for (const message of [
+      "Failed to fetch",
+      "NetworkError when attempting to fetch resource.",
+      "Load failed",
+      "Network request failed",
+    ]) {
+      expect(isNetworkFailure(new TypeError(message))).toBe(true);
+    }
+  });
+
+  it("does not count a server's answer or a bug in the page as a lost connection", () => {
+    expect(isNetworkFailure(new HttpError("/x", 403, "<html>Blocked</html>"))).toBe(false);
+    expect(isNetworkFailure(new TypeError("Cannot read properties of undefined (reading 'id')"))).toBe(false);
+    expect(isNetworkFailure("Failed to fetch")).toBe(false);
   });
 });
