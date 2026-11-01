@@ -64,10 +64,78 @@ export function normalizeTilSpaces(html: string): string {
   return html.replace(/&nbsp;|\u00a0/g, " ");
 }
 
+// A web address written out in the text: http:// or https:// up to the next
+// space. Punctuation that ends the sentence around it is trimmed off after
+// (trimUrlEnd).
+const URL_IN_TEXT = /\bhttps?:\/\/[^\s<>"]+/gi;
+
+/** `url` without the punctuation a sentence puts after it: "see
+ * https://example.com." links up to ".com". A closing bracket stays when the
+ * address opened one, as in https://en.wikipedia.org/wiki/Go_(game). */
+function trimUrlEnd(url: string): string {
+  let end = url.length;
+  while (end > 0) {
+    const last = url[end - 1];
+    const open = last === ")" ? "(" : last === "]" ? "[" : undefined;
+    const head = url.slice(0, end);
+    if (/[.,;:!?'"*’”»]/.test(last) || (open && head.split(last).length > head.split(open).length)) {
+      end -= 1;
+    } else {
+      break;
+    }
+  }
+  return url.slice(0, end);
+}
+
+function isWebAddress(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
+/** `html` with every web address in its text made a link that opens in a new
+ * tab. The editor has no link format, so an address someone types or pastes
+ * is saved as plain text; this is where it becomes clickable, for entries
+ * already saved too. Runs on sanitized HTML: every anchor it adds is built
+ * through the DOM, with an http(s) href that URL parsed, so nothing it writes
+ * can carry markup. Text already inside a link is left alone. */
+function linkifyTilUrls(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  const texts: Text[] = [];
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.parentElement?.closest("a")) texts.push(node as Text);
+  }
+  for (const text of texts) {
+    const value = text.data;
+    const parts: Node[] = [];
+    let done = 0;
+    for (const match of value.matchAll(URL_IN_TEXT)) {
+      const url = trimUrlEnd(match[0]);
+      if (!isWebAddress(url)) continue;
+      const link = doc.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("target", "_blank");
+      link.setAttribute("rel", "noopener noreferrer");
+      link.textContent = url;
+      parts.push(doc.createTextNode(value.slice(done, match.index)), link);
+      done = match.index + url.length;
+    }
+    if (parts.length === 0) continue;
+    parts.push(doc.createTextNode(value.slice(done)));
+    text.replaceWith(...parts);
+  }
+  return doc.body.innerHTML;
+}
+
 /** Sanitized HTML for read-only display, with &nbsp; as ordinary spaces —
- * which also covers entries saved before saving normalized them. */
+ * which also covers entries saved before saving normalized them — and web
+ * addresses as links. */
 export function tilDisplayHtml(html: string): string {
-  return normalizeTilSpaces(sanitizeTilHtml(html));
+  return linkifyTilUrls(normalizeTilSpaces(sanitizeTilHtml(html)));
 }
 
 /** Whether two `what` values say the same thing once the editor's own

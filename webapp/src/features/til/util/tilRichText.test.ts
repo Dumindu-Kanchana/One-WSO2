@@ -62,6 +62,64 @@ describe("tilDisplayHtml", () => {
   it("sanitizes and normalizes spaces in one pass", () => {
     expect(tilDisplayHtml("<p>a&nbsp;b</p><script>x()</script>")).toBe("<p>a b</p>");
   });
+
+  const link = (url: string) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+
+  it("makes a web address in the text a link that opens in a new tab", () => {
+    expect(tilDisplayHtml("<p>Docs: https://wso2.com/docs/</p>")).toBe(`<p>Docs: ${link("https://wso2.com/docs/")}</p>`);
+  });
+
+  it("links every address, inside formatting and list items too", () => {
+    expect(tilDisplayHtml("<ul><li><strong>http://a.example</strong> or https://b.example</li></ul>")).toBe(
+      `<ul><li><strong>${link("http://a.example")}</strong> or ${link("https://b.example")}</li></ul>`,
+    );
+  });
+
+  it("links an address Quill saved with &nbsp; around it", () => {
+    expect(tilDisplayHtml("<p>see&nbsp;https://wso2.com&nbsp;now</p>")).toBe(`<p>see ${link("https://wso2.com")} now</p>`);
+  });
+
+  it("leaves the punctuation that ends a sentence out of the link", () => {
+    expect(tilDisplayHtml("<p>See https://wso2.com/a, then https://wso2.com/b.</p>")).toBe(
+      `<p>See ${link("https://wso2.com/a")}, then ${link("https://wso2.com/b")}.</p>`,
+    );
+    expect(tilDisplayHtml("<p>(see https://wso2.com/a)</p>")).toBe(`<p>(see ${link("https://wso2.com/a")})</p>`);
+    expect(tilDisplayHtml("<p>“https://wso2.com/a”</p>")).toBe(`<p>“${link("https://wso2.com/a")}”</p>`);
+  });
+
+  it("keeps a closing bracket the address itself opened", () => {
+    expect(tilDisplayHtml("<p>https://en.wikipedia.org/wiki/Go_(game)</p>")).toBe(
+      `<p>${link("https://en.wikipedia.org/wiki/Go_(game)")}</p>`,
+    );
+  });
+
+  it("keeps a query string intact", () => {
+    expect(tilDisplayHtml("<p>https://wso2.com/s?q=a&amp;b=c</p>")).toBe(
+      '<p><a href="https://wso2.com/s?q=a&amp;b=c" target="_blank" rel="noopener noreferrer">https://wso2.com/s?q=a&amp;b=c</a></p>',
+    );
+  });
+
+  it("links only http and https addresses that have a host", () => {
+    for (const html of [
+      "<p>javascript:alert(1)</p>",
+      "<p>ftp://files.example</p>",
+      "<p>https://</p>",
+      "<p>xhttps://wso2.com</p>",
+      "<p>wso2.com</p>",
+    ]) {
+      expect(tilDisplayHtml(html)).toBe(html);
+    }
+  });
+
+  it("leaves text that is already a link alone", () => {
+    const html = '<p><a href="https://wso2.com" target="_blank">https://wso2.com</a></p>';
+    expect(tilDisplayHtml(html)).toBe(html);
+  });
+
+  it("can't be made to write markup through an address", () => {
+    const html = tilDisplayHtml('<p>https://wso2.com/"onmouseover="alert(1)</p>');
+    expect(html).toBe(`<p>${link("https://wso2.com/")}"onmouseover="alert(1)</p>`);
+  });
 });
 
 describe("isSameTilHtml", () => {

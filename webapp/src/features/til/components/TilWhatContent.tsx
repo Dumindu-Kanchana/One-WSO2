@@ -32,6 +32,7 @@ export default function TilWhatContent({ html, variant = "body2" }: { html: stri
         "& ul > li": { listStyleType: "disc" },
         "& ol > li": { listStyleType: "decimal" },
         "& p": { my: "0.4em" },
+        "& a": { color: "primary.main", textUnderlineOffset: "3px" },
       }}
       dangerouslySetInnerHTML={{ __html: tilDisplayHtml(html) }}
     />
