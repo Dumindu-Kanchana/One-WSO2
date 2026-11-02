@@ -323,6 +323,11 @@ export default function ParCycleCreationDialog({
                   control={<Switch checked={par2Forms} onChange={(e) => setPar2Forms(e.target.checked)} />}
                   label="Use PAR 2.0 forms: the guided self-review and structured 360° feedback"
                 />
+                {par2Forms && isPreviewEnabled("leadership360") && (
+                  <Typography variant="body2" color="text.secondary">
+                    Leadership 360° runs with this cycle, from its start date to the 360° deadline.
+                  </Typography>
+                )}
               </Grid>
             )}
             {!par2Forms && (

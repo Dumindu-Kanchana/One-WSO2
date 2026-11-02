@@ -15,16 +15,12 @@
 // under the License.
 
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import {
-  Box,
   Button,
   Card,
   CardContent,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Skeleton,
   Stack,
   Table,
@@ -32,14 +28,15 @@ import {
   TableCell,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from "@wso2/oxygen-ui";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
-import { useLeadership360Results, useLeadership360Surveys, useSaveLeadership360Survey } from "../api/useLeadership360";
-import type { Leadership360Leader, Leadership360Survey, Leadership360SurveyStatus } from "../api/leadership360Types";
+import { useLeadership360Results, useLeadership360Surveys } from "../api/useLeadership360";
+import { useParCyclesByStatus } from "../api/useParAdmin";
+import type { Leadership360Leader, Leadership360SurveyStatus } from "../api/leadership360Types";
 import Leadership360SummaryDialog from "../components/Leadership360SummaryDialog";
 import { formatShortDate } from "../util/parDate";
+import { isDeadlinePassed } from "../util/parDeadline";
 
 const STATUS_CHIP: Record<Leadership360SurveyStatus, { label: string; color: "default" | "success" | "info" }> = {
   UPCOMING: { label: "Upcoming", color: "info" },
@@ -47,12 +44,16 @@ const STATUS_CHIP: Record<Leadership360SurveyStatus, { label: string; color: "de
   CLOSED: { label: "Closed", color: "default" },
 };
 
-// PAR Admin View → Leadership 360°: run the survey windows and read every
-// leader's results, including named responses and the relationship breakdown.
+// PAR Admin View → 360° feedback: both kinds in one list. PAR 360° runs
+// inside each open cycle (followed up in Ongoing). Each PAR 2.0 cycle's
+// Leadership 360° survey is created with the cycle and runs on its 360°
+// dates; every leader's results are read here, live, including named
+// responses and the relationship breakdown.
 export default function ParAdminLeadership360Tab() {
+  const navigate = useNavigate();
+  const cycles = useParCyclesByStatus("OPEN");
   const surveys = useLeadership360Surveys();
   const [chosen, setChosen] = useState<number | undefined>(undefined);
-  const [editing, setEditing] = useState<Leadership360Survey | "new" | null>(null);
 
   const list = surveys.data ?? [];
   const surveyId = chosen ?? (list.find((s) => s.status === "OPEN") ?? list[0])?.surveyId;
@@ -70,26 +71,28 @@ export default function ParAdminLeadership360Tab() {
     <Stack spacing={3}>
       <Card variant="outlined">
         <CardContent>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-            <Typography variant="h6" component="h2">
-              Surveys
-            </Typography>
-            <Button size="small" variant="contained" onClick={() => setEditing("new")}>
-              New survey
-            </Button>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            While a survey is open, anyone can give feedback on members of the leadership group. Leaders see a summary
-            after it closes, and only with 3 or more responses.
+          <Typography variant="h6" component="h2" sx={{ mb: 1 }}>
+            360° feedback
           </Typography>
-          {list.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            PAR 360° runs inside each cycle until its 360° deadline; follow it up in Ongoing. Leadership 360° runs with
+            every PAR 2.0 cycle, on the same dates: anyone can give feedback on members of the leadership team, named
+            any time or anonymously once a month. Results are live once 3 or more people have responded.
+          </Typography>
+          {cycles.isError && (
+            <ErrorNotice error={cycles.error} onRetry={() => cycles.refetch()} retrying={cycles.isFetching}>
+              Couldn't load the open PAR cycles.
+            </ErrorNotice>
+          )}
+          {list.length === 0 && (cycles.data ?? []).length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              No surveys yet.
+              No 360° feedback yet.
             </Typography>
           ) : (
             <Table size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell>Type</TableCell>
                   <TableCell>Name</TableCell>
                   <TableCell>Dates</TableCell>
                   <TableCell>Status</TableCell>
@@ -97,8 +100,33 @@ export default function ParAdminLeadership360Tab() {
                 </TableRow>
               </TableHead>
               <TableBody>
+                {(cycles.data ?? []).map((c) => {
+                  const closed = isDeadlinePassed(c.parThreeSixtyRatingDeadline);
+                  return (
+                    <TableRow key={`par-${c.parCycleId}`}>
+                      <TableCell>
+                        <Chip size="small" variant="outlined" label="PAR" />
+                      </TableCell>
+                      <TableCell>{c.parCycleName}</TableCell>
+                      <TableCell>
+                        {formatShortDate(c.parCycleStartDate)} – {formatShortDate(c.parThreeSixtyRatingDeadline)}
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={closed ? "Closed" : "Open"} color={closed ? "default" : "success"} />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button size="small" onClick={() => navigate("/people-ops/performance/admin/ongoing")}>
+                          Open in Ongoing
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {list.map((s) => (
                   <TableRow key={s.surveyId} selected={s.surveyId === surveyId} hover onClick={() => setChosen(s.surveyId)}>
+                    <TableCell>
+                      <Chip size="small" variant="outlined" label="Leadership" />
+                    </TableCell>
                     <TableCell>{s.surveyName}</TableCell>
                     <TableCell>
                       {formatShortDate(s.startDate)} – {formatShortDate(s.endDate)}
@@ -106,17 +134,7 @@ export default function ParAdminLeadership360Tab() {
                     <TableCell>
                       <Chip size="small" label={STATUS_CHIP[s.status].label} color={STATUS_CHIP[s.status].color} />
                     </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditing(s);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                    </TableCell>
+                    <TableCell />
                   </TableRow>
                 ))}
               </TableBody>
@@ -126,10 +144,6 @@ export default function ParAdminLeadership360Tab() {
       </Card>
 
       {surveyId !== undefined && <SurveyResponses surveyId={surveyId} />}
-
-      {editing && (
-        <SurveyDialog survey={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />
-      )}
     </Stack>
   );
 }
@@ -142,7 +156,7 @@ function SurveyResponses({ surveyId }: { surveyId: number }) {
     <Card variant="outlined">
       <CardContent>
         <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>
-          Responses by leader
+          Leadership 360° responses by leader
         </Typography>
         {results.isLoading ? (
           <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 1 }} />
@@ -193,59 +207,5 @@ function SurveyResponses({ surveyId }: { surveyId: number }) {
         />
       )}
     </Card>
-  );
-}
-
-function SurveyDialog({ survey, onClose }: { survey?: Leadership360Survey; onClose: () => void }) {
-  const save = useSaveLeadership360Survey(survey?.surveyId);
-  const [surveyName, setSurveyName] = useState(survey?.surveyName ?? "");
-  const [startDate, setStartDate] = useState(survey?.startDate ?? "");
-  const [endDate, setEndDate] = useState(survey?.endDate ?? "");
-  const canSave = surveyName.trim() !== "" && startDate !== "" && endDate !== "" && startDate <= endDate;
-
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{survey ? "Edit survey" : "New survey"}</DialogTitle>
-      <DialogContent dividers>
-        <Stack spacing={2}>
-          <TextField label="Name" value={surveyName} onChange={(e) => setSurveyName(e.target.value)} fullWidth />
-          <Box sx={{ display: "flex", gap: 2 }}>
-            <TextField
-              label="Opens"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-              fullWidth
-            />
-            <TextField
-              label="Closes"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-              fullWidth
-            />
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            The survey uses the newest Leadership 360° form. Survey dates can't overlap.
-          </Typography>
-          {save.isError && <ErrorNotice error={save.error}>Couldn't save the survey.</ErrorNotice>}
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
-        <Button size="small" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          size="small"
-          variant="contained"
-          disabled={!canSave || save.isPending}
-          onClick={() => save.mutate({ surveyName: surveyName.trim(), startDate, endDate }, { onSuccess: onClose })}
-        >
-          Save
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 }

@@ -33,6 +33,7 @@ vi.mock("../api/useParMutations", () => ({
 vi.mock("../api/useReview360", () => ({
   useReviewSummary: () => ({ data: undefined }),
 }));
+vi.mock("../api/useLeadership360", () => ({ useCycleLeadership360ForPdf: () => undefined }));
 vi.mock("../api/useOkrs", () => ({
   useOkrs: () => ({
     isSuccess: true,

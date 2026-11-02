@@ -32,10 +32,14 @@ const openCycles: { isSuccess: boolean; data?: unknown[] } = {
   isSuccess: false,
 };
 
+// GET /par-cycles/{id}/forms: a PAR 2.0 cycle lists PEER_360 (useParShowsPar2).
+const cycleForms: { isSuccess: boolean; data?: string[] } = { isSuccess: false };
+
 vi.mock("@tanstack/react-query", () => ({
   useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
     if (queryKey[0] === "par-employee-info") return employeeInfo;
     if (queryKey[0] === "par-cycles-open") return openCycles;
+    if (queryKey[0] === "par-cycle-forms") return cycleForms;
     return { data: undefined };
   },
 }));
@@ -77,6 +81,8 @@ beforeEach(() => {
   employeeInfo.data = undefined;
   openCycles.isSuccess = false;
   openCycles.data = undefined;
+  cycleForms.isSuccess = false;
+  cycleForms.data = undefined;
   profile.isLoading = false;
   profile.isPending = false;
   profile.data.employee.employmentType = "Permanent";
@@ -155,6 +161,8 @@ function show(initial = "/me/performance") {
             }
           />
           <Route path="history" element={<Tab name="History" />} />
+          <Route path="cycle/*" element={<Tab name="Active cycle" />} />
+          <Route path="give-feedback" element={<Tab name="Give feedback" />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -310,4 +318,60 @@ describe("before the lookup has answered", () => {
     expect(await screen.findByTestId("url")).toHaveTextContent("/me/performance");
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });
+});
+
+describe("a PAR 2.0 cycle", () => {
+  function withPar2(run: () => Promise<void>) {
+    return async () => {
+      const saved = window.config;
+      window.config = {
+        ...(saved ?? {}),
+        ONE_WSO2_PREVIEW_FEATURES: { par2: true, leadership360: true },
+      } as Window["config"];
+      try {
+        hasActiveCycle();
+        cycleForms.isSuccess = true;
+        cycleForms.data = ["SELF_REVIEW", "PEER_360"];
+        await run();
+      } finally {
+        window.config = saved;
+      }
+    };
+  }
+
+  it(
+    "has three tabs and opens on the self-review",
+    withPar2(async () => {
+      hasLead("lead@wso2.com");
+      show();
+      expect(await screen.findByRole("tab", { name: "Active cycle" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Give feedback" })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "History" })).toBeInTheDocument();
+      expect(screen.getAllByRole("tab")).toHaveLength(3);
+      expect(await screen.findByTestId("url")).toHaveTextContent("/me/performance/cycle/self-review");
+    }),
+  );
+
+  it(
+    "without a lead, has Give feedback and History and opens on Give feedback",
+    withPar2(async () => {
+      hasLead(null);
+      show();
+      expect(await screen.findByRole("tab", { name: "Give feedback" })).toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: "Active cycle" })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("tab")).toHaveLength(2);
+      expect(await screen.findByTestId("url")).toHaveTextContent("/me/performance/give-feedback");
+    }),
+  );
+
+  it(
+    "keeps today's tabs for a cycle without the PAR 2.0 forms",
+    withPar2(async () => {
+      hasLead("lead@wso2.com");
+      cycleForms.data = ["SELF_REVIEW"];
+      show();
+      expect(await screen.findByRole("tab", { name: "Request 360° Feedback" })).toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: "Active cycle" })).not.toBeInTheDocument();
+    }),
+  );
 });

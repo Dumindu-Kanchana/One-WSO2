@@ -85,6 +85,7 @@ import ParGroupPage, {
   ParRequiresLeadRoute,
   ParRequiresSomethingToShowRoute,
 } from "@features/par/pages/ParGroupPage";
+import ParActiveCycleTab, { ParActiveCycleIndex } from "@features/par/pages/ParActiveCycleTab";
 import ParLeadGroupPage, { ParLeadGroupIndex, ParRequiresTeamLeadRoute } from "@features/par/pages/ParLeadGroupPage";
 import ParAdminGroupPage, { ParAdminGroupIndex, ParRequiresAdminRoute } from "@features/par/pages/ParAdminGroupPage";
 // Lazy on purpose, same reasoning as the leave report tabs below —
@@ -103,11 +104,10 @@ const ParLeadAllocationTab = lazy(() => import("@features/par/pages/ParLeadAlloc
 const ParAdminOngoingTab = lazy(() => import("@features/par/pages/ParAdminOngoingTab"));
 const ParAdminHistoryTab = lazy(() => import("@features/par/pages/ParAdminHistoryTab"));
 const ParAdminGlobalConfigTab = lazy(() => import("@features/par/pages/ParAdminGlobalConfigTab"));
-const ParLeadership360Tab = lazy(() => import("@features/par/pages/ParLeadership360Tab"));
 const ParAdminLeadership360Tab = lazy(() => import("@features/par/pages/ParAdminLeadership360Tab"));
 const ParLeadLeadership360Tab = lazy(() => import("@features/par/pages/ParLeadLeadership360Tab"));
-const ParHomeTab = lazy(() => import("@features/par/pages/ParHomeTab"));
-const Par360HubTab = lazy(() => import("@features/par/pages/Par360HubTab"));
+const ParGiveFeedbackTab = lazy(() => import("@features/par/pages/ParGiveFeedbackTab"));
+const ParCycleFeedbackSection = lazy(() => import("@features/par/pages/ParCycleFeedbackSection"));
 const ParOkrsPage = lazy(() => import("@features/par/pages/ParOkrsPage"));
 const ParRequiresOkrManagerRoute = lazy(() =>
   import("@features/par/pages/ParOkrsPage").then((m) => ({ default: m.ParRequiresOkrManagerRoute })),
@@ -580,8 +580,9 @@ export default function App() {
                 employee entirely in the source (OngoingCycleView.tsx), not
                 merely disabled — ParRequiresLeadRoute enforces that at the
                 route, the same way the tab bar itself is filtered.
-                ParRequiresActiveCycleRoute wraps every tab but History:
-                none of them has anything to act on once the cycle closes. */}
+                ParRequiresActiveCycleRoute wraps every tab but History and
+                360° feedback: none of them has anything to act on once the
+                cycle closes. */}
             <Route
               path="employee-feedback"
               element={
@@ -639,43 +640,57 @@ export default function App() {
                 </Suspense>
               }
             />
-            {/* PAR 2.0 cycles: Home and the 360° hub (ParGroupPage shows
-                their tabs only for a cycle with the structured 360° form). */}
+            {/* PAR 2.0 cycles: Active cycle (your own PAR, in three sections)
+                and Give feedback (PAR and Leadership 360° feedback for
+                others). ParGroupPage shows their tabs only for a cycle with
+                the structured 360° form; Give feedback redirects without one. */}
             {isPreviewEnabled("par2") && (
               <Route
-                path="home"
+                path="cycle"
                 element={
                   <ParRequiresActiveCycleRoute>
                     <ParRequiresLeadRoute>
-                      <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                        <ParHomeTab />
-                      </Suspense>
+                      <ParActiveCycleTab />
                     </ParRequiresLeadRoute>
                   </ParRequiresActiveCycleRoute>
                 }
-              />
+              >
+                <Route index element={<ParActiveCycleIndex />} />
+                <Route
+                  path="self-review"
+                  element={
+                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                      <ParEmployeeFeedbackTab />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="360"
+                  element={
+                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                      <ParCycleFeedbackSection />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="f2f"
+                  element={
+                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                      <ParF2fTab />
+                    </Suspense>
+                  }
+                />
+              </Route>
             )}
             {isPreviewEnabled("par2") && (
               <Route
-                path="360"
+                path="give-feedback"
                 element={
                   <ParRequiresActiveCycleRoute>
                     <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                      <Par360HubTab />
+                      <ParGiveFeedbackTab />
                     </Suspense>
                   </ParRequiresActiveCycleRoute>
-                }
-              />
-            )}
-            {/* Leadership 360° runs on its own survey dates, so unlike the
-                cycle tabs it needs neither an active cycle nor a lead. */}
-            {isPreviewEnabled("leadership360") && (
-              <Route
-                path="leadership-360"
-                element={
-                  <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                    <ParLeadership360Tab />
-                  </Suspense>
                 }
               />
             )}
@@ -785,7 +800,7 @@ export default function App() {
             />
             {isPreviewEnabled("leadership360") && (
               <Route
-                path="leadership-360"
+                path="360"
                 element={
                   <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
                     <ParAdminLeadership360Tab />

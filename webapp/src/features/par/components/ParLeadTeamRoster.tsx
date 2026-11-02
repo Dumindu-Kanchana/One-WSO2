@@ -145,6 +145,10 @@ export default function ParLeadTeamRoster({
   // A PAR 2.0 cycle also shows each member's OKRs: how many are completed, and any overdue.
   const memberEmails = useMemo(() => (details.data?.details ?? []).map((m) => m.parEmployeeEmail), [details.data]);
   const okrsByEmail = useOkrsOf(memberEmails, showsPar2);
+  // OKRs are for the leadership team, so a lead with no member in it gets no OKRs column.
+  const anyOkrs = [...okrsByEmail.values()].some(
+    (okrs) => okrsForCycle(okrs ?? [], cycle.parCycleEndDate).length > 0,
+  );
 
   if (details.isLoading) {
     return <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 1.5 }} />;
@@ -344,7 +348,7 @@ export default function ParLeadTeamRoster({
         );
       },
     },
-    ...(showsPar2
+    ...(showsPar2 && anyOkrs
       ? [
           {
             field: "okrs",

@@ -33,7 +33,7 @@ export interface HomeStep {
 export interface NextUp {
   title: string;
   body: string;
-  // The Me → Performance tab the action opens, if there is one.
+  // Where under Me → Performance the action goes, if there is one.
   action?: { label: string; segment: string };
 }
 
@@ -124,31 +124,31 @@ export function nextUp({ cycle, rating, selfReviewProgress, reviewers, requests 
           body: selfReviewProgress
             ? `${selfReviewProgress.answered} of ${selfReviewProgress.total} sections done. Your lead sees it once you share.`
             : "Your draft is saved. Your lead sees it once you share.",
-          action: { label: "Continue", segment: "employee-feedback" },
+          action: { label: "Continue", segment: "cycle/self-review" },
         }
       : {
           title: "Start your self-review",
-          body: "Four short sections on your impact, goals, growth and the support you need. It saves as you type.",
-          action: { label: "Start", segment: "employee-feedback" },
+          body: "A few short sections on your impact and how you've grown. It saves as you type.",
+          action: { label: "Start", segment: "cycle/self-review" },
         };
   }
   if (feedbackOpen && asked < MIN_360_RESPONSES) {
     return {
       title: "Ask for 360° feedback",
       body: `Ask at least ${MIN_360_RESPONSES} people who worked closely with you this cycle (${asked} so far).`,
-      action: { label: "Ask for feedback", segment: "360" },
+      action: { label: "Ask for feedback", segment: "cycle/360" },
     };
   }
   const waiting = openRequests(requests);
   const giveFeedback: NextUp | undefined =
     waiting.length > 0 && !isDeadlinePassed(cycle.parThreeSixtyRatingDeadline)
       ? {
-          title: `Give feedback to ${waiting[0].employeeName ?? waiting[0].employeeEmail}`,
+          title: `${waiting[0].employeeName ?? waiting[0].employeeEmail} asked for your feedback`,
           body:
             waiting.length > 1
               ? `${waiting.length} people asked for your 360° feedback. It takes about five minutes each.`
               : "They asked for your 360° feedback. It takes about five minutes.",
-          action: { label: "Give feedback", segment: "360" },
+          action: { label: "Respond", segment: "give-feedback" },
         }
       : undefined;
   // While the lead reviews, feedback others are waiting on is the thing to do.
@@ -166,18 +166,18 @@ export function nextUp({ cycle, rating, selfReviewProgress, reviewers, requests 
       ? {
           title: "Your face-to-face is booked",
           body: "Talk through your PAR with your lead, then mark the F2F as done.",
-          action: { label: "Open F2F", segment: "f2f" },
+          action: { label: "Open F2F", segment: "cycle/f2f" },
         }
       : {
           title: "Book your face-to-face",
           body: "Your lead has shared your PAR. Find a time to talk it through.",
-          action: { label: "Book F2F", segment: "f2f" },
+          action: { label: "Book F2F", segment: "cycle/f2f" },
         };
   }
   if (giveFeedback) return giveFeedback;
   return {
     title: "Your PAR is complete",
     body: "Download the final PAR, with your lead's feedback and your 360° summary, for your records.",
-    action: { label: "Open your PAR", segment: "employee-feedback" },
+    action: { label: "Open your PAR", segment: "cycle/self-review" },
   };
 }

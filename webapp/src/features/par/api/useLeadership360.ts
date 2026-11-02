@@ -16,7 +16,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAsgardeo } from "@asgardeo/react";
-import { authedGet, authedPatch, authedPost, authedPut, defaultQueryRetry, HttpError } from "@api/http";
+import { authedGet, authedPost, authedPut, defaultQueryRetry, HttpError } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
 import { parBackendUrl, parServiceUrls } from "@config/apiConfig";
 import { digiopsHeaders } from "@features/my/util/digiopsHeaders";
@@ -28,7 +28,6 @@ import type {
   Leadership360ResultsEntry,
   Leadership360Summary,
   Leadership360Survey,
-  Leadership360SurveyInput,
   Leadership360View,
 } from "./leadership360Types";
 
@@ -39,12 +38,12 @@ function useLeadership360Enabled() {
 
 // The survey open today. Resolves to null (not an error) when none is open —
 // the backend's 404 means "nothing to fill in right now", a normal state.
-export function useCurrentLeadership360Survey() {
-  const enabled = useLeadership360Enabled();
+export function useCurrentLeadership360Survey(enabled = true) {
+  const backendEnabled = useLeadership360Enabled();
   const getAccessToken = useAccessToken();
   return useQuery<Leadership360CurrentSurvey | null>({
     queryKey: ["leadership360-current-survey"],
-    enabled,
+    enabled: enabled && backendEnabled,
     queryFn: async () => {
       const accessToken = await getAccessToken();
       try {
@@ -204,10 +203,35 @@ export function useLeadership360Surveys(enabled = true) {
 }
 
 // The surveys a results screen can show (any that has started), and the one
-// it opens on: the latest closed survey, else the latest open one.
+// it opens on: the open one (results are live), else the latest closed one.
 export function resultsSurveys(surveys: Leadership360Survey[] | undefined) {
   const started = (surveys ?? []).filter((s) => s.status !== "UPCOMING");
-  return { started, defaultSurveyId: (started.find((s) => s.status === "CLOSED") ?? started[0])?.surveyId };
+  return { started, defaultSurveyId: (started.find((s) => s.status === "OPEN") ?? started[0])?.surveyId };
+}
+
+// The Leadership 360° survey that runs with a PAR cycle, if it has one.
+export function cycleSurvey(surveys: Leadership360Survey[] | undefined, parCycleId: number | undefined) {
+  return parCycleId === undefined ? undefined : (surveys ?? []).find((s) => s.parCycleId === parCycleId);
+}
+
+// Your own Leadership 360° results in a PAR cycle, for the PAR's PDF: the
+// summary and the questions it answers, once there are results, with the
+// date they're as of while the survey is still open. Nothing for anyone
+// outside the leadership team (the results list comes back empty, so no
+// summary is asked for).
+export function useCycleLeadership360ForPdf(parCycleId: number, workEmail: string | undefined, enabled: boolean) {
+  const surveys = useLeadership360Surveys(enabled);
+  const survey = enabled ? cycleSurvey(surveys.data, parCycleId) : undefined;
+  const results = useLeadership360Results(survey?.surveyId, "SELF");
+  const available = Boolean(results.data?.[0]?.available);
+  const summary = useLeadership360Summary(available ? survey?.surveyId : undefined, "SELF", workEmail);
+  const withTemplate = useLeadership360SurveyWithTemplate(available ? survey?.surveyId : undefined);
+  if (!survey || !summary.data?.available || !withTemplate.data) return undefined;
+  return {
+    definition: withTemplate.data.template.definition,
+    summary: summary.data,
+    asOf: survey.status === "OPEN" ? new Date().toLocaleDateString("en-CA") : undefined,
+  };
 }
 
 // Whether any member of the leadership group reports to the signed-in user.
@@ -218,31 +242,4 @@ export function useLeadsALeader(enabled: boolean) {
   const { defaultSurveyId } = resultsSurveys(surveys.data);
   const reports = useLeadership360Results(enabled ? defaultSurveyId : undefined, "REPORTS");
   return enabled && (reports.data?.length ?? 0) > 0;
-}
-
-// Creating a survey (no id) or changing one (an id) — both refresh the list
-// and whatever "current survey" respondents see.
-export function useSaveLeadership360Survey(surveyId?: number) {
-  const getAccessToken = useAccessToken();
-  const qc = useQueryClient();
-  return useMutation<Leadership360Survey | null, Error, Leadership360SurveyInput>({
-    mutationFn: async (input) => {
-      const accessToken = await getAccessToken();
-      return surveyId === undefined
-        ? authedPost<Leadership360Survey>(parServiceUrls.leadership360Surveys(), accessToken, input, digiopsHeaders())
-        : authedPatch<Leadership360Survey>(
-            parServiceUrls.leadership360Survey(surveyId),
-            accessToken,
-            input,
-            digiopsHeaders(),
-          );
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["leadership360-surveys"] }),
-        qc.invalidateQueries({ queryKey: ["leadership360-current-survey"] }),
-        qc.invalidateQueries({ queryKey: ["leadership360-results"] }),
-      ]);
-    },
-  });
 }

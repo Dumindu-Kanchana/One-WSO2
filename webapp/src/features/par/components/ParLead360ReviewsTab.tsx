@@ -36,12 +36,14 @@ import {
 } from "@wso2/oxygen-ui";
 import { PlusIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { employeeDisplayName } from "@features/leave/util/employeeName";
 import { useReviewers, useRequestReviewers } from "../api/usePar360";
 import { useParEmployeeReviews } from "../api/useLeadHistory";
 import Par360RequestDialog from "./Par360RequestDialog";
+import Leadership360ResultsCard from "./Leadership360ResultsCard";
 import ParEmptyState from "./ParEmptyState";
 import ParLead360Evidence from "./ParLead360Evidence";
 import { Par360StatusChip } from "./ParChips";
@@ -183,6 +185,15 @@ export default function ParLead360ReviewsTab({
             ))}
           </TableBody>
         </Table>
+      )}
+
+      {structured && isPreviewEnabled("leadership360") && (
+        <Leadership360ResultsCard
+          view="REPORTS"
+          leaderEmail={employeeEmail}
+          parCycleId={cycle.parCycleId}
+          sx={{ mt: 3 }}
+        />
       )}
 
       <Par360RequestDialog

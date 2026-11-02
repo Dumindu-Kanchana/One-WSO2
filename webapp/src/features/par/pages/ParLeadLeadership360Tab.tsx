@@ -85,7 +85,7 @@ export default function ParLeadLeadership360Tab() {
           )}
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Results appear after the survey closes, and only for leaders with 3 or more responses.
+          Live while a cycle's survey is open, for leaders with 3 or more responses.
         </Typography>
         {(results.data ?? []).length === 0 ? (
           <Typography variant="body2" color="text.secondary">
@@ -104,8 +104,7 @@ export default function ParLeadLeadership360Tab() {
               {(results.data ?? []).map((entry) => (
                 <TableRow key={entry.leader.workEmail}>
                   <TableCell>{entry.leader.employeeName}</TableCell>
-                  {/* No count while the survey is open (see Leadership360ResultsEntry). */}
-                  <TableCell align="right">{entry.responseCount ?? "—"}</TableCell>
+                  <TableCell align="right">{entry.responseCount}</TableCell>
                   <TableCell align="right">
                     {entry.available ? (
                       <Button size="small" onClick={() => setViewing(entry.leader)}>

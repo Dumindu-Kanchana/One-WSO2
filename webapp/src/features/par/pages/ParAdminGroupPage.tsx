@@ -29,10 +29,11 @@ const TABS: RoutedTabDef[] = [
   { segment: "configurations", label: "Configurations" },
 ];
 
-const LEADERSHIP_360_TAB: RoutedTabDef = { segment: "leadership-360", label: "Leadership 360°" };
+// Both kinds of 360° feedback: each open cycle's PAR 360° and the Leadership 360° surveys.
+const FEEDBACK_360_TAB: RoutedTabDef = { segment: "360", label: "360° feedback" };
 
 export default function ParAdminGroupPage() {
-  const tabs = isPreviewEnabled("leadership360") ? [...TABS, LEADERSHIP_360_TAB] : TABS;
+  const tabs = isPreviewEnabled("leadership360") ? [...TABS, FEEDBACK_360_TAB] : TABS;
   return (
     <ParShell
       title="Admin View"

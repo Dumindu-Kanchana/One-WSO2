@@ -80,19 +80,15 @@ export type FormAnswers = Record<string, number | string | null>;
 
 export type Leadership360SurveyStatus = "UPCOMING" | "OPEN" | "CLOSED";
 
+// A PAR 2.0 cycle's survey runs on the cycle's 360° dates; the pilot has no cycle.
 export interface Leadership360Survey {
   surveyId: number;
   surveyName: string;
   formTemplateId: number;
+  parCycleId?: number;
   startDate: string;
   endDate: string;
   status: Leadership360SurveyStatus;
-}
-
-export interface Leadership360SurveyInput {
-  surveyName: string;
-  startDate: string;
-  endDate: string;
 }
 
 export interface Leadership360CurrentSurvey {
@@ -113,11 +109,27 @@ export interface Leadership360FeedbackInput {
   anonymous: boolean;
 }
 
+// A named draft saved on the server (anonymous drafts stay in the browser).
 export type Leadership360Draft = Leadership360FeedbackInput;
+
+export interface Leadership360NamedGiven {
+  leaderEmail: string;
+  submittedOn: string;
+}
+
+export interface Leadership360AnonymousGiven {
+  leaderEmail: string;
+  // YYYY-MM
+  month: string;
+}
 
 export interface Leadership360MyFeedback {
   drafts: Leadership360Draft[];
-  submittedLeaderEmails: string[];
+  // Newest first.
+  named: Leadership360NamedGiven[];
+  anonymous: Leadership360AnonymousGiven[];
+  // YYYY-MM: anonymous feedback on a leader is allowed once in it.
+  currentMonth: string;
 }
 
 export interface FormQuestionAverage {
@@ -128,18 +140,31 @@ export interface FormQuestionAverage {
 
 export interface Leadership360NamedResponse {
   respondentEmail: string;
+  respondentName: string | null;
+  submittedOn: string | null;
+  // The respondent's latest response, the one whose scores count.
+  latest: boolean;
   answers: FormAnswers;
+}
+
+export interface Leadership360NamedComment {
+  respondentEmail: string;
+  respondentName: string | null;
+  comment: string;
 }
 
 export interface Leadership360Summary {
   leaderEmail: string;
-  // While the survey is open, PAR admins only.
-  responseCount?: number;
+  // Responses that count: each anonymous one, and each named person once.
+  responseCount: number;
   available: boolean;
   reason?: string;
   overallAverage?: number;
   questionAverages: FormQuestionAverage[];
+  // From anonymous feedback.
   comments: string[];
+  // From named feedback, shown with their author.
+  namedComments: Leadership360NamedComment[];
   // PAR admins only.
   relationshipCounts?: Record<string, number>;
   // PAR admins and the leader's manager only.
@@ -148,8 +173,8 @@ export interface Leadership360Summary {
 
 export interface Leadership360ResultsEntry {
   leader: Leadership360Leader;
-  // While the survey is open, PAR admins only.
-  responseCount?: number;
+  // Responses that count: each anonymous one, and each named person once.
+  responseCount: number;
   available: boolean;
 }
 

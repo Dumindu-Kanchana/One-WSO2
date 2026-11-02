@@ -19,6 +19,7 @@ import {
   Alert,
   Box,
   Button,
+  Card,
   Chip,
   Skeleton,
   Stack,
@@ -32,13 +33,22 @@ import {
 } from "@wso2/oxygen-ui";
 import { ArrowLeftIcon, ChevronRightIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import { formatShortDate } from "../util/parDate";
 import { deriveLegacyCycleDates, formatLegacyCycleName } from "../util/parLegacyHistory";
 import { useParLegacyHistory } from "../api/useLeadHistory";
 import { useClosedParCycles, useParRating } from "../api/useParData";
+import { useSelfReview } from "../api/useSelfReview";
+import { useReviewSummary } from "../api/useReview360";
+import { useCycleLeadership360ForPdf } from "../api/useLeadership360";
 import ParRatingSummary from "../components/ParRatingSummary";
+import ParSelfReviewView from "../components/ParSelfReviewView";
+import Par360SummaryView from "../components/Par360SummaryView";
+import { decodeParComment } from "../util/parComment";
+import { downloadPar2Pdf } from "../util/parPdf";
 import ParLegacyRecordDetail from "../components/ParLegacyRecordDetail";
+import Leadership360ResultsCard from "../components/Leadership360ResultsCard";
 import type { ParCycle, ParLegacyHistory } from "../api/types";
 
 type Row =
@@ -230,8 +240,19 @@ function HistoryTable({ rows, onOpen }: { rows: Row[]; onOpen: (row: Row) => voi
 
 function RealCycleDetail({ cycle, workEmail }: { cycle: ParCycle; workEmail: string | undefined }) {
   const rating = useParRating(cycle.parCycleId, workEmail);
+  // A PAR 2.0 cycle has a guided self-review (nil for any other cycle), a 360° summary and
+  // Leadership 360° results. Only looked up behind the par2 preview flag.
+  const par2 = isPreviewEnabled("par2");
+  const selfReview = useSelfReview(cycle.parCycleId, workEmail, par2);
+  const leadShared = Boolean(rating.data?.parLeadComment || rating.data?.parRating);
+  const review360 = useReviewSummary(cycle.parCycleId, workEmail, par2 && Boolean(selfReview.data) && leadShared);
+  const leadership360 = useCycleLeadership360ForPdf(
+    cycle.parCycleId,
+    workEmail,
+    par2 && Boolean(selfReview.data) && isPreviewEnabled("leadership360"),
+  );
 
-  if (rating.isLoading) {
+  if (rating.isLoading || (par2 && selfReview.isLoading)) {
     return <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5 }} />;
   }
   if (rating.isError) {
@@ -243,6 +264,41 @@ function RealCycleDetail({ cycle, workEmail }: { cycle: ParCycle; workEmail: str
   }
   if (!rating.data) {
     return <Alert severity="info">No record was found for you in this cycle.</Alert>;
+  }
+  if (selfReview.data) {
+    const { definition } = selfReview.data.template;
+    const summary = review360.data;
+    return (
+      <Stack spacing={1.75}>
+        <ParRatingSummary
+          cycle={cycle}
+          rating={rating.data}
+          selfReview={<ParSelfReviewView definition={definition} answers={selfReview.data.answers} />}
+          onDownloadPdf={() =>
+            downloadPar2Pdf({
+              rating: rating.data!,
+              leadComment: decodeParComment(rating.data!.parLeadComment),
+              selfReview: { definition, answers: selfReview.data!.answers },
+              review360: summary ?? undefined,
+              leadership360,
+            })
+          }
+        />
+        {summary?.available && (
+          <Card variant="outlined" sx={{ p: 2 }}>
+            <Typography sx={{ fontWeight: 600, mb: 1.5 }}>Your 360° summary</Typography>
+            <Par360SummaryView
+              definition={summary.template.definition}
+              responseCount={summary.responseCount}
+              index={summary.index}
+              questionAverages={summary.questionAverages}
+              comments={summary.comments}
+            />
+          </Card>
+        )}
+        {isPreviewEnabled("leadership360") && <Leadership360ResultsCard view="SELF" parCycleId={cycle.parCycleId} />}
+      </Stack>
+    );
   }
   return <ParRatingSummary cycle={cycle} rating={rating.data} />;
 }

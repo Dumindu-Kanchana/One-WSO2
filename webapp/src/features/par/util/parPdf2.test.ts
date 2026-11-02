@@ -81,7 +81,7 @@ describe("downloadPar2Pdf", () => {
     const text = JSON.stringify(tables.at(-1));
     expect(text).toContain("Shipped it.");
     expect(text).toContain("• Halve onboarding time (Achieved)");
-    expect(text).toContain("360° summary (anonymised, 3 responses)");
+    expect(text).toContain("360° summary (3 responses)");
     expect(text).toContain("4.1 (3 ratings)");
     expect(text).toContain("• Clear write-ups.");
   });
@@ -100,5 +100,45 @@ describe("downloadPar2Pdf", () => {
       },
     });
     expect(JSON.stringify(tables.at(-1))).not.toContain("360°");
+  });
+
+  it("adds a leader's Leadership 360° results, as of a date while the survey is open", () => {
+    const leadership: FormDefinition = {
+      kind: "LEADERSHIP_360",
+      version: 1,
+      title: "Leadership 360°",
+      scales: { agreement: { min: 1, max: 5 } },
+      sections: [
+        { id: "t", title: "Traits", questions: [{ id: "integrity", type: "RATING", text: "Shows integrity", scale: "agreement" }] },
+      ],
+    };
+    const summary = {
+      leaderEmail: "e@x.com",
+      responseCount: 3,
+      available: true,
+      overallAverage: 4.33,
+      questionAverages: [{ questionId: "integrity", average: 4.33, ratingCount: 3 }],
+      comments: ["Clear direction."],
+      namedComments: [{ respondentEmail: "m@x.com", respondentName: "Maya", comment: "Specific feedback." }],
+    };
+    const base = {
+      rating: { parEmployeeEmail: "e@x.com" } as ParRating,
+      leadComment: "",
+      selfReview: { definition: selfReviewDefinition, answers: { impact: "Shipped it." } },
+    };
+
+    downloadPar2Pdf({ ...base, leadership360: { definition: leadership, summary, asOf: "2026-11-02" } });
+    let text = JSON.stringify(tables.at(-1));
+    expect(text).toContain("Leadership 360° (3 responses, as of 2 Nov '26)");
+    expect(text).toContain("4.33 (3 ratings)");
+    expect(text).toContain("• Specific feedback. (Maya)");
+    expect(text).toContain("• Clear direction. (Anonymous)");
+
+    downloadPar2Pdf({ ...base, leadership360: { definition: leadership, summary } });
+    text = JSON.stringify(tables.at(-1));
+    expect(text).toContain("Leadership 360° (3 responses)");
+
+    downloadPar2Pdf({ ...base, leadership360: { definition: leadership, summary: { ...summary, available: false } } });
+    expect(JSON.stringify(tables.at(-1))).not.toContain("Leadership 360°");
   });
 });

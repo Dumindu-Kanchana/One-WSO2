@@ -39,11 +39,13 @@ import type {
   Leadership360View,
 } from "../api/leadership360Types";
 import { allQuestions, stepSections } from "../util/leadership360Form";
+import { formatShortDate } from "../util/parDate";
 
-// One leader's results in one survey. What it contains depends on the view
-// it's opened from — the backend decides: the leader (SELF) gets averages and
-// comments only; their manager (REPORTS) and PAR admins (ALL) also get named
-// responses; admins also get the relationship breakdown.
+// One leader's results in one survey, live while it's open. What it contains
+// depends on the view it's opened from — the backend decides: the leader
+// (SELF) gets averages and comments, with names on named comments; their
+// manager (REPORTS) and PAR admins (ALL) also get named responses in full;
+// admins also get the relationship breakdown.
 export default function Leadership360SummaryDialog({
   open,
   onClose,
@@ -101,10 +103,7 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
   if (!summary.available) {
     return (
       <Alert severity="info">
-        {summary.reason}
-        {/* Only PAR admins get a count while the survey is open. */}
-        {summary.responseCount !== undefined &&
-          ` ${summary.responseCount} ${summary.responseCount === 1 ? "person has" : "people have"} responded so far.`}
+        {summary.reason} {summary.responseCount} {summary.responseCount === 1 ? "response" : "responses"} so far.
       </Alert>
     );
   }
@@ -165,16 +164,31 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
         <Typography variant="h6" component="h3" sx={{ mb: 1 }}>
           Comments
         </Typography>
-        {summary.comments.length === 0 ? (
+        {summary.comments.length === 0 && summary.namedComments.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No written comments.
           </Typography>
         ) : (
           <Stack spacing={1}>
+            {summary.namedComments.map((c, i) => (
+              <Box key={`named-${i}`} sx={{ pl: 1.5, borderLeft: 3, borderColor: "primary.light" }}>
+                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                  {c.comment}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {c.respondentName ?? c.respondentEmail}
+                </Typography>
+              </Box>
+            ))}
             {summary.comments.map((comment, i) => (
-              <Typography key={i} variant="body2" sx={{ whiteSpace: "pre-wrap", pl: 1.5, borderLeft: 3, borderColor: "divider" }}>
-                {comment}
-              </Typography>
+              <Box key={`anonymous-${i}`} sx={{ pl: 1.5, borderLeft: 3, borderColor: "divider" }}>
+                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                  {comment}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Anonymous
+                </Typography>
+              </Box>
             ))}
           </Stack>
         )}
@@ -199,11 +213,16 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
             Named responses ({summary.namedResponses.length})
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Only respondents who chose to submit with their name. The leader never sees these.
+            Only respondents who chose to submit with their name. The leader sees their comments with their name, not
+            the whole response. When someone responded more than once, only their latest scores count.
           </Typography>
-          {summary.namedResponses.map((response) => (
-            <Accordion key={response.respondentEmail} disableGutters>
-              <AccordionSummary>{response.respondentEmail}</AccordionSummary>
+          {summary.namedResponses.map((response, i) => (
+            <Accordion key={`${response.respondentEmail}-${i}`} disableGutters>
+              <AccordionSummary>
+                {response.respondentName ?? response.respondentEmail}
+                {response.submittedOn && ` · ${formatShortDate(response.submittedOn)}`}
+                {!response.latest && " · earlier response"}
+              </AccordionSummary>
               <AccordionDetails>
                 <Stack spacing={0.5}>
                   {Object.entries(response.answers).map(([questionId, answer]) => (

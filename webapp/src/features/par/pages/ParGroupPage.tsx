@@ -21,6 +21,7 @@ import RoutedTabs, { type RoutedTabDef } from "@components/routed-tabs/RoutedTab
 import { isPreviewEnabled } from "@config/previewFeatures";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import ParShell from "../components/ParShell";
+import ParCycleTracker from "../components/ParCycleTracker";
 import {
   useActiveParCycle,
   useParEmployeeItemVisible,
@@ -28,6 +29,10 @@ import {
   useParHasLead,
 } from "../api/useParData";
 import { useParShowsPar2 } from "../api/useReview360";
+import { useReviewRequests } from "../api/usePar360";
+import { useCurrentLeadership360Survey, useMyLeadership360Feedback } from "../api/useLeadership360";
+import { localDraftLeaders } from "../util/leadership360LocalDraft";
+import { openRequests } from "../util/parHome";
 
 // Tab labels and order match par-app's own OngoingCycleView.tsx tab bar
 // (Employee Feedback / Request 360° / Provide 360° / F2F). History is
@@ -55,18 +60,16 @@ const LEADLESS_TABS: RoutedTabDef[] = [
 const HISTORY_ONLY_TABS: RoutedTabDef[] = [{ segment: "history", label: "PAR History" }];
 
 // A PAR 2.0 cycle (one with the structured 360° form, behind the `par2`
-// preview flag): Home first, and one 360° tab in place of Request/Provide.
-const PAR2_TABS: RoutedTabDef[] = [
-  { segment: "home", label: "Home" },
-  { segment: "employee-feedback", label: "Self-review" },
-  { segment: "360", label: "360° feedback" },
-  { segment: "f2f", label: "F2F" },
-  { segment: "history", label: "PAR History" },
-];
-
-// Leadership 360° runs on its own survey dates, not a PAR cycle, so it joins
-// every tab set above — lead or no lead, active cycle or not.
-const LEADERSHIP_360_TAB: RoutedTabDef = { segment: "leadership-360", label: "Leadership 360°" };
+// preview flag): three tabs. Active cycle holds everything about your own PAR
+// (self-review, asking for 360° feedback, F2F); Give feedback holds feedback
+// for others, PAR and Leadership 360°; History holds past cycles. Without a
+// lead there's no PAR of your own to work on, only feedback to give.
+const ACTIVE_CYCLE_TAB: RoutedTabDef = { segment: "cycle", label: "Active cycle" };
+const PAR2_HISTORY_TAB: RoutedTabDef = { segment: "history", label: "History" };
+const giveFeedbackTab = (waiting: number): RoutedTabDef => ({
+  segment: "give-feedback",
+  label: waiting > 0 ? `Give feedback (${waiting})` : "Give feedback",
+});
 
 // One page frame for everything an employee does with their own PAR — the
 // shell, the tab bar, and an <Outlet /> for whichever tab the URL names.
@@ -79,9 +82,18 @@ export default function ParGroupPage() {
   const { hasLead, isLoading } = useParHasLead(workEmail, profile.isLoading);
   const { isActive, isLoading: isActiveLoading } = useParHasActiveCycle(workEmail, profile.isLoading);
   const { showsPar2, isLoading: isPar2Loading } = useParShowsPar2(activeCycles.data?.[0]?.parCycleId);
+  const par2Cycle = isActive && showsPar2 ? activeCycles.data?.[0] : undefined;
+  const waiting = useFeedbackWaiting(workEmail, par2Cycle?.parCycleId);
 
-  const cycleTabs = !isActive ? HISTORY_ONLY_TABS : !hasLead ? LEADLESS_TABS : showsPar2 ? PAR2_TABS : FULL_TABS;
-  const tabs = isPreviewEnabled("leadership360") ? [...cycleTabs, LEADERSHIP_360_TAB] : cycleTabs;
+  const tabs = par2Cycle
+    ? hasLead
+      ? [ACTIVE_CYCLE_TAB, giveFeedbackTab(waiting), PAR2_HISTORY_TAB]
+      : [giveFeedbackTab(waiting), PAR2_HISTORY_TAB]
+    : !isActive
+      ? HISTORY_ONLY_TABS
+      : !hasLead
+        ? LEADLESS_TABS
+        : FULL_TABS;
 
   return (
     <ParShell
@@ -95,6 +107,8 @@ export default function ParGroupPage() {
         <Skeleton variant="rectangular" height={36} sx={{ borderRadius: 1, mb: 2, maxWidth: 640 }} />
       ) : (
         <>
+          {/* PAR 2.0: where you are in the cycle, pinned above every tab. */}
+          {par2Cycle && hasLead && workEmail && <ParCycleTracker cycle={par2Cycle} workEmail={workEmail} />}
           <RoutedTabs basePath="/me/performance" tabs={tabs} ariaLabel="Performance sections" />
           <Outlet />
         </>
@@ -103,10 +117,24 @@ export default function ParGroupPage() {
   );
 }
 
-/** The index route of the group: sends a leadless employee straight to
- * Provide 360° Feedback (their only tab), an employee with no active cycle
- * to History (their only tab), and everyone else to Employee Feedback.
- * Waits for both questions rather than guessing, same reasoning as
+/** Feedback waiting on you in a PAR 2.0 cycle, for the Give feedback tab's
+ * label: PAR requests not yet answered and your Leadership 360° drafts (named
+ * ones on the server, anonymous ones in this browser). */
+function useFeedbackWaiting(workEmail: string | undefined, parCycleId: number | undefined): number {
+  const requests = useReviewRequests(parCycleId, workEmail);
+  const leadership = isPreviewEnabled("leadership360") && parCycleId !== undefined;
+  const survey = useCurrentLeadership360Survey(leadership);
+  const surveyId = leadership ? survey.data?.survey.surveyId : undefined;
+  const mine = useMyLeadership360Feedback(surveyId);
+  const local = workEmail && surveyId !== undefined ? localDraftLeaders(workEmail, surveyId).length : 0;
+  return openRequests(requests.data ?? []).length + (mine.data?.drafts.length ?? 0) + local;
+}
+
+/** The index route of the group. In a PAR 2.0 cycle: Active cycle's
+ * self-review, or Give feedback without a lead. Otherwise a leadless employee
+ * goes straight to Provide 360° Feedback (their only tab), an employee with
+ * no active cycle to History (their only tab), and everyone else to Employee
+ * Feedback. Waits for both questions rather than guessing, same reasoning as
  * LeaveGroupIndex. */
 export function ParGroupIndex() {
   const profile = useMeProfile();
@@ -117,7 +145,7 @@ export function ParGroupIndex() {
   const { showsPar2, isLoading: isPar2Loading } = useParShowsPar2(activeCycles.data?.[0]?.parCycleId);
   if (isLoading || isActiveLoading || activeCycles.isLoading || isPar2Loading) return null; // ParGroupPage already holds the Outlet behind its own gate
   if (!isActive) return <Navigate to="/me/performance/history" replace />;
-  if (hasLead && showsPar2) return <Navigate to="/me/performance/home" replace />;
+  if (showsPar2) return <Navigate to={`/me/performance/${hasLead ? "cycle/self-review" : "give-feedback"}`} replace />;
   return <Navigate to={`/me/performance/${hasLead ? "employee-feedback" : "provide-360"}`} replace />;
 }
 

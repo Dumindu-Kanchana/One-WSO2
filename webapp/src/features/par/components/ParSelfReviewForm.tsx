@@ -34,6 +34,7 @@ import {
 } from "@wso2/oxygen-ui";
 import { LightbulbIcon, PlayCircleIcon, PlusIcon, Trash2Icon } from "@wso2/oxygen-ui-icons-react";
 import { describeError } from "@api/errors";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import type { FormQuestion } from "../api/leadership360Types";
 import type { ParCycle, ParRating } from "../api/types";
@@ -41,6 +42,7 @@ import type { SelfReview, SelfReviewAnswers, SelfReviewGoal } from "../api/selfR
 import { useSaveParRating } from "../api/useParMutations";
 import { useSaveSelfReview, useShareSelfReview } from "../api/useSelfReview";
 import { useReviewSummary } from "../api/useReview360";
+import { useCycleLeadership360ForPdf } from "../api/useLeadership360";
 import { decodeParComment } from "../util/parComment";
 import { downloadPar2Pdf } from "../util/parPdf";
 import { formatShortDate } from "../util/parDate";
@@ -54,7 +56,7 @@ import { appendLine, okrCitation } from "../util/okr";
 const AUTOSAVE_DELAY_MS = 1200;
 const GOAL_MAX_LENGTH = 300;
 
-// The guided self-review of a PAR 2.0 cycle: four sections that autosave as
+// The guided self-review of a PAR 2.0 cycle: the template's sections, which autosave as
 // the employee writes, shared with the lead in one step. Sharing state lives
 // on the PAR record, so unsharing and the lead locking it in work as they do
 // for the single comment.
@@ -94,6 +96,12 @@ export default function ParSelfReviewForm({
   const leadShared = Boolean(rating.parLeadComment || rating.parRating);
   // The finished PAR's PDF carries the anonymised 360° summary when there is one.
   const review360 = useReviewSummary(cycle.parCycleId, workEmail, leadShared);
+  // A leader's Leadership 360° results go in the PDF too, as of today while the survey is open.
+  const leadership360 = useCycleLeadership360ForPdf(
+    cycle.parCycleId,
+    workEmail,
+    leadShared && isPreviewEnabled("leadership360"),
+  );
 
   const toSave = answersToSave(definition, answers);
   const dirty = JSON.stringify(toSave) !== lastSaved.current;
@@ -180,6 +188,7 @@ export default function ParSelfReviewForm({
                 leadComment: decodeParComment(rating.parLeadComment),
                 selfReview: { definition, answers: selfReview.answers },
                 review360: review360.data ?? undefined,
+                leadership360,
               })
             }
           />
@@ -248,8 +257,8 @@ export default function ParSelfReviewForm({
           Start your self-review
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 520, mx: "auto" }}>
-          Four short sections: your impact this cycle, last cycle's goals, how you've grown, and the support you need.
-          Everything saves as you write. Share it with your lead by {formatShortDate(cycle.parEmployeeDeadline)}.
+          {definition.sections.length === 1 ? "One short section" : `${definition.sections.length} short sections`}:{" "}
+          {definition.sections.map((s) => s.title.toLowerCase()).join(", ")}. Everything saves as you write. Share it with your lead by {formatShortDate(cycle.parEmployeeDeadline)}.
         </Typography>
         <Button variant="contained" size="large" onClick={() => setStarted(true)}>
           Start

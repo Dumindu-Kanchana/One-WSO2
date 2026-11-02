@@ -48,52 +48,94 @@ import type {
   Leadership360Leader,
 } from "../api/leadership360Types";
 import { cleanAnswers, headerSections, missingRequired, sectionProgress, stepSections } from "../util/leadership360Form";
+import { readLocalDraft, removeLocalDraft, writeLocalDraft } from "../util/leadership360LocalDraft";
 import { formatShortDate } from "../util/parDate";
 
 const AUTOSAVE_DELAY_MS = 5000;
 const DEFAULT_TEXT_MAX_LENGTH = 5000;
 
+const MONTH_NAMES = new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" });
+
+/** "November" for "2026-11", and the first day of the next month ("1 December"). */
+function monthNames(month: string): { name: string; next: string } {
+  const [year, m] = month.split("-").map(Number);
+  return {
+    name: MONTH_NAMES.format(new Date(Date.UTC(year, m - 1, 1))),
+    next: `1 ${MONTH_NAMES.format(new Date(Date.UTC(year, m, 1)))}`,
+  };
+}
+
 // Feedback on one member of the leadership group: the relationship question,
-// then one step per template section, saved as a draft as you go and
-// submitted once — anonymously by default.
+// then one step per template section, saved as a draft as you go. Anonymous
+// by default, once per leader per calendar month; named any number of times.
+// A named draft is saved on the server; an anonymous one only in this browser.
 export default function Leadership360FeedbackDialog({
   open,
   onClose,
   survey,
   leader,
+  workEmail,
   draft,
+  anonymousUsedThisMonth = false,
+  currentMonth,
   onSubmitted,
 }: {
   open: boolean;
   onClose: () => void;
   survey: Leadership360CurrentSurvey;
   leader: Leadership360Leader;
+  /** The person giving feedback, whose browser keeps their anonymous drafts. */
+  workEmail: string;
+  /** The named draft saved on the server, if any. */
   draft?: Leadership360Draft;
+  /** Anonymous feedback on this leader was already given this calendar month. */
+  anonymousUsedThisMonth?: boolean;
+  /** This calendar month (YYYY-MM), from the server. */
+  currentMonth?: string;
   onSubmitted: (leader: Leadership360Leader) => void;
 }) {
   const { definition } = survey.template;
   const headers = headerSections(definition);
   const steps = stepSections(definition);
+  const surveyId = survey.survey.surveyId;
 
-  const [answers, setAnswers] = useState<FormAnswers>(draft?.answers ?? {});
-  const [anonymous, setAnonymous] = useState(draft?.anonymous ?? true);
+  const [initial] = useState(() => {
+    if (draft) return { answers: draft.answers, anonymous: false };
+    const local = anonymousUsedThisMonth ? null : readLocalDraft(workEmail, surveyId, leader.workEmail);
+    return { answers: local ?? {}, anonymous: !anonymousUsedThisMonth };
+  });
+  const [answers, setAnswers] = useState<FormAnswers>(initial.answers);
+  const [anonymous, setAnonymous] = useState(initial.anonymous);
   const [step, setStep] = useState(0);
   const [dirty, setDirty] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
   const [missingCount, setMissingCount] = useState(0);
   const [confirmation, setConfirmation] = useState<ConfirmationContent | null>(null);
 
-  const saveDraft = useSaveLeadership360Draft(survey.survey.surveyId);
-  const submit = useSubmitLeadership360Feedback(survey.survey.surveyId);
+  const saveDraft = useSaveLeadership360Draft(surveyId);
+  const submit = useSubmitLeadership360Feedback(surveyId);
   const latest = useRef({ answers, anonymous });
   latest.current = { answers, anonymous };
+  // Whether the server holds a named draft that an anonymous one must replace.
+  const serverDraft = useRef(Boolean(draft));
+  const month = currentMonth ? monthNames(currentMonth) : undefined;
 
   const save = () => {
     setDirty(false);
-    saveDraft.mutate({
-      leaderEmail: leader.workEmail,
-      answers: cleanAnswers(latest.current.answers),
-      anonymous: latest.current.anonymous,
-    });
+    const { answers: current, anonymous: isAnonymous } = latest.current;
+    if (isAnonymous) {
+      setSavedLocally(writeLocalDraft(workEmail, surveyId, leader.workEmail, cleanAnswers(current)));
+      // Saving as anonymous removes the named copy from the server (and stores nothing there).
+      if (serverDraft.current) {
+        serverDraft.current = false;
+        saveDraft.mutate({ leaderEmail: leader.workEmail, answers: {}, anonymous: true });
+      }
+      return;
+    }
+    removeLocalDraft(workEmail, surveyId, leader.workEmail);
+    setSavedLocally(false);
+    serverDraft.current = true;
+    saveDraft.mutate({ leaderEmail: leader.workEmail, answers: cleanAnswers(current), anonymous: false });
   };
 
   // Autosave a few seconds after the last change, so nothing is lost.
@@ -126,8 +168,8 @@ export default function Leadership360FeedbackDialog({
     setConfirmation({
       title: `Submit feedback on ${leader.employeeName}?`,
       text: anonymous
-        ? "Your name isn't stored with this response, so it can't be edited or withdrawn after you submit."
-        : `People Ops and ${leader.employeeName}'s manager will see your name. It can't be edited after you submit.`,
+        ? `Your name isn't stored with this response, so it can't be edited or withdrawn after you submit. You can give anonymous feedback on ${leader.employeeName} again${month ? ` from ${month.next}` : " next month"}.`
+        : `${leader.employeeName} sees your comments with your name; their manager and People Ops see your whole response. You can give named feedback again later, and your latest scores are the ones that count.`,
       confirmLabel: anonymous ? "Submit anonymously" : "Submit with my name",
       confirmColor: "primary",
       confirmAction: () =>
@@ -136,6 +178,7 @@ export default function Leadership360FeedbackDialog({
           {
             onSuccess: () => {
               setDirty(false);
+              if (anonymous) removeLocalDraft(workEmail, surveyId, leader.workEmail);
               onSubmitted(leader);
               onClose();
             },
@@ -152,7 +195,7 @@ export default function Leadership360FeedbackDialog({
       <DialogTitle>
         Feedback on {leader.employeeName}
         <Typography variant="body2" color="text.secondary">
-          {[leader.jobRole, `${survey.survey.surveyName}, closes ${formatShortDate(survey.survey.endDate)}`]
+          {[leader.jobRole, `${survey.survey.surveyName}, open until ${formatShortDate(survey.survey.endDate)}`]
             .filter(Boolean)
             .join(" · ")}
         </Typography>
@@ -217,6 +260,7 @@ export default function Leadership360FeedbackDialog({
               control={
                 <Switch
                   checked={anonymous}
+                  disabled={anonymousUsedThisMonth}
                   onChange={(e) => {
                     setAnonymous(e.target.checked);
                     setDirty(true);
@@ -225,12 +269,17 @@ export default function Leadership360FeedbackDialog({
               }
               label={anonymous ? "Submit anonymously" : "Submit with my name"}
             />
+            {anonymousUsedThisMonth && (
+              <Alert severity="info" sx={{ my: 1 }}>
+                You gave anonymous feedback on {leader.employeeName} in {month?.name ?? "this month"}. You can give named
+                feedback now, or anonymous feedback again from {month?.next ?? "next month"}.
+              </Alert>
+            )}
             <Typography variant="body2" color="text.secondary">
               {anonymous
-                ? "Your name isn't stored with this response. Nobody — not the leader, their manager or People Ops — can see who you are."
-                : `People Ops and ${leader.employeeName}'s manager will see your name with this response.`}{" "}
-              {leader.employeeName} sees only a summary, after the survey closes and only if 3 or more people
-              responded.
+                ? `Your name isn't stored with this response. Nobody — not the leader, their manager or People Ops — can see who you are. Anonymous feedback on a leader is once a month, and your draft is kept only in this browser.`
+                : `${leader.employeeName} sees your comments with your name. Their manager and People Ops see your whole response.`}{" "}
+              Results show as feedback comes in, once 3 or more people have responded.
             </Typography>
           </Box>
 
@@ -247,7 +296,15 @@ export default function Leadership360FeedbackDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
         <Typography variant="caption" color="text.secondary" sx={{ mr: "auto" }}>
-          {saveDraft.isPending ? "Saving draft…" : saveDraft.isSuccess && !dirty ? "Draft saved" : ""}
+          {saveDraft.isPending
+            ? "Saving draft…"
+            : dirty
+              ? ""
+              : anonymous && savedLocally
+                ? "Draft saved in this browser"
+                : !anonymous && saveDraft.isSuccess
+                  ? "Draft saved"
+                  : ""}
         </Typography>
         <Button size="small" onClick={close}>
           Close

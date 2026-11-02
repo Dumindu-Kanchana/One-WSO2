@@ -60,7 +60,7 @@ export function useParCycleForms(parCycleId: number | undefined) {
   return { ...query, hasStructured360: Boolean(query.data?.includes("PEER_360")) };
 }
 
-/** Whether the open cycle is a PAR 2.0 cycle shown with Home and the 360° hub. */
+/** Whether the open cycle is a PAR 2.0 cycle, shown with the Active cycle / Give feedback / History tabs. */
 export function useParShowsPar2(parCycleId: number | undefined): { showsPar2: boolean; isLoading: boolean } {
   const enabled = isPreviewEnabled("par2");
   const forms = useParCycleForms(enabled ? parCycleId : undefined);

@@ -63,7 +63,7 @@ describe("nextUp", () => {
 
   it("asks for 360° feedback until three people are asked", () => {
     const shared = rating({ parEmployeeStatus: "SHARED" });
-    expect(nextUp(input({ rating: shared, reviewers: [reviewer("PENDING", 1), reviewer("REJECTED", 2)] })).action?.segment).toBe("360");
+    expect(nextUp(input({ rating: shared, reviewers: [reviewer("PENDING", 1), reviewer("REJECTED", 2)] })).action?.segment).toBe("cycle/360");
     const asked = [1, 2, 3].map((n) => reviewer("PENDING", n));
     expect(nextUp(input({ rating: shared, reviewers: asked })).title).toBe("Your lead is reviewing");
   });
@@ -75,7 +75,7 @@ describe("nextUp", () => {
     ];
     const reviewers = [1, 2, 3].map((n) => reviewer("SHARED", n));
     expect(nextUp(input({ rating: rating({ parEmployeeStatus: "SHARED" }), reviewers, requests })).title).toBe(
-      "Give feedback to Ann",
+      "Ann asked for your feedback",
     );
   });
 
@@ -85,7 +85,7 @@ describe("nextUp", () => {
     ];
     const leadShared = rating({ parEmployeeStatus: "SHARED_BLOCKED", parLeadStatus: "SHARED" });
     expect(nextUp(input({ rating: leadShared, requests })).title).toBe("Book your face-to-face");
-    expect(nextUp(input({ rating: { ...leadShared, parF2fStatus: "COMPLETED" }, requests })).title).toBe("Give feedback to Ann");
+    expect(nextUp(input({ rating: { ...leadShared, parF2fStatus: "COMPLETED" }, requests })).title).toBe("Ann asked for your feedback");
   });
 
   it("moves to the F2F once the lead shares, then to the finished PAR", () => {

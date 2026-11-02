@@ -125,13 +125,13 @@ describe("a PAR admin", () => {
   });
 });
 
-describe("the Leadership 360° tab", () => {
+describe("the 360° feedback tab", () => {
   beforeEach(() => isAdmin(true));
 
   it("is hidden while its preview flag is off", async () => {
     show();
     expect(await screen.findByRole("tab", { name: "Ongoing" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Leadership 360°" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "360° feedback" })).not.toBeInTheDocument();
   });
 
   it("shows once the preview flag is on", async () => {
@@ -139,7 +139,7 @@ describe("the Leadership 360° tab", () => {
     window.config = { ...(saved ?? {}), ONE_WSO2_PREVIEW_FEATURES: { leadership360: true } } as Window["config"];
     try {
       show();
-      expect(await screen.findByRole("tab", { name: "Leadership 360°" })).toBeInTheDocument();
+      expect(await screen.findByRole("tab", { name: "360° feedback" })).toBeInTheDocument();
     } finally {
       window.config = saved;
     }

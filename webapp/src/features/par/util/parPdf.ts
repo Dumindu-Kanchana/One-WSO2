@@ -17,10 +17,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Par360Review, ParLegacyHistory, ParLegacyQuestionAnswer, ParRating } from "../api/types";
-import type { FormDefinition } from "../api/leadership360Types";
+import type { FormDefinition, Leadership360Summary } from "../api/leadership360Types";
 import type { Review360Summary } from "../api/review360Types";
 import type { SelfReviewAnswers } from "../api/selfReviewTypes";
 import { decodeParComment, sanitizeParHtml } from "./parComment";
+import { formatShortDate } from "./parDate";
 import { pdfRatingText } from "./parLabels";
 import {
   formatLegacyCycleName,
@@ -99,21 +100,33 @@ export function downloadParPdf(rating: ParRating, selfComment: string, leadComme
 }
 
 const SECTION_ROW = { fontStyle: "bold", fillColor: [225, 225, 225], halign: "left" } as const;
+const SUBSECTION_ROW = { fontStyle: "bold", textColor: [80, 80, 80], halign: "left" } as const;
 const TEXT_CELL = { textColor: [50, 50, 50], cellPadding: 6 } as const;
 
+/** A leader's own Leadership 360° results for the cycle, as they see them on screen. */
+export interface Leadership360PdfSection {
+  definition: FormDefinition;
+  summary: Leadership360Summary;
+  /** While the survey is still open, the date (YYYY-MM-DD) the results are as of. */
+  asOf?: string;
+}
+
 // The finished PAR of a PAR 2.0 cycle: the lead's feedback, the guided
-// self-review section by section, and (when the employee may see it) the
-// anonymised 360° summary — averages and comments, never names.
+// self-review section by section, (when the employee may see it) the 360°
+// summary — averages and comments, never names — and, for a leader, their
+// Leadership 360° results as they see them on screen.
 export function downloadPar2Pdf({
   rating,
   leadComment,
   selfReview,
   review360,
+  leadership360,
 }: {
   rating: ParRating;
   leadComment: string;
   selfReview: { definition: FormDefinition; answers: SelfReviewAnswers };
   review360?: Review360Summary;
+  leadership360?: Leadership360PdfSection;
 }): void {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const rows: PdfRow[] = [];
@@ -140,11 +153,12 @@ export function downloadPar2Pdf({
   if (review360?.available) {
     const definition = review360.template.definition;
     const questions = definition.sections.flatMap((s) => s.questions);
-    section(`360° summary (anonymised, ${review360.responseCount} responses)`);
+    section(`360° summary (${review360.responseCount} responses)`);
     rows.push(["360° index", { content: review360.index?.toFixed(1) ?? "-", styles: TEXT_CELL }]);
-    for (const a of review360.questionAverages) {
-      const q = questions.find((x) => x.id === a.questionId);
-      rows.push([q?.text ?? a.questionId, { content: `${a.average.toFixed(1)} (${a.ratingCount} ratings)`, styles: TEXT_CELL }]);
+    // In the form's order, not the order the averages arrive in.
+    for (const q of questions.filter((x) => x.type === "RATING")) {
+      const a = review360.questionAverages.find((x) => x.questionId === q.id);
+      if (a) rows.push([q.text, { content: `${a.average.toFixed(1)} (${a.ratingCount} ratings)`, styles: TEXT_CELL }]);
     }
     for (const q of questions.filter((x) => x.type === "TEXT")) {
       const comments = review360.comments[q.id] ?? [];
@@ -152,6 +166,31 @@ export function downloadPar2Pdf({
         rows.push([q.text, { content: comments.map((c) => `• ${c}`).join("\n"), styles: TEXT_CELL }]);
       }
     }
+  }
+
+  if (leadership360?.summary.available) {
+    const { definition, summary, asOf } = leadership360;
+    section(
+      `Leadership 360° (${summary.responseCount} responses${asOf ? `, as of ${formatShortDate(asOf)}` : ""})`,
+    );
+    rows.push(["Overall", { content: summary.overallAverage?.toFixed(2) ?? "-", styles: TEXT_CELL }]);
+    // Grouped under the form's own sections, in its order, as on screen.
+    for (const s of definition.sections) {
+      const rated = s.questions.filter((q) => q.type === "RATING");
+      if (rated.length === 0) continue;
+      rows.push([{ content: s.title, colSpan: 2, styles: SUBSECTION_ROW }]);
+      for (const q of rated) {
+        const a = summary.questionAverages.find((x) => x.questionId === q.id);
+        if (a) {
+          rows.push([q.text, { content: `${a.average.toFixed(2)} (${a.ratingCount} ratings)`, styles: TEXT_CELL }]);
+        }
+      }
+    }
+    const comments = [
+      ...summary.namedComments.map((c) => `• ${c.comment} (${c.respondentName ?? c.respondentEmail})`),
+      ...summary.comments.map((c) => `• ${c} (Anonymous)`),
+    ];
+    if (comments.length > 0) rows.push(["Comments", { content: comments.join("\n"), styles: TEXT_CELL }]);
   }
 
   autoTable(doc, {
