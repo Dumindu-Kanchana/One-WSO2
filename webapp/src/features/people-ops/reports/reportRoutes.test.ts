@@ -96,7 +96,8 @@ describe("People Ops rail sections", () => {
     // perspectives.ts's own comment above the PAR group) — that each one
     // actually reaches its gate and redirects a non-lead/non-admin away is
     // asserted in ParLeadTabRouting.test.tsx/ParAdminTabRouting.test.tsx,
-    // not here.
+    // not here. par-okrs is the same again, on the PAR backend's OKR manager
+    // group (useParIsOkrManager, ParRequiresOkrManagerRoute).
     //
     // promotion-lead-portal and promotion-team-history are the same shape
     // of exception as the two PAR ones: promotion-app has its own
@@ -123,6 +124,7 @@ describe("People Ops rail sections", () => {
       "people-subscriptions-manage",
       "par-lead-portal",
       "par-admin-portal",
+      "par-okrs",
       "promotion-lead-portal",
       "promotion-team-history",
       "promotion-functional-lead-portal",
