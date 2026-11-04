@@ -32,7 +32,14 @@ vi.mock("../api/useLeadership360", async (importOriginal) => ({
     return query(results);
   },
 }));
-vi.mock("./Leadership360SummaryDialog", () => ({ default: () => null }));
+vi.mock("./Leadership360SummaryDialog", () => ({
+  default: () => null,
+  Leadership360Results: ({ surveyId, view }: { surveyId: number; view: string }) => (
+    <div>
+      Results of survey {surveyId} ({view})
+    </div>
+  ),
+}));
 
 const { default: Leadership360ResultsCard } = await import("./Leadership360ResultsCard");
 
@@ -54,13 +61,14 @@ beforeEach(() => {
 });
 
 describe("Leadership360ResultsCard", () => {
-  it("shows the cycle's survey, live, asking only for your own results", () => {
+  it("shows the cycle's survey's results in place, live, asking only for your own", () => {
     results = [{ leader: ada, responseCount: 4, available: true }];
     render(<Leadership360ResultsCard view="SELF" parCycleId={9} />);
     expect(screen.getByText("Your Leadership 360° results")).toBeInTheDocument();
     expect(screen.getByText("Survey 5")).toBeInTheDocument();
     expect(screen.getByText(/Updates as feedback comes in/)).toBeInTheDocument();
-    expect(screen.getByText("4 responses")).toBeInTheDocument();
+    expect(screen.getByText("Results of survey 5 (SELF)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View results" })).not.toBeInTheDocument();
     expect(asked.every((a) => a.surveyId === 5 && a.view === "SELF")).toBe(true);
   });
 
@@ -68,7 +76,7 @@ describe("Leadership360ResultsCard", () => {
     results = [{ leader: ada, responseCount: 2, available: false }];
     render(<Leadership360ResultsCard view="SELF" parCycleId={9} />);
     expect(screen.getByText("2 responses so far; results show from 3.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "View results" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Results of survey/)).not.toBeInTheDocument();
   });
 
   it("shows a closed cycle's survey as final results (History)", () => {

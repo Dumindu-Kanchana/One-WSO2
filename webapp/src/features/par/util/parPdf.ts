@@ -153,7 +153,7 @@ export function downloadPar2Pdf({
   if (review360?.available) {
     const definition = review360.template.definition;
     const questions = definition.sections.flatMap((s) => s.questions);
-    section(`360° summary (${review360.responseCount} responses)`);
+    section(`PAR 360° results (${review360.responseCount} responses)`);
     rows.push(["360° index", { content: review360.index?.toFixed(1) ?? "-", styles: TEXT_CELL }]);
     // In the form's order, not the order the averages arrive in.
     for (const q of questions.filter((x) => x.type === "RATING")) {
@@ -171,7 +171,7 @@ export function downloadPar2Pdf({
   if (leadership360?.summary.available) {
     const { definition, summary, asOf } = leadership360;
     section(
-      `Leadership 360° (${summary.responseCount} responses${asOf ? `, as of ${formatShortDate(asOf)}` : ""})`,
+      `Leadership 360° results (${summary.responseCount} responses${asOf ? `, as of ${formatShortDate(asOf)}` : ""})`,
     );
     rows.push(["Overall", { content: summary.overallAverage?.toFixed(2) ?? "-", styles: TEXT_CELL }]);
     // Grouped under the form's own sections, in its order, as on screen.

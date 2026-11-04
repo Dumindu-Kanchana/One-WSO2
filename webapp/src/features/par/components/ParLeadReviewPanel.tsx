@@ -66,6 +66,7 @@ import { ParCommentView } from "./ParContent";
 import { ParAutoAssignedChip } from "./ParChips";
 import ParDriveFileChip from "./ParDriveFileChip";
 import ParEmptyState from "./ParEmptyState";
+import Leadership360ResultsCard from "./Leadership360ResultsCard";
 import ParSelfReviewView from "./ParSelfReviewView";
 import ParHistoryReviewSection from "./ParHistoryReviewSection";
 import type { ParCycle } from "../api/types";
@@ -477,7 +478,9 @@ export default function ParLeadReviewPanel({
                   )}
                 </Box>
 
-                {showsPar2 && <ParLead360Guidance parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} />}
+                {showsPar2 && !isLeadership && (
+                  <ParLead360Guidance parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} />
+                )}
 
                 {parRatingValue === top5p20pEnabledRating && (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
@@ -657,7 +660,8 @@ export default function ParLeadReviewPanel({
               sx={{ px: 1, borderBottom: 1, borderColor: "divider" }}
             >
               <Tab label="Self-review" />
-              <Tab label="360° summary" />
+              {/* A leader's 360° feedback is Leadership 360°. */}
+              <Tab label={isLeadership ? "Leadership 360°" : "PAR 360°"} />
               {/* OKRs are set for the leadership team only. */}
               {isLeadership && <Tab label="OKRs" />}
             </Tabs>
@@ -665,7 +669,16 @@ export default function ParLeadReviewPanel({
               {evidenceTab === 0 ? (
                 selfReviewContent
               ) : evidenceTab === 1 ? (
-                <ParLead360Evidence parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} framed={false} />
+                isLeadership ? (
+                  <Leadership360ResultsCard
+                    view="REPORTS"
+                    leaderEmail={employeeEmail}
+                    parCycleId={cycle.parCycleId}
+                    fallback={<ParEmptyState text="No Leadership 360° results for this cycle yet" />}
+                  />
+                ) : (
+                  <ParLead360Evidence parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} framed={false} />
+                )
               ) : (
                 <ParOkrEvidence ownerEmail={employeeEmail} cycleEndDate={cycle.parCycleEndDate} />
               )}

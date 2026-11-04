@@ -61,10 +61,10 @@ export default function ParLead360Evidence({
   return (
     <Stack spacing={2}>
       <Box component={framed ? Card : "div"} {...(framed ? { variant: "outlined", sx: { p: 2 } } : {})}>
-        {framed && <Typography sx={{ fontWeight: 600, mb: 1.5 }}>360° summary</Typography>}
+        {framed && <Typography sx={{ fontWeight: 600, mb: 1.5 }}>PAR 360° results</Typography>}
         {data.responseCount === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No one has responded yet.
+            No one has submitted yet.
           </Typography>
         ) : (
           <>
@@ -109,7 +109,7 @@ export function Par360GuidanceText({ data, sx }: { data: Review360Responses; sx?
             {data.teamMembersWithResponses === 1 ? "" : "s"})
           </>
         )}
-        . It informs your rating; it isn't the rating.
+        .
       </Typography>
     </Box>
   );

@@ -172,8 +172,8 @@ function FeedbackForm({
             <Alert severity="error">The deadline for 360° feedback passed on {formatShortDate(deadline)}.</Alert>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              {employeeName} sees that you responded, never what you wrote. Their lead reads it with your name, and{" "}
-              {employeeName} gets an anonymised summary once at least three people have responded. Due{" "}
+              {employeeName} sees that you submitted, never what you wrote. Their lead reads it with your name, and{" "}
+              {employeeName} sees anonymised results once at least three people have submitted. Due{" "}
               {formatShortDate(deadline)}.
             </Typography>
           )}

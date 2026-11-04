@@ -13,43 +13,31 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
-import { Stack, ToggleButton, ToggleButtonGroup } from "@wso2/oxygen-ui";
+import { Navigate, Outlet, useLocation } from "react-router";
+import { Stack } from "@wso2/oxygen-ui";
+import { useMeProfile } from "@features/my/api/useMeProfile";
+import { useActiveParCycle } from "../api/useParData";
+import ParCycleTracker from "../components/ParCycleTracker";
+import type { HomeStepKey } from "../util/parHome";
 
 const BASE = "/me/performance/cycle";
 
-// Active cycle sections. Lead review and the finished PAR show on the
-// self-review page, once the lead shares.
-const SECTIONS = [
-  { segment: "self-review", label: "Self-review" },
-  { segment: "360", label: "360° feedback" },
-  { segment: "f2f", label: "F2F" },
-] as const;
+const STEPS: HomeStepKey[] = ["self-review", "360", "lead-review", "f2f"];
 
 // Me → Performance → Active cycle (PAR 2.0): everything about your own PAR in
-// the open cycle, one section at a time. The pinned tracker above the tabs
-// opens the same sections.
+// the open cycle. The phase tracker on top is the way around: each step opens
+// its part below (the lead's review shows on the self-review page once the
+// lead shares).
 export default function ParActiveCycleTab() {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const current = SECTIONS.find((s) => pathname.startsWith(`${BASE}/${s.segment}`))?.segment ?? "self-review";
+  const profile = useMeProfile();
+  const workEmail = profile.data?.userInfo.workEmail;
+  const cycle = useActiveParCycle(workEmail).data?.[0];
+  const selected = STEPS.find((step) => pathname.startsWith(`${BASE}/${step}`)) ?? "self-review";
 
   return (
     <Stack spacing={2}>
-      <ToggleButtonGroup
-        exclusive
-        size="small"
-        value={current}
-        onChange={(_, next: string | null) => next && navigate(`${BASE}/${next}`)}
-        aria-label="Active cycle sections"
-        sx={{ alignSelf: "flex-start" }}
-      >
-        {SECTIONS.map((s) => (
-          <ToggleButton key={s.segment} value={s.segment} sx={{ textTransform: "none", px: 2 }}>
-            {s.label}
-          </ToggleButton>
-        ))}
-      </ToggleButtonGroup>
+      {cycle && workEmail && <ParCycleTracker cycle={cycle} workEmail={workEmail} selected={selected} />}
       <Outlet />
     </Stack>
   );

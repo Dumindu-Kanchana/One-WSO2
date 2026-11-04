@@ -181,13 +181,19 @@ function show() {
 
 const noFeedback = (): Leadership360MyFeedback => ({ drafts: [], named: [], anonymous: [], currentMonth: "2026-11" });
 
-/** Give feedback, then the kind (when asked), then a person from the list. */
-async function pick(user: ReturnType<typeof userEvent.setup>, kind: string | null, name: string) {
+/** Give feedback, then a person from the list. */
+async function pick(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole("button", { name: "Give feedback" }));
-  if (kind) await user.click(screen.getByRole("button", { name: new RegExp(kind) }));
   await user.type(screen.getByRole("combobox", { name: "Who is it for?" }), name);
   await user.click(screen.getByRole("option", { name: new RegExp(name) }));
 }
+
+const rowNames = () =>
+  ["Alex", "Sam", "Hannah", "Elena"]
+    .map((name) => ({ name, at: document.body.textContent!.indexOf(name) }))
+    .filter((r) => r.at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .map((r) => r.name);
 
 beforeEach(() => {
   parts = { cycle, hasLead: true, leadership: true };
@@ -205,32 +211,70 @@ beforeEach(() => {
 });
 
 describe("ParGiveFeedbackTab", () => {
-  it("lists your Leadership 360° drafts with the requests: named from the server, anonymous from this browser", () => {
+  it("lists requests, drafts and what you've given in one list, waiting ones first", () => {
+    requests = [
+      { ...alexAsked, employeeEmail: "sam@example.com", employeeName: "Sam", reviewStatus: "SHARED" },
+      { ...alexAsked, employeeName: "Alex" },
+    ];
     mine = { ...noFeedback(), drafts: [{ leaderEmail: "hannah@example.com", answers: {}, anonymous: false }] };
     window.localStorage.setItem("par-l360-anonymous-draft:me@example.com:3:elena@example.com", "{}");
     show();
-    expect(screen.queryByText("Leadership 360 · 2026 H2")).not.toBeInTheDocument();
-    expect(screen.getByText("Named draft")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Requests to me/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Draft")).toBeInTheDocument();
     expect(screen.getByText("Anonymous draft")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Requests to me (2)" })).toBeInTheDocument();
+    expect(screen.getByText("Submitted")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View" })).toBeInTheDocument();
+    expect(rowNames().at(-1)).toBe("Sam");
   });
 
-  it("lists Leadership 360° feedback you gave under Given, without its content", async () => {
-    const user = userEvent.setup();
+  it("shows Leadership 360° feedback you gave as submitted, without opening it again", () => {
     mine = {
       ...noFeedback(),
       named: [{ leaderEmail: "hannah@example.com", submittedOn: "2026-11-02" }],
       anonymous: [{ leaderEmail: "elena@example.com", month: "2026-11" }],
     };
     show();
-    await user.click(screen.getByRole("button", { name: "Given (2)" }));
-    expect(screen.getByText("Named · 2 Nov '26")).toBeInTheDocument();
-    expect(screen.getByText("Anonymous · November 2026")).toBeInTheDocument();
+    expect(screen.getByText("Submitted · 2 Nov '26")).toBeInTheDocument();
+    expect(screen.getByText("Submitted anonymously · November 2026")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
   });
 
-  it("says nobody is waiting when there's nothing, with no banner for the open survey", () => {
+  it("answers a leader's request with the Leadership 360° form", async () => {
+    const user = userEvent.setup();
+    requests = [{ ...alexAsked, employeeEmail: "elena@example.com", employeeName: "Elena" }];
     show();
-    expect(screen.getByText("No one is waiting on your feedback")).toBeInTheDocument();
+    expect(screen.getByText("Leadership 360°")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Respond" }));
+    expect(screen.getByText("Leadership form for Elena")).toBeInTheDocument();
+  });
+
+  it("counts a leader's request as answered once you gave anonymous feedback", () => {
+    requests = [{ ...alexAsked, employeeEmail: "elena@example.com", employeeName: "Elena" }];
+    mine = { ...noFeedback(), anonymous: [{ leaderEmail: "elena@example.com", month: "2026-11" }] };
+    show();
+    expect(screen.getByText("Submitted anonymously · November 2026")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Respond" })).not.toBeInTheDocument();
+  });
+
+  it("filters to feedback you were asked for, or gave without being asked", async () => {
+    const user = userEvent.setup();
+    requests = [
+      { ...alexAsked, employeeName: "Alex" },
+      { ...alexAsked, employeeEmail: "sam@example.com", employeeName: "Sam", isEmployeeRequested: false },
+    ];
+    show();
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Voluntary" }));
+    expect(screen.getByText("Sam")).toBeInTheDocument();
+    expect(screen.queryByText("Alex")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Requested" }));
+    expect(screen.getByText("Alex")).toBeInTheDocument();
+    expect(screen.queryByText("Sam")).not.toBeInTheDocument();
+  });
+
+  it("says nobody asked when there's nothing, with no banner for the open survey", () => {
+    show();
+    expect(screen.getByText("No one has asked for your feedback yet")).toBeInTheDocument();
     expect(screen.queryByText("Leadership 360 · 2026 H2")).not.toBeInTheDocument();
   });
 });
@@ -245,42 +289,43 @@ describe("Give feedback", () => {
     expect(screen.getByText("PAR form for Alex")).toBeInTheDocument();
   });
 
-  it("asks for the kind first, then lists only the leadership team for Leadership 360°", async () => {
+  it("asks for the person first, from everyone, and a leader gets the Leadership 360° form", async () => {
     const user = userEvent.setup();
     show();
     await user.click(screen.getByRole("button", { name: "Give feedback" }));
-    expect(screen.getByRole("button", { name: /For a PAR/ })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Leadership 360°/ }));
+    expect(screen.queryByRole("button", { name: /For a PAR/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("combobox", { name: "Who is it for?" }));
     const options = screen.getAllByRole("option").map((o) => o.textContent);
-    expect(options).toHaveLength(2);
+    expect(options).toHaveLength(3);
     expect(options[0]).toContain("Hannah");
-    expect(screen.getByText("Leaders you work with")).toBeInTheDocument();
+    expect(screen.getByText("People you work with")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Elena/ })).toHaveTextContent("Leadership 360°");
     await user.click(screen.getByRole("option", { name: /Elena/ }));
     expect(screen.getByText("Leadership form for Elena")).toBeInTheDocument();
   });
 
-  it("goes back from the person list to the kinds", async () => {
+  it("leaves out people already in your list: you respond or continue there", async () => {
     const user = userEvent.setup();
+    requests = [{ ...alexAsked, employeeName: "Alex" }];
     show();
     await user.click(screen.getByRole("button", { name: "Give feedback" }));
-    await user.click(screen.getByRole("button", { name: /For a PAR/ }));
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByRole("button", { name: /Leadership 360°/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Who is it for?" }));
+    expect(screen.queryByRole("option", { name: /Alex/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Elena/ })).toBeInTheDocument();
   });
 
-  it("opens the form for someone who asked you", async () => {
-    const user = userEvent.setup();
-    requests = [alexAsked];
+  it("shows an offer you opened but didn't answer as your draft, with nothing to decline", () => {
+    requests = [{ ...alexAsked, employeeName: "Alex", isEmployeeRequested: false }];
     show();
-    await pick(user, "For a PAR", "Alex");
-    expect(screen.getByText("PAR form for Alex")).toBeInTheDocument();
+    expect(screen.getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
   });
 
   it("confirms before offering PAR feedback nobody asked for, and Back returns to the list", async () => {
     const user = userEvent.setup();
     show();
-    await pick(user, "For a PAR", "Alex");
+    await pick(user, "Alex");
     expect(screen.getByText(/Offer feedback for Alex's 2026 H2 PAR\?/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByRole("combobox", { name: "Who is it for?" })).toHaveValue("");
@@ -291,22 +336,31 @@ describe("Give feedback", () => {
     expect(offerMutate).toHaveBeenCalledWith("alex@example.com", expect.anything());
   });
 
-  it("can't pick someone you've already given feedback", async () => {
+  it("doesn't list someone you've already given PAR feedback", async () => {
     const user = userEvent.setup();
     requests = [{ ...alexAsked, reviewStatus: "SHARED" }];
     show();
     await user.click(screen.getByRole("button", { name: "Give feedback" }));
-    await user.click(screen.getByRole("button", { name: /For a PAR/ }));
     await user.click(screen.getByRole("combobox", { name: "Who is it for?" }));
-    expect(screen.getByRole("option", { name: /Alex/ })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByRole("option", { name: /Alex/ })).not.toBeInTheDocument();
   });
 
-  it("marks each request with its kind", () => {
+  it("can't pick a leader while no Leadership 360° survey is open", async () => {
+    const user = userEvent.setup();
+    currentSurvey = null;
+    show();
+    await user.click(screen.getByRole("button", { name: "Give feedback" }));
+    await user.click(screen.getByRole("combobox", { name: "Who is it for?" }));
+    const elenaOption = screen.getByRole("option", { name: /Elena/ });
+    expect(elenaOption).toHaveAttribute("aria-disabled", "true");
+    expect(elenaOption).toHaveTextContent("Leadership 360° closed");
+  });
+
+  it("marks each row with its kind", () => {
     requests = [{ ...alexAsked, employeeName: "Alex" }];
     show();
-    expect(screen.getByRole("button", { name: "Requests to me (1)" })).toBeInTheDocument();
     expect(screen.getByText("Alex")).toBeInTheDocument();
-    expect(screen.getByText("PAR")).toBeInTheDocument();
+    expect(screen.getByText("PAR 360°")).toBeInTheDocument();
   });
 
   it("keeps leaders pickable after feedback, and the form knows this month's anonymous one is used", async () => {
@@ -314,12 +368,11 @@ describe("Give feedback", () => {
     mine = { ...noFeedback(), anonymous: [{ leaderEmail: "elena@example.com", month: "2026-11" }] };
     show();
     await user.click(screen.getByRole("button", { name: "Give feedback" }));
-    await user.click(screen.getByRole("button", { name: /Leadership 360°/ }));
     await user.click(screen.getByRole("combobox", { name: "Who is it for?" }));
-    const elena = screen.getByRole("option", { name: /Elena/ });
-    expect(elena).not.toHaveAttribute("aria-disabled", "true");
-    expect(elena).toHaveTextContent("Given before");
-    await user.click(elena);
+    const elenaOption = screen.getByRole("option", { name: /Elena/ });
+    expect(elenaOption).not.toHaveAttribute("aria-disabled", "true");
+    expect(elenaOption).toHaveTextContent("Leadership 360° · Submitted");
+    await user.click(elenaOption);
     expect(screen.getByText("Leadership form for Elena (named only this month)")).toBeInTheDocument();
   });
 });

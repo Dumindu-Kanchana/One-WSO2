@@ -32,6 +32,7 @@ import {
 import VirtualizedListbox from "@components/virtualized-listbox/VirtualizedListbox";
 import { employeeDisplayName } from "@features/leave/util/employeeName";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
+import { useParticipants } from "../api/usePar360";
 import { describeError } from "@api/errors";
 
 // Picks colleagues to add as 360° reviewers — par-app's ReviewRequestModal,
@@ -42,6 +43,16 @@ import { describeError } from "@api/errors";
 // Employee Portal's Request 360° Feedback tab) and a thin Dialog wrapper
 // around it (kept for ParLead360ReviewsTab.tsx, which still opens this from
 // a Fab).
+//
+// In a PAR 2.0 cycle (`parCycleId`) the people come from the cycle itself,
+// the same list Give feedback offers, rather than the whole org directory.
+/** Someone who can be asked, from either source. */
+interface Colleague {
+  workEmail: string;
+  name: string;
+  thumbnail?: string | null;
+}
+
 export function Par360RequestPicker({
   open,
   selfEmail,
@@ -51,6 +62,7 @@ export function Par360RequestPicker({
   onCancel,
   isSubmitting,
   error,
+  parCycleId,
 }: {
   /** Gates `useLeaveEmployees` the same way the Dialog's own `open` did. */
   open: boolean;
@@ -67,22 +79,30 @@ export function Par360RequestPicker({
   onCancel: () => void;
   isSubmitting: boolean;
   error: unknown;
+  /** A PAR 2.0 cycle: pick from its participants. */
+  parCycleId?: number;
 }) {
-  const employees = useLeaveEmployees(open);
+  const directory = useLeaveEmployees(open && parCycleId === undefined);
+  const participants = useParticipants(parCycleId, open && parCycleId !== undefined);
+  const employees = parCycleId === undefined ? directory : participants;
   const [selected, setSelected] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
 
+  const people: Colleague[] = useMemo(
+    () =>
+      parCycleId === undefined
+        ? (directory.data ?? [])
+            .filter((e) => e.employeeStatus !== "Left" && e.workEmail)
+            .map((e) => ({ workEmail: e.workEmail, name: employeeDisplayName(e), thumbnail: e.employeeThumbnail }))
+        : (participants.data ?? []).map((p) => ({ workEmail: p.workEmail, name: p.employeeName })),
+    [parCycleId, directory.data, participants.data],
+  );
   const offerable = useMemo(
     () =>
-      (employees.data ?? []).filter(
-        (e) =>
-          e.employeeStatus !== "Left" &&
-          e.workEmail &&
-          e.workEmail !== selfEmail &&
-          e.workEmail !== leadEmail &&
-          !existingEmails.includes(e.workEmail),
+      people.filter(
+        (e) => e.workEmail !== selfEmail && e.workEmail !== leadEmail && !existingEmails.includes(e.workEmail),
       ),
-    [employees.data, selfEmail, leadEmail, existingEmails],
+    [people, selfEmail, leadEmail, existingEmails],
   );
   const options = useMemo(() => offerable.map((e) => e.workEmail), [offerable]);
   const byEmail = useMemo(() => new Map(offerable.map((e) => [e.workEmail, e])), [offerable]);
@@ -153,11 +173,11 @@ export function Par360RequestPicker({
               <li {...props} key={option}>
                 <Box sx={{ display: "flex", alignItems: "center", height: 30 }}>
                   <Avatar
-                    src={employee?.employeeThumbnail || undefined}
+                    src={employee?.thumbnail || undefined}
                     slotProps={{ img: { referrerPolicy: "no-referrer" } }}
                     sx={{ width: 24, height: 24, marginRight: "8px" }}
                   />
-                  {employee ? employeeDisplayName(employee) : null}
+                  {employee?.name}
                   <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
                     {option}
                   </Typography>
@@ -178,9 +198,9 @@ export function Par360RequestPicker({
                   variant="outlined"
                   label={
                     <Box sx={{ display: "flex", alignItems: "center" }}>
-                      {employee?.employeeThumbnail && (
+                      {employee?.thumbnail && (
                         <Avatar
-                          src={employee.employeeThumbnail}
+                          src={employee.thumbnail}
                           slotProps={{ img: { referrerPolicy: "no-referrer" } }}
                           sx={{ width: 24, height: 24, marginRight: "8px", marginLeft: "-8px" }}
                         />
@@ -198,7 +218,7 @@ export function Par360RequestPicker({
             if (!q) return opts;
             return opts.filter((o) => {
               const e = byEmail.get(o);
-              return o.toLowerCase().includes(q) || (e ? employeeDisplayName(e).toLowerCase().includes(q) : false);
+              return o.toLowerCase().includes(q) || (e ? e.name.toLowerCase().includes(q) : false);
             });
           }}
           renderInput={(params) => (
@@ -237,6 +257,7 @@ export default function Par360RequestDialog({
   onSubmit,
   isSubmitting,
   error,
+  parCycleId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -246,6 +267,8 @@ export default function Par360RequestDialog({
   onSubmit: (reviewerEmails: string[]) => void;
   isSubmitting: boolean;
   error: unknown;
+  /** A PAR 2.0 cycle: pick from its participants. */
+  parCycleId?: number;
 }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
@@ -263,6 +286,7 @@ export default function Par360RequestDialog({
           onCancel={onClose}
           isSubmitting={isSubmitting}
           error={error}
+          parCycleId={parCycleId}
         />
       </DialogContent>
     </Dialog>

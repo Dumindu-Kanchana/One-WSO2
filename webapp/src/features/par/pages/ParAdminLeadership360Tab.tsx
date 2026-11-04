@@ -77,7 +77,7 @@ export default function ParAdminLeadership360Tab() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
             PAR 360° runs inside each cycle until its 360° deadline; follow it up in Ongoing. Leadership 360° runs with
             every PAR 2.0 cycle, on the same dates: anyone can give feedback on members of the leadership team, named
-            any time or anonymously once a month. Results are live once 3 or more people have responded.
+            any time or anonymously once a month. Results are live once 3 or more people have submitted.
           </Typography>
           {cycles.isError && (
             <ErrorNotice error={cycles.error} onRetry={() => cycles.refetch()} retrying={cycles.isFetching}>

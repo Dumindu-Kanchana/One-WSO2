@@ -120,7 +120,11 @@ export function useSubmitLeadership360Feedback(surveyId: number | undefined) {
       await authedPost<void>(parServiceUrls.leadership360Submissions(surveyId), accessToken, input, digiopsHeaders());
     },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["leadership360-my-feedback", surveyId] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["leadership360-my-feedback", surveyId] }),
+        // Named feedback answers the leader's request to you, if they asked.
+        qc.invalidateQueries({ queryKey: ["par-360-review-requests"] }),
+      ]);
     },
   });
 }

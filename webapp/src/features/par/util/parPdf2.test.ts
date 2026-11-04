@@ -61,7 +61,7 @@ const peer360: FormDefinition = {
 };
 
 describe("downloadPar2Pdf", () => {
-  it("writes the self-review and the anonymised 360° summary", () => {
+  it("writes the self-review and the anonymised PAR 360° results", () => {
     downloadPar2Pdf({
       rating: { parEmployeeEmail: "e@x.com", parRating: "Successful" } as ParRating,
       leadComment: "<p>Great cycle.</p>",
@@ -81,12 +81,12 @@ describe("downloadPar2Pdf", () => {
     const text = JSON.stringify(tables.at(-1));
     expect(text).toContain("Shipped it.");
     expect(text).toContain("• Halve onboarding time (Achieved)");
-    expect(text).toContain("360° summary (3 responses)");
+    expect(text).toContain("PAR 360° results (3 responses)");
     expect(text).toContain("4.1 (3 ratings)");
     expect(text).toContain("• Clear write-ups.");
   });
 
-  it("leaves the 360° summary out until the employee may see it", () => {
+  it("leaves the PAR 360° results out until the employee may see them", () => {
     downloadPar2Pdf({
       rating: { parEmployeeEmail: "e@x.com" } as ParRating,
       leadComment: "",
@@ -129,14 +129,14 @@ describe("downloadPar2Pdf", () => {
 
     downloadPar2Pdf({ ...base, leadership360: { definition: leadership, summary, asOf: "2026-11-02" } });
     let text = JSON.stringify(tables.at(-1));
-    expect(text).toContain("Leadership 360° (3 responses, as of 2 Nov '26)");
+    expect(text).toContain("Leadership 360° results (3 responses, as of 2 Nov '26)");
     expect(text).toContain("4.33 (3 ratings)");
     expect(text).toContain("• Specific feedback. (Maya)");
     expect(text).toContain("• Clear direction. (Anonymous)");
 
     downloadPar2Pdf({ ...base, leadership360: { definition: leadership, summary } });
     text = JSON.stringify(tables.at(-1));
-    expect(text).toContain("Leadership 360° (3 responses)");
+    expect(text).toContain("Leadership 360° results (3 responses)");
 
     downloadPar2Pdf({ ...base, leadership360: { definition: leadership, summary: { ...summary, available: false } } });
     expect(JSON.stringify(tables.at(-1))).not.toContain("Leadership 360°");

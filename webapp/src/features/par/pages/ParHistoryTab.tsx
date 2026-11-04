@@ -286,7 +286,7 @@ function RealCycleDetail({ cycle, workEmail }: { cycle: ParCycle; workEmail: str
         />
         {summary?.available && (
           <Card variant="outlined" sx={{ p: 2 }}>
-            <Typography sx={{ fontWeight: 600, mb: 1.5 }}>Your 360° summary</Typography>
+            <Typography sx={{ fontWeight: 600, mb: 1.5 }}>Your PAR 360° results</Typography>
             <Par360SummaryView
               definition={summary.template.definition}
               responseCount={summary.responseCount}

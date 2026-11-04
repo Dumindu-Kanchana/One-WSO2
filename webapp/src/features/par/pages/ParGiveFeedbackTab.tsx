@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { Navigate, useSearchParams } from "react-router";
 import {
   Box,
@@ -43,7 +43,7 @@ import {
   useLeadership360Leaders,
   useMyLeadership360Feedback,
 } from "../api/useLeadership360";
-import type { ParCycle, Par360ReviewRequest } from "../api/types";
+import type { Leadership360Leader } from "../api/leadership360Types";
 import Par360FeedbackDialog from "../components/Par360FeedbackDialog";
 import Par360GiveFeedbackDialog, { type FeedbackStart } from "../components/Par360GiveFeedbackDialog";
 import Leadership360FeedbackDialog from "../components/Leadership360FeedbackDialog";
@@ -52,9 +52,15 @@ import { PersonRow, StatusChip } from "../components/Par360PeopleRows";
 import { localDraftLeaders } from "../util/leadership360LocalDraft";
 import { formatShortDate } from "../util/parDate";
 import { isDeadlinePassed } from "../util/parDeadline";
-import { openRequests } from "../util/parHome";
+import { feedbackSource, giveFeedbackItems, isVoluntary, type GiveFeedbackItem } from "../util/par360Feedback";
 
-type View = "requests" | "given";
+type Show = "all" | "requested" | "voluntary";
+
+const EMPTY: Record<Show, string> = {
+  all: "No one has asked for your feedback yet",
+  requested: "No one has asked for your feedback yet",
+  voluntary: "You haven't given feedback nobody asked for this cycle",
+};
 
 const MONTH_NAME = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 const monthName = (month: string) => {
@@ -62,10 +68,10 @@ const monthName = (month: string) => {
   return MONTH_NAME.format(new Date(Date.UTC(year, m - 1, 1)));
 };
 
-// Give feedback, both kinds in one place: requests for your PAR feedback and
-// the open Leadership 360° survey (Requests to me), what you've given (Given),
-// and Give feedback to start new feedback (the kind, then the person). A
-// request is answered with Respond on its row.
+// Give feedback: one list of everyone who asked for your feedback and the
+// feedback you've given, waiting ones first. Who it's about decides the form:
+// Leadership 360° for a member of the leadership team, PAR feedback for anyone
+// else. Give feedback starts feedback nobody asked for, the person first.
 export default function ParGiveFeedbackTab() {
   const profile = useMeProfile();
   const workEmail = profile.data?.userInfo.workEmail;
@@ -78,18 +84,17 @@ export default function ParGiveFeedbackTab() {
   const openSurvey = parts.leadership ? (survey.data ?? undefined) : undefined;
   const surveyId = openSurvey?.survey.surveyId;
   const mine = useMyLeadership360Feedback(surveyId);
-  const { showSuccess } = useNotifications();
-  const [params, setParams] = useSearchParams();
+  const leaders = useLeadership360Leaders(parts.leadership);
+  const decline = useSubmitReview(cycle?.parCycleId);
+  const { showSuccess, showError } = useNotifications();
   const [choosing, setChoosing] = useState(false);
   const [giving, setGiving] = useState<FeedbackStart | null>(null);
-
-  const serverDrafts = mine.data?.drafts ?? [];
-  // Anonymous drafts live in this browser only (read again on every render, so a closed form shows up).
-  const localDrafts = workEmail && surveyId !== undefined ? localDraftLeaders(workEmail, surveyId) : [];
-  const named = mine.data?.named ?? [];
-  const anonymousGiven = mine.data?.anonymous ?? [];
-  const needsLeaders = serverDrafts.length + localDrafts.length + named.length + anonymousGiven.length > 0;
-  const leaders = useLeadership360Leaders(needsLeaders);
+  const [viewing, setViewing] = useState<GiveFeedbackItem | null>(null);
+  const [declining, setDeclining] = useState<GiveFeedbackItem | null>(null);
+  // Which rows to show, kept in the URL so a reload or a link keeps it.
+  const [params, setParams] = useSearchParams();
+  const showParam = params.get("show");
+  const show: Show = showParam === "requested" || showParam === "voluntary" ? showParam : "all";
 
   const employee = profile.data?.employee;
   const workedWith = useMemo(
@@ -102,8 +107,10 @@ export default function ParGiveFeedbackTab() {
     ],
     [parLeadEmail, employee, requests.data, reviewers.data],
   );
-
-  const view: View = params.get("view") === "given" ? "given" : "requests";
+  const leaderByEmail = useMemo(
+    () => new Map((leaders.data ?? []).map((l) => [l.workEmail.toLowerCase(), l])),
+    [leaders.data],
+  );
 
   if (parts.isLoading) {
     return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
@@ -121,22 +128,41 @@ export default function ParGiveFeedbackTab() {
   }
   if (!workEmail) return null;
 
-  const parOpen = openRequests(requests.data ?? []);
-  const parGiven = (requests.data ?? []).filter((r) => r.reviewStatus === "SHARED" || r.reviewStatus === "REJECTED");
-  const leaderByEmail = new Map((leaders.data ?? []).map((l) => [l.workEmail.toLowerCase(), l]));
-  const leadershipGivenCount = named.length + anonymousGiven.length;
-  // Your Leadership 360° drafts wait alongside the PAR requests; starting new Leadership 360°
-  // feedback is Give feedback, so the open survey itself needs no row of its own.
-  const leadershipDrafts = [
-    ...serverDrafts.map((d) => ({ leaderEmail: d.leaderEmail, anonymous: false })),
-    ...localDrafts.map((leaderEmail) => ({ leaderEmail, anonymous: true })),
-  ];
-  const requestCount = parOpen.length + leadershipDrafts.length;
-  const givenCount = parGiven.length + leadershipGivenCount;
-  const parListState = requests.isLoading ? "loading" : requests.isError ? "error" : "ready";
+  const deadlinePassed = isDeadlinePassed(cycle.parThreeSixtyRatingDeadline);
+  // Anonymous drafts live in this browser only (read again on every render, so a closed form shows up).
+  const localDrafts = surveyId !== undefined ? localDraftLeaders(workEmail, surveyId) : [];
+  const items = giveFeedbackItems({
+    requests: requests.data ?? [],
+    leaderEmails: new Set(leaderByEmail.keys()),
+    leaderNames: new Map([...leaderByEmail].map(([email, l]) => [email, l.employeeName])),
+    mine: mine.data,
+    localDraftLeaders: localDrafts,
+    parDeadlinePassed: deadlinePassed,
+    surveyOpen: Boolean(openSurvey),
+  });
+  const voluntary = items.filter(isVoluntary);
+  const requested = items.filter((item) => !isVoluntary(item));
+  const shown = show === "voluntary" ? voluntary : show === "requested" ? requested : items;
+  const waiting = shown.filter((item) => item.state === "todo" || item.state === "draft");
   const currentMonth = mine.data?.currentMonth;
   const anonymousUsedThisMonth = (leaderEmail: string) =>
-    anonymousGiven.some((g) => g.month === currentMonth && g.leaderEmail.toLowerCase() === leaderEmail.toLowerCase());
+    (mine.data?.anonymous ?? []).some(
+      (g) => g.month === currentMonth && g.leaderEmail.toLowerCase() === leaderEmail.toLowerCase(),
+    );
+  const leaderOf = (item: GiveFeedbackItem): Leadership360Leader =>
+    leaderByEmail.get(item.email.toLowerCase()) ?? {
+      workEmail: item.email,
+      employeeName: item.name ?? item.email,
+      jobRole: null,
+      employeeThumbnail: null,
+    };
+  const open = (item: GiveFeedbackItem) =>
+    setGiving(
+      item.kind === "LEADERSHIP"
+        ? { kind: "LEADERSHIP", leader: leaderOf(item) }
+        : { kind: "PAR", email: item.email, name: item.name ?? item.email },
+    );
+  const loading = requests.isLoading || (parts.leadership && (leaders.isLoading || mine.isLoading));
 
   return (
     <Stack spacing={2} sx={{ maxWidth: 1100, pt: 0.5 }}>
@@ -144,17 +170,18 @@ export default function ParGiveFeedbackTab() {
         <ToggleButtonGroup
           exclusive
           size="small"
-          value={view}
-          onChange={(_, next: View | null) =>
-            next && setParams(next === "requests" ? {} : { view: next }, { replace: true })
-          }
-          aria-label="Feedback views"
+          value={show}
+          onChange={(_, next: Show | null) => next && setParams(next === "all" ? {} : { show: next }, { replace: true })}
+          aria-label="Show"
         >
-          <ToggleButton value="requests" sx={{ textTransform: "none", px: 2 }}>
-            Requests to me{requestCount > 0 ? ` (${requestCount})` : ""}
+          <ToggleButton value="all" sx={{ textTransform: "none", px: 2 }}>
+            All
           </ToggleButton>
-          <ToggleButton value="given" sx={{ textTransform: "none", px: 2 }}>
-            Given{givenCount > 0 ? ` (${givenCount})` : ""}
+          <ToggleButton value="requested" sx={{ textTransform: "none", px: 2 }}>
+            Requested
+          </ToggleButton>
+          <ToggleButton value="voluntary" sx={{ textTransform: "none", px: 2 }}>
+            Voluntary
           </ToggleButton>
         </ToggleButtonGroup>
         <Button variant="contained" onClick={() => setChoosing(true)}>
@@ -162,86 +189,49 @@ export default function ParGiveFeedbackTab() {
         </Button>
       </Box>
 
-      {view === "requests" && (
-        <ParList state={parListState} retry={() => requests.refetch()} error={requests.error}>
-          <RequestList
-            cycle={cycle}
-            requests={parOpen}
-            given={false}
-            extra={leadershipDrafts.map((d) => {
-              const leader = leaderByEmail.get(d.leaderEmail.toLowerCase());
-              return (
-                <PersonRow
-                  key={`l360-${d.leaderEmail}-${d.anonymous}`}
-                  name={leader?.employeeName}
-                  email={d.leaderEmail}
-                  note={leader?.jobRole}
-                  kind="LEADERSHIP"
-                >
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                    <Chip size="small" label={d.anonymous ? "Anonymous draft" : "Named draft"} variant="outlined" />
-                    {leader && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => setGiving({ kind: "LEADERSHIP", leader })}
-                      >
-                        Continue
-                      </Button>
-                    )}
-                  </Box>
-                </PersonRow>
-              );
-            })}
-          />
-        </ParList>
-      )}
-
-      {view === "given" && (
-        <Stack spacing={2}>
-          {(parGiven.length > 0 || leadershipGivenCount === 0) && (
-            <ParList state={parListState} retry={() => requests.refetch()} error={requests.error}>
-              <RequestList cycle={cycle} requests={parGiven} given />
-            </ParList>
-          )}
-          {leadershipGivenCount > 0 && (
-            <Card variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {openSurvey?.survey.surveyName}. Leadership 360° answers can't be opened again once submitted.
-              </Typography>
+      {loading ? (
+        <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 1.5 }} />
+      ) : requests.isError ? (
+        <ErrorNotice error={requests.error} onRetry={() => requests.refetch()}>
+          Couldn't load feedback requests.
+        </ErrorNotice>
+      ) : (
+        <Card variant="outlined" sx={{ p: 2 }}>
+          {shown.length === 0 ? (
+            <ParEmptyState text={EMPTY[show]} />
+          ) : (
+            <>
+              {waiting.length > 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  About five minutes each.
+                  {waiting.some((item) => !isVoluntary(item)) &&
+                    " If you haven't worked closely enough with someone to help, decline instead."}
+                  {!deadlinePassed && ` Due ${formatShortDate(cycle.parThreeSixtyRatingDeadline)}.`}
+                </Typography>
+              )}
               <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-                {named.map((g, i) => {
-                  const leader = leaderByEmail.get(g.leaderEmail.toLowerCase());
-                  return (
-                    <PersonRow
-                      key={`named-${g.leaderEmail}-${i}`}
-                      name={leader?.employeeName}
-                      email={g.leaderEmail}
-                      note={leader?.jobRole}
-                      kind="LEADERSHIP"
-                    >
-                      <Chip size="small" variant="outlined" label={`Named · ${formatShortDate(g.submittedOn)}`} />
-                    </PersonRow>
-                  );
-                })}
-                {anonymousGiven.map((g) => {
-                  const leader = leaderByEmail.get(g.leaderEmail.toLowerCase());
-                  return (
-                    <PersonRow
-                      key={`anonymous-${g.leaderEmail}-${g.month}`}
-                      name={leader?.employeeName}
-                      email={g.leaderEmail}
-                      note={leader?.jobRole}
-                      kind="LEADERSHIP"
-                    >
-                      <Chip size="small" variant="outlined" label={`Anonymous · ${monthName(g.month)}`} />
-                    </PersonRow>
-                  );
-                })}
+                {shown.map((item) => (
+                  <PersonRow
+                    key={`${item.kind}-${item.email}`}
+                    name={item.name}
+                    email={item.email}
+                    note={[feedbackSource(item), leaderByEmail.get(item.email.toLowerCase())?.jobRole]
+                      .filter(Boolean)
+                      .join(" · ")}
+                    kind={item.kind}
+                  >
+                    <ItemActions
+                      item={item}
+                      onOpen={() => open(item)}
+                      onView={() => setViewing(item)}
+                      onDecline={() => setDeclining(item)}
+                    />
+                  </PersonRow>
+                ))}
               </Stack>
-            </Card>
+            </>
           )}
-        </Stack>
+        </Card>
       )}
 
       {choosing && (
@@ -249,24 +239,26 @@ export default function ParGiveFeedbackTab() {
           onClose={() => setChoosing(false)}
           workEmail={workEmail}
           cycle={cycle}
-          requests={requests.data ?? []}
           workedWith={workedWith}
           survey={openSurvey}
-          myLeadership={mine.data}
-          localDraftLeaders={localDrafts}
+          leaders={leaders.data ?? []}
+          items={items}
           onStart={(start) => {
             setChoosing(false);
             setGiving(start);
           }}
         />
       )}
-      {giving?.kind === "PAR" && (
+      {(giving?.kind === "PAR" || viewing) && (
         <Par360FeedbackDialog
           open
-          onClose={() => setGiving(null)}
+          onClose={() => {
+            setGiving(null);
+            setViewing(null);
+          }}
           parCycleId={cycle.parCycleId}
-          employeeEmail={giving.email}
-          employeeName={giving.name}
+          employeeEmail={giving?.kind === "PAR" ? giving.email : viewing!.email}
+          employeeName={giving?.kind === "PAR" ? giving.name : (viewing!.name ?? viewing!.email)}
           deadline={cycle.parThreeSixtyRatingDeadline}
         />
       )}
@@ -278,114 +270,12 @@ export default function ParGiveFeedbackTab() {
           survey={openSurvey}
           leader={giving.leader}
           workEmail={workEmail}
-          draft={serverDrafts.find((d) => d.leaderEmail.toLowerCase() === giving.leader.workEmail.toLowerCase())}
+          draft={(mine.data?.drafts ?? []).find(
+            (d) => d.leaderEmail.toLowerCase() === giving.leader.workEmail.toLowerCase(),
+          )}
           anonymousUsedThisMonth={anonymousUsedThisMonth(giving.leader.workEmail)}
           currentMonth={currentMonth}
           onSubmitted={(leader) => showSuccess(`Your feedback on ${leader.employeeName} was submitted.`)}
-        />
-      )}
-    </Stack>
-  );
-}
-
-function ParList({
-  state,
-  error,
-  retry,
-  children,
-}: {
-  state: "loading" | "error" | "ready";
-  error: Error | null;
-  retry: () => void;
-  children: ReactNode;
-}) {
-  if (state === "loading") return <Skeleton variant="rectangular" height={160} sx={{ borderRadius: 1.5 }} />;
-  if (state === "error") {
-    return (
-      <ErrorNotice error={error} onRetry={retry}>
-        Couldn't load feedback requests.
-      </ErrorNotice>
-    );
-  }
-  return <>{children}</>;
-}
-
-function RequestList({
-  cycle,
-  requests,
-  given,
-  extra = [],
-}: {
-  cycle: ParCycle;
-  requests: Par360ReviewRequest[];
-  given: boolean;
-  /** More rows after the PAR requests: your Leadership 360° drafts. */
-  extra?: ReactNode[];
-}) {
-  const decline = useSubmitReview(cycle.parCycleId);
-  const { showSuccess, showError } = useNotifications();
-  const [opened, setOpened] = useState<Par360ReviewRequest | null>(null);
-  const [declining, setDeclining] = useState<Par360ReviewRequest | null>(null);
-  const deadlinePassed = isDeadlinePassed(cycle.parThreeSixtyRatingDeadline);
-  const nameOf = (r: Par360ReviewRequest) => r.employeeName ?? r.employeeEmail;
-
-  if (requests.length === 0 && extra.length === 0) {
-    return (
-      <Card variant="outlined" sx={{ p: 2 }}>
-        <ParEmptyState text={given ? "You haven't given any feedback this cycle yet" : "No one is waiting on your feedback"} />
-      </Card>
-    );
-  }
-
-  return (
-    <Card variant="outlined" sx={{ p: 2 }}>
-      {!given && requests.length > 0 && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          About five minutes each. If you haven't worked closely enough with someone to help, decline instead.
-          {!deadlinePassed && ` Due ${formatShortDate(cycle.parThreeSixtyRatingDeadline)}.`}
-        </Typography>
-      )}
-      <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
-        {requests.map((r) => (
-          <PersonRow
-            key={r.employeeEmail}
-            name={r.employeeName}
-            email={r.employeeEmail}
-            note={r.isLeadRequested && !r.isEmployeeRequested ? "Asked by their lead" : undefined}
-            kind="PAR"
-          >
-            {given ? (
-              r.reviewStatus === "SHARED" ? (
-                <Button size="small" onClick={() => setOpened(r)}>
-                  View
-                </Button>
-              ) : (
-                <StatusChip status="REJECTED" />
-              )
-            ) : (
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                {r.reviewStatus === "DRAFT" && <Chip size="small" label="Draft" variant="outlined" />}
-                <Button size="small" color="inherit" disabled={deadlinePassed} onClick={() => setDeclining(r)}>
-                  Decline
-                </Button>
-                <Button size="small" variant="contained" disabled={deadlinePassed} onClick={() => setOpened(r)}>
-                  {r.reviewStatus === "DRAFT" ? "Continue" : "Respond"}
-                </Button>
-              </Box>
-            )}
-          </PersonRow>
-        ))}
-        {extra}
-      </Stack>
-
-      {opened && (
-        <Par360FeedbackDialog
-          open
-          onClose={() => setOpened(null)}
-          parCycleId={cycle.parCycleId}
-          employeeEmail={opened.employeeEmail}
-          employeeName={nameOf(opened)}
-          deadline={cycle.parThreeSixtyRatingDeadline}
         />
       )}
 
@@ -393,8 +283,8 @@ function RequestList({
         <DialogTitle>Decline this request?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            {declining && nameOf(declining)} will see that you declined, so they can ask someone else. Anything you
-            started is discarded.
+            {declining && (declining.name ?? declining.email)} will see that you declined, so they can ask someone
+            else. Anything you started is discarded.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -406,10 +296,10 @@ function RequestList({
             onClick={() =>
               declining &&
               decline.mutate(
-                { employeeWorkEmail: declining.employeeEmail, payload: { par360ReviewStatus: "REJECTED" } },
+                { employeeWorkEmail: declining.email, payload: { par360ReviewStatus: "REJECTED" } },
                 {
                   onSuccess: () => {
-                    showSuccess(`You declined ${nameOf(declining)}'s request.`);
+                    showSuccess(`You declined ${declining.name ?? declining.email}'s request.`);
                     setDeclining(null);
                   },
                   onError: (err) => showError(describeError(err)),
@@ -421,6 +311,56 @@ function RequestList({
           </Button>
         </DialogActions>
       </Dialog>
-    </Card>
+    </Stack>
+  );
+}
+
+// What a row says and offers: Respond or Continue while it waits on you, then
+// how it ended.
+function ItemActions({
+  item,
+  onOpen,
+  onView,
+  onDecline,
+}: {
+  item: GiveFeedbackItem;
+  onOpen: () => void;
+  onView: () => void;
+  onDecline: () => void;
+}) {
+  if (item.state === "submitted") {
+    const label =
+      item.given?.anonymous === true
+        ? `Submitted anonymously · ${monthName(item.given.month)}`
+        : item.given?.anonymous === false
+          ? `Submitted · ${formatShortDate(item.given.on)}`
+          : "Submitted";
+    return (
+      <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+        <Chip size="small" color="success" label={label} />
+        {/* Leadership 360° answers can't be opened again once submitted. */}
+        {item.kind === "PAR" && (
+          <Button size="small" onClick={onView}>
+            View
+          </Button>
+        )}
+      </Box>
+    );
+  }
+  if (item.state === "declined") return <StatusChip status="REJECTED" />;
+  if (item.state === "closed") return <Chip size="small" variant="outlined" label="Closed" />;
+  const draft = item.state === "draft";
+  return (
+    <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+      {draft && <Chip size="small" variant="outlined" label={item.anonymousDraft ? "Anonymous draft" : "Draft"} />}
+      {item.request && !item.offered && (
+        <Button size="small" color="inherit" onClick={onDecline}>
+          Decline
+        </Button>
+      )}
+      <Button size="small" variant="contained" onClick={onOpen}>
+        {draft ? "Continue" : "Respond"}
+      </Button>
+    </Box>
   );
 }

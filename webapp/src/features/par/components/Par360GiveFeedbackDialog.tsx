@@ -20,8 +20,6 @@ import {
   Autocomplete,
   Box,
   Button,
-  Card,
-  CardActionArea,
   Dialog,
   DialogActions,
   DialogContent,
@@ -32,196 +30,123 @@ import {
 } from "@wso2/oxygen-ui";
 import { describeError } from "@api/errors";
 import { useOfferToReview, useParticipants } from "../api/usePar360";
-import { useLeadership360Leaders } from "../api/useLeadership360";
-import type { ParCycle, Par360ReviewRequest } from "../api/types";
-import type {
-  Leadership360CurrentSurvey,
-  Leadership360Leader,
-  Leadership360MyFeedback,
-} from "../api/leadership360Types";
+import type { ParCycle } from "../api/types";
+import type { Leadership360CurrentSurvey, Leadership360Leader } from "../api/leadership360Types";
 import {
-  canStart,
-  leadershipFeedbackState,
-  parFeedbackState,
+  pickableForNewFeedback,
   pickerPeople,
-  type FeedbackKind,
-  type FeedbackState,
+  type GiveFeedbackItem,
   type PickerPerson,
 } from "../util/par360Feedback";
-import { formatShortDate } from "../util/parDate";
 import { isDeadlinePassed } from "../util/parDeadline";
 
 export type FeedbackStart =
   | { kind: "PAR"; email: string; name: string }
   | { kind: "LEADERSHIP"; leader: Leadership360Leader };
 
-const STATE_LABEL: Partial<Record<FeedbackState, string>> = {
-  asked: "Asked you",
-  draft: "Draft",
-  given: "Given",
-  declined: "Declined",
-  closed: "Closed",
-};
-
-// Give feedback: first the kind (asked only when both a PAR 2.0 cycle and a
-// Leadership 360° survey are open), then the person, from a list of just the
-// people that kind applies to. PAR feedback nobody asked for is an offer,
-// confirmed first, since it adds you to their reviewers.
+// Give feedback: the person first, from everyone in the cycle and the
+// leadership team. Who they are decides the form: Leadership 360° for a member
+// of the leadership team, PAR feedback for anyone else. PAR feedback nobody
+// asked for is an offer, confirmed first, since it adds you to their reviewers.
 export default function Par360GiveFeedbackDialog({
   onClose,
   workEmail,
   cycle,
-  requests,
   workedWith,
   survey,
-  myLeadership,
-  localDraftLeaders = [],
+  leaders,
+  items,
   onStart,
 }: {
   onClose: () => void;
   workEmail: string;
-  /** The PAR 2.0 cycle, when PAR feedback can be given at all. */
-  cycle?: ParCycle;
-  /** PAR feedback requests to you. */
-  requests: Par360ReviewRequest[];
-  /** Your lead, who asked you and who you asked: leaders among them are listed first. */
+  cycle: ParCycle;
+  /** Your lead, who asked you and who you asked: listed first. */
   workedWith: (string | null | undefined)[];
   /** The open Leadership 360° survey, if any. */
   survey?: Leadership360CurrentSurvey;
-  myLeadership?: Leadership360MyFeedback;
-  /** Leaders with an anonymous draft in this browser (lower-case emails). */
-  localDraftLeaders?: string[];
+  /** The leadership team. */
+  leaders: Leadership360Leader[];
+  /** Your Give feedback list, for where you are with each leader. */
+  items: GiveFeedbackItem[];
   onStart: (start: FeedbackStart) => void;
 }) {
-  const askKind = Boolean(cycle) && Boolean(survey);
-  const [kind, setKind] = useState<FeedbackKind | null>(askKind ? null : cycle ? "PAR" : "LEADERSHIP");
   const [person, setPerson] = useState<PickerPerson | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const participants = useParticipants(cycle?.parCycleId, kind === "PAR");
-  const leaders = useLeadership360Leaders(kind === "LEADERSHIP");
-  const offer = useOfferToReview(cycle?.parCycleId, workEmail);
-  const parClosed = cycle ? isDeadlinePassed(cycle.parThreeSixtyRatingDeadline) : true;
-  const cycleName = cycle?.parCycleName ?? "";
+  const participants = useParticipants(cycle.parCycleId);
+  const offer = useOfferToReview(cycle.parCycleId, workEmail);
+  const parClosed = isDeadlinePassed(cycle.parThreeSixtyRatingDeadline);
+  const leaderByEmail = useMemo(() => new Map(leaders.map((l) => [l.workEmail.toLowerCase(), l])), [leaders]);
 
-  const people = useMemo(
-    () =>
-      kind === "PAR"
-        ? pickerPeople({
-            selfEmail: workEmail,
-            people: (participants.data ?? []).map((p) => ({ email: p.workEmail, name: p.employeeName })),
-            workedWith: [],
-          })
-        : pickerPeople({
-            selfEmail: workEmail,
-            people: (leaders.data ?? []).map((l) => ({ email: l.workEmail, name: l.employeeName, jobRole: l.jobRole })),
-            workedWith,
-          }),
-    [kind, workEmail, participants.data, leaders.data, workedWith],
-  );
-
-  const stateOf = (p: PickerPerson): FeedbackState => {
-    const key = p.email.toLowerCase();
-    if (kind === "PAR") {
-      return parFeedbackState(
-        requests.find((r) => r.employeeEmail.toLowerCase() === key),
-        parClosed,
-      );
+  const people = useMemo(() => {
+    const byEmail = new Map<string, { email: string; name: string; jobRole?: string | null }>();
+    for (const p of participants.data ?? []) {
+      byEmail.set(p.workEmail.toLowerCase(), { email: p.workEmail, name: p.employeeName });
     }
-    return leadershipFeedbackState(
-      (myLeadership?.drafts ?? []).some((d) => d.leaderEmail.toLowerCase() === key) || localDraftLeaders.includes(key),
-    );
-  };
+    for (const l of leaders) {
+      byEmail.set(l.workEmail.toLowerCase(), { email: l.workEmail, name: l.employeeName, jobRole: l.jobRole });
+    }
+    return pickerPeople({
+      selfEmail: workEmail,
+      people: [...byEmail.values()].filter((p) => pickableForNewFeedback(p.email, items)),
+      workedWith,
+    });
+  }, [participants.data, leaders, workEmail, workedWith, items]);
 
-  // What to say next to a person in the list. Leaders stay pickable after feedback (named any time).
+  const isLeader = (p: PickerPerson) => leaderByEmail.has(p.email.toLowerCase());
+  // Everyone else listed is someone nobody asked you about: PAR 360° feedback for them is an offer,
+  // and none can be offered once the 360° deadline has passed.
+  const options = people.filter((p) => isLeader(p) || !parClosed);
+
+  // What to say next to a leader. They stay listed after feedback (named feedback can be given again).
   const labelOf = (p: PickerPerson): string | undefined => {
-    const state = stateOf(p);
-    if (kind === "LEADERSHIP" && state === "open") {
-      const key = p.email.toLowerCase();
-      const given =
-        (myLeadership?.named ?? []).some((g) => g.leaderEmail.toLowerCase() === key) ||
-        (myLeadership?.anonymous ?? []).some((g) => g.leaderEmail.toLowerCase() === key);
-      return given ? "Given before" : undefined;
-    }
-    return STATE_LABEL[state];
+    if (!isLeader(p)) return undefined;
+    if (!survey) return "Leadership 360° closed";
+    const given = items.some(
+      (i) => i.kind === "LEADERSHIP" && i.state === "submitted" && i.email.toLowerCase() === p.email.toLowerCase(),
+    );
+    return given ? "Leadership 360° · Submitted" : "Leadership 360°";
   };
 
   const choose = (p: PickerPerson | null) => {
     offer.reset();
     setPerson(p);
     if (!p) return;
-    if (kind === "PAR") {
-      if (stateOf(p) === "offer") setConfirming(true);
-      else onStart({ kind: "PAR", email: p.email, name: p.name });
-      return;
-    }
-    const leader = (leaders.data ?? []).find((l) => l.workEmail.toLowerCase() === p.email.toLowerCase());
+    const leader = leaderByEmail.get(p.email.toLowerCase());
     if (leader) onStart({ kind: "LEADERSHIP", leader });
+    else setConfirming(true);
   };
-
-  const loading = kind === "PAR" ? participants.isLoading : leaders.isLoading;
-  const loadError = kind === "PAR" ? participants.error : leaders.error;
-  const title =
-    kind === "PAR"
-      ? "Give feedback for a PAR"
-      : kind === "LEADERSHIP"
-        ? "Give Leadership 360° feedback"
-        : "Give feedback";
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{title}</DialogTitle>
+      <DialogTitle>Give feedback</DialogTitle>
       <DialogContent>
-        {kind === null ? (
-          <Stack spacing={1.5} sx={{ pt: 0.5 }}>
-            <Typography variant="body2" color="text.secondary">
-              What kind of feedback?
-            </Typography>
-            <KindOption
-              title="For a PAR"
-              text={
-                parClosed
-                  ? `The ${cycleName} 360° deadline has passed.`
-                  : `On a colleague's work, for their ${cycleName} PAR. Their lead sees your name. Due ${formatShortDate(cycle?.parThreeSixtyRatingDeadline)}.`
-              }
-              disabled={parClosed}
-              onClick={() => setKind("PAR")}
-            />
-            <KindOption
-              title="Leadership 360°"
-              text={`On a member of the leadership team. You can stay anonymous. Open until ${formatShortDate(survey?.survey.endDate)}.`}
-              onClick={() => setKind("LEADERSHIP")}
-            />
-          </Stack>
-        ) : confirming && person ? (
+        {confirming && person ? (
           <Stack spacing={2} sx={{ pt: 0.5 }}>
             <Typography variant="body2">
-              Offer feedback for {person.name}'s {cycleName} PAR? They didn't ask you, so you'll be added to their
-              reviewers. They'll see that you gave feedback, and their lead reads your answers with your name.
+              Offer feedback for {person.name}'s {cycle.parCycleName} PAR? They didn't ask you, so you'll be added to
+              their reviewers. They'll see that you gave feedback, and their lead reads your answers with your name.
             </Typography>
             {offer.isError && <Alert severity="error">{describeError(offer.error)}</Alert>}
           </Stack>
-        ) : kind === "PAR" && parClosed ? (
-          <Alert severity="info">The {cycleName} 360° deadline has passed.</Alert>
         ) : (
           <Stack spacing={2} sx={{ pt: 0.5 }}>
             <Typography variant="body2" color="text.secondary">
-              {kind === "PAR"
-                ? `Anyone in your ${cycleName} PAR cycle. Their lead sees your name.`
-                : `Any member of the leadership team you've worked with. You can stay anonymous.`}
+              For a member of the leadership team it's Leadership 360° feedback, and you can stay anonymous. For anyone
+              else it's PAR 360° feedback, which their lead reads with your name. People already in your list aren't
+              shown here: respond to them or continue there.
             </Typography>
-            {loadError ? (
-              <Alert severity="error">Couldn't load people to choose from. {describeError(loadError)}</Alert>
+            {participants.error ? (
+              <Alert severity="error">Couldn't load people to choose from. {describeError(participants.error)}</Alert>
             ) : (
               <Autocomplete
-                options={people}
-                loading={loading}
+                options={options}
+                loading={participants.isLoading}
                 value={person}
                 onChange={(_e, p) => choose(p)}
-                groupBy={
-                  kind === "LEADERSHIP" ? (p) => (p.suggested ? "Leaders you work with" : "All leaders") : undefined
-                }
+                groupBy={(p) => (p.suggested ? "People you work with" : "Everyone")}
                 getOptionLabel={(p) => p.name}
-                getOptionDisabled={(p) => !canStart(stateOf(p))}
+                getOptionDisabled={(p) => isLeader(p) && !survey}
                 isOptionEqualToValue={(a, b) => a.email === b.email}
                 renderOption={(props, p) => {
                   const label = labelOf(p);
@@ -277,44 +202,9 @@ export default function Par360GiveFeedbackDialog({
             </Button>
           </>
         ) : (
-          <>
-            {askKind && kind !== null && (
-              <Button
-                onClick={() => {
-                  setKind(null);
-                  setPerson(null);
-                }}
-              >
-                Back
-              </Button>
-            )}
-            <Button onClick={onClose}>Cancel</Button>
-          </>
+          <Button onClick={onClose}>Cancel</Button>
         )}
       </DialogActions>
     </Dialog>
-  );
-}
-
-function KindOption({
-  title,
-  text,
-  disabled = false,
-  onClick,
-}: {
-  title: string;
-  text: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Card variant="outlined">
-      <CardActionArea onClick={onClick} disabled={disabled} sx={{ p: 2, opacity: disabled ? 0.6 : 1 }}>
-        <Typography sx={{ fontWeight: 600 }}>{title}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-          {text}
-        </Typography>
-      </CardActionArea>
-    </Card>
   );
 }

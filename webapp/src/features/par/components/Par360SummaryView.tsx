@@ -41,9 +41,9 @@ export default function Par360SummaryView({
   return (
     <Stack spacing={2.5}>
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        <Metric label="360° index" value={formatIndex(index)} hint={`out of ${scaleMax}`} />
-        {teamIndex !== undefined && <Metric label="Team average" value={formatIndex(teamIndex)} hint="for context" />}
-        <Metric label="Responses" value={String(responseCount)} />
+        <SummaryMetric label="360° index" value={formatIndex(index)} hint={`out of ${scaleMax}`} />
+        {teamIndex !== undefined && <SummaryMetric label="Team average" value={formatIndex(teamIndex)} hint="for context" />}
+        <SummaryMetric label="Responses" value={String(responseCount)} />
       </Box>
 
       <Stack spacing={1.25}>
@@ -97,7 +97,8 @@ export default function Par360SummaryView({
   );
 }
 
-function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
+/** One headline number of a summary, with its label above it. */
+export function SummaryMetric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <Box>
       <Typography variant="caption" color="text.secondary">

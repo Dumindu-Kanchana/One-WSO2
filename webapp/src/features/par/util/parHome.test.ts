@@ -63,7 +63,9 @@ describe("nextUp", () => {
 
   it("asks for 360° feedback until three people are asked", () => {
     const shared = rating({ parEmployeeStatus: "SHARED" });
-    expect(nextUp(input({ rating: shared, reviewers: [reviewer("PENDING", 1), reviewer("REJECTED", 2)] })).action?.segment).toBe("cycle/360");
+    expect(nextUp(input({ rating: shared, reviewers: [reviewer("PENDING", 1), reviewer("REJECTED", 2)] })).title).toBe(
+      "Request 360° feedback",
+    );
     const asked = [1, 2, 3].map((n) => reviewer("PENDING", n));
     expect(nextUp(input({ rating: shared, reviewers: asked })).title).toBe("Your lead is reviewing");
   });
@@ -105,8 +107,8 @@ describe("homeSteps", () => {
     const steps = homeSteps(
       input({ rating: rating({ parEmployeeStatus: "SHARED" }), reviewers: [reviewer("SHARED", 1), reviewer("PENDING", 2)] }),
     );
-    expect(steps.map((s) => s.state)).toEqual(["done", "current", "upcoming", "upcoming", "upcoming"]);
-    expect(steps[1].detail).toBe("1 of 2 responded");
+    expect(steps.map((s) => s.state)).toEqual(["done", "current", "upcoming", "upcoming"]);
+    expect(steps[1].detail).toBe("1 of 2 submitted");
   });
 
   it("counts 360° as done with three responses, without waiting for everyone", () => {
@@ -114,5 +116,23 @@ describe("homeSteps", () => {
     const steps = homeSteps(input({ reviewers }));
     expect(steps[0].state).toBe("current");
     expect(steps[1].state).toBe("done");
+  });
+});
+
+describe("a member of the leadership team", () => {
+  it("counts Leadership 360° responses for the 360° step, not who they asked", () => {
+    const shared = rating({ parEmployeeStatus: "SHARED" });
+    const asked = [reviewer("PENDING", 1), reviewer("PENDING", 2), reviewer("PENDING", 3)];
+    expect(homeSteps(input({ rating: shared, reviewers: asked, leadership: { responseCount: 2 } }))[1]).toMatchObject({
+      state: "current",
+      label: "360° feedback",
+      detail: "Leadership 360°: 2 submitted",
+    });
+    expect(homeSteps(input({ rating: shared, leadership: { responseCount: 3 } }))[1].state).toBe("done");
+  });
+
+  it("is asked to ask for Leadership 360° feedback", () => {
+    const next = nextUp(input({ rating: rating({ parEmployeeStatus: "SHARED" }), leadership: { responseCount: 0 } }));
+    expect(next.title).toBe("Request Leadership 360° feedback");
   });
 });

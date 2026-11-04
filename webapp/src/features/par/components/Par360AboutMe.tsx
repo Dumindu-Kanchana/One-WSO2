@@ -15,7 +15,7 @@
 // under the License.
 
 import { useState, type ReactNode } from "react";
-import { Alert, Box, Button, Card, Skeleton, Stack, Typography } from "@wso2/oxygen-ui";
+import { Alert, Box, Button, Card, Chip, Skeleton, Stack, Typography } from "@wso2/oxygen-ui";
 import { PlusIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useParEmployeeInfo, useParRating } from "../api/useParData";
@@ -32,9 +32,11 @@ import { isDeadlinePassed } from "../util/parDeadline";
 import { feedbackProgress } from "../util/parHome";
 
 // Your own PAR 360° feedback in a PAR 2.0 cycle: your anonymised summary, shown
-// only once your lead shares your PAR, and the people you asked (who responded,
-// never what they wrote), with Ask for feedback. `afterSummary` goes between
-// the two (a leader's Leadership 360° results, when there are any).
+// only once your lead shares your PAR, and the people you asked (who submitted,
+// never what they wrote), with Request feedback. `afterSummary` goes between
+// the two (a leader's Leadership 360° results, when there are any). A member of
+// the leadership team has no PAR 360° summary: the people they ask answer in
+// Leadership 360°, which can be anonymous, so only declines show.
 export default function Par360AboutMe({
   cycle,
   workEmail,
@@ -49,7 +51,8 @@ export default function Par360AboutMe({
   const reviewers = useReviewers(cycle.parCycleId, workEmail);
   const requestReviewers = useRequestReviewers(cycle.parCycleId, workEmail);
   const leadShared = rating.data?.parLeadStatus === "SHARED";
-  const summary = useReviewSummary(cycle.parCycleId, workEmail, leadShared);
+  const leader = Boolean(rating.data?.parIsLeadershipEmployee);
+  const summary = useReviewSummary(cycle.parCycleId, workEmail, leadShared && !leader);
   const [adding, setAdding] = useState(false);
 
   const list = reviewers.data ?? [];
@@ -61,15 +64,15 @@ export default function Par360AboutMe({
   return (
     <Stack spacing={2}>
       {/* Nothing to show before the lead shares the PAR, so no placeholder either. */}
-      {leadShared && (
+      {leadShared && !leader && (
         <Card variant="outlined" sx={{ p: 2 }}>
-          <Typography sx={{ fontWeight: 600 }}>Your 360° summary</Typography>
+          <Typography sx={{ fontWeight: 600 }}>Your PAR 360° results</Typography>
           {summary.isLoading ? (
             <Skeleton variant="rectangular" height={80} sx={{ borderRadius: 1, mt: 1 }} />
           ) : summary.data?.available ? (
             <Box sx={{ mt: 1.5 }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Averages and comments from everyone who responded. Names are left out and comments are sorted, so
+                Averages and comments from everyone who submitted. Names are left out and comments are sorted, so
                 none of it points to one person.
               </Typography>
               <Par360SummaryView
@@ -92,12 +95,24 @@ export default function Par360AboutMe({
       <Card variant="outlined" sx={{ p: 2 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2, flexWrap: "wrap" }}>
           <Box>
-            <Typography sx={{ fontWeight: 600 }}>People you asked</Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+              <Typography sx={{ fontWeight: 600 }}>Feedback requests</Typography>
+              {!deadlinePassed && !leadShared && (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Due ${formatShortDate(cycle.parThreeSixtyRatingDeadline)}`}
+                />
+              )}
+            </Box>
             <Typography variant="body2" color="text.secondary">
-              {asked === 0
-                ? `Ask ${MIN_360_RESPONSES} to ${MAX_360_REVIEWERS} people who worked closely with you this cycle.`
-                : `${responded} of ${asked} responded${declined ? `, ${declined} declined` : ""}. You see who responded, never what they wrote.`}{" "}
-              {!deadlinePassed && !leadShared && `Due ${formatShortDate(cycle.parThreeSixtyRatingDeadline)}.`}
+              {leader
+                ? asked === 0
+                  ? "Request Leadership 360° feedback from people who work closely with you. Anyone can also give it unrequested."
+                  : `${asked} requested${declined ? `, ${declined} declined` : ""}. They can answer anonymously, so you don't see who submitted.`
+                : asked === 0
+                  ? `Request feedback from ${MIN_360_RESPONSES} to ${MAX_360_REVIEWERS} people who worked closely with you this cycle.`
+                  : `${responded} of ${asked} submitted${declined ? `, ${declined} declined` : ""}.`}
             </Typography>
           </Box>
           {!adding && (
@@ -107,7 +122,7 @@ export default function Par360AboutMe({
               disabled={blocked}
               onClick={() => setAdding(true)}
             >
-              Ask for feedback
+              Request feedback
             </Button>
           )}
         </Box>
@@ -118,7 +133,7 @@ export default function Par360AboutMe({
         )}
         {full && !leadShared && (
           <Typography variant="caption" color="text.secondary">
-            You've asked {MAX_360_REVIEWERS} people, the most for one cycle.
+            You've requested feedback from {MAX_360_REVIEWERS} people, the most for one cycle.
           </Typography>
         )}
         {adding && (
@@ -132,6 +147,7 @@ export default function Par360AboutMe({
               onCancel={() => setAdding(false)}
               isSubmitting={requestReviewers.isPending}
               error={requestReviewers.error ?? undefined}
+              parCycleId={cycle.parCycleId}
             />
           </Box>
         )}
@@ -143,12 +159,12 @@ export default function Par360AboutMe({
               Couldn't load your reviewers.
             </ErrorNotice>
           ) : list.length === 0 ? (
-            <ParEmptyState text="You haven't asked anyone yet" />
+            <ParEmptyState text="You haven't requested feedback from anyone yet" />
           ) : (
             <Stack divider={<Box sx={{ borderTop: 1, borderColor: "divider" }} />}>
               {list.map((r) => (
                 <PersonRow key={r.reviewerEmail} name={r.reviewerName} email={r.reviewerEmail}>
-                  <StatusChip status={r.reviewStatus} />
+                  <StatusChip status={r.reviewStatus} leadership={leader} />
                 </PersonRow>
               ))}
             </Stack>

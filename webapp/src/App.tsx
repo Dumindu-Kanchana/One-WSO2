@@ -640,8 +640,8 @@ export default function App() {
                 </Suspense>
               }
             />
-            {/* PAR 2.0 cycles: Active cycle (your own PAR, in three sections)
-                and Give feedback (PAR and Leadership 360° feedback for
+            {/* PAR 2.0 cycles: Active cycle (your own PAR, one tracker step at
+                a time) and Give feedback (PAR and Leadership 360° feedback for
                 others). ParGroupPage shows their tabs only for a cycle with
                 the structured 360° form; Give feedback redirects without one. */}
             {isPreviewEnabled("par2") && (
@@ -656,14 +656,19 @@ export default function App() {
                 }
               >
                 <Route index element={<ParActiveCycleIndex />} />
-                <Route
-                  path="self-review"
-                  element={
-                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                      <ParEmployeeFeedbackTab />
-                    </Suspense>
-                  }
-                />
+                {/* The lead's review shows on the self-review page once the lead
+                    shares; its tracker step opens it too. */}
+                {["self-review", "lead-review"].map((path) => (
+                  <Route
+                    key={path}
+                    path={path}
+                    element={
+                      <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                        <ParEmployeeFeedbackTab />
+                      </Suspense>
+                    }
+                  />
+                ))}
                 <Route
                   path="360"
                   element={

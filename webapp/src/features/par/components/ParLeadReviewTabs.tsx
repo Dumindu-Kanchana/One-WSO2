@@ -112,6 +112,7 @@ export default function ParLeadReviewTabs({
                 leadStatus={rating.data?.parLeadStatus}
                 leadStatusKnown={rating.isSuccess}
                 structured={showsPar2}
+                leadership={showsPar2 && Boolean(rating.data?.parIsLeadershipEmployee)}
               />
             )}
         {!isAdminView && tab === 2 && <ParLeadF2fPanel cycle={cycle} employeeEmail={employeeEmail} />}

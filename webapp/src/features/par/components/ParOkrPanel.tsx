@@ -79,7 +79,7 @@ export function ParOkrEvidence({ ownerEmail, cycleEndDate }: { ownerEmail: strin
   return (
     <>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        {completed} of {total} completed. OKRs inform your rating; they aren't the rating.
+        {completed} of {total} completed.
       </Typography>
       <ParOkrList okrs={shown} />
     </>

@@ -16,12 +16,11 @@
 
 import type { ReactNode } from "react";
 import { Navigate, Outlet } from "react-router";
-import { Chip, Skeleton } from "@wso2/oxygen-ui";
+import { Skeleton } from "@wso2/oxygen-ui";
 import RoutedTabs, { type RoutedTabDef } from "@components/routed-tabs/RoutedTabs";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import ParShell from "../components/ParShell";
-import ParCycleTracker from "../components/ParCycleTracker";
 import {
   useActiveParCycle,
   useParEmployeeItemVisible,
@@ -30,9 +29,15 @@ import {
 } from "../api/useParData";
 import { useParShowsPar2 } from "../api/useReview360";
 import { useReviewRequests } from "../api/usePar360";
-import { useCurrentLeadership360Survey, useMyLeadership360Feedback } from "../api/useLeadership360";
+import type { ParCycle } from "../api/types";
+import {
+  useCurrentLeadership360Survey,
+  useLeadership360Leaders,
+  useMyLeadership360Feedback,
+} from "../api/useLeadership360";
 import { localDraftLeaders } from "../util/leadership360LocalDraft";
-import { openRequests } from "../util/parHome";
+import { isDeadlinePassed } from "../util/parDeadline";
+import { giveFeedbackItems, waitingCount } from "../util/par360Feedback";
 
 // Tab labels and order match par-app's own OngoingCycleView.tsx tab bar
 // (Employee Feedback / Request 360° / Provide 360° / F2F). History is
@@ -77,13 +82,11 @@ export default function ParGroupPage() {
   const profile = useMeProfile();
   const workEmail = profile.data?.userInfo.workEmail;
   const activeCycles = useActiveParCycle(workEmail);
-  // Unset while there's no active cycle to name.
-  const cycleName = activeCycles.data?.[0]?.parCycleName;
   const { hasLead, isLoading } = useParHasLead(workEmail, profile.isLoading);
   const { isActive, isLoading: isActiveLoading } = useParHasActiveCycle(workEmail, profile.isLoading);
   const { showsPar2, isLoading: isPar2Loading } = useParShowsPar2(activeCycles.data?.[0]?.parCycleId);
   const par2Cycle = isActive && showsPar2 ? activeCycles.data?.[0] : undefined;
-  const waiting = useFeedbackWaiting(workEmail, par2Cycle?.parCycleId);
+  const waiting = useFeedbackWaiting(workEmail, par2Cycle);
 
   const tabs = par2Cycle
     ? hasLead
@@ -100,15 +103,10 @@ export default function ParGroupPage() {
       title="Performance Appraisal Review"
       subtitle="Complete your own feedback, request and give 360° feedback and see your record from past cycles."
     >
-      {/* The active cycle's own name/period, not the page's title — this
-          page is "Performance Appraisal Review" regardless of which cycle is running. */}
-      {cycleName && <Chip label={cycleName} size="small" color="primary" variant="outlined" sx={{ mb: 2, fontWeight: 600 }} />}
       {isLoading || isActiveLoading || isPar2Loading ? (
         <Skeleton variant="rectangular" height={36} sx={{ borderRadius: 1, mb: 2, maxWidth: 640 }} />
       ) : (
         <>
-          {/* PAR 2.0: where you are in the cycle, pinned above every tab. */}
-          {par2Cycle && hasLead && workEmail && <ParCycleTracker cycle={par2Cycle} workEmail={workEmail} />}
           <RoutedTabs basePath="/me/performance" tabs={tabs} ariaLabel="Performance sections" />
           <Outlet />
         </>
@@ -117,17 +115,27 @@ export default function ParGroupPage() {
   );
 }
 
-/** Feedback waiting on you in a PAR 2.0 cycle, for the Give feedback tab's
- * label: PAR requests not yet answered and your Leadership 360° drafts (named
- * ones on the server, anonymous ones in this browser). */
-function useFeedbackWaiting(workEmail: string | undefined, parCycleId: number | undefined): number {
-  const requests = useReviewRequests(parCycleId, workEmail);
-  const leadership = isPreviewEnabled("leadership360") && parCycleId !== undefined;
+/** People waiting on your feedback in a PAR 2.0 cycle, for the Give feedback
+ * tab's label: requests not yet answered and Leadership 360° drafts (named ones
+ * on the server, anonymous ones in this browser), one per person. */
+function useFeedbackWaiting(workEmail: string | undefined, cycle: ParCycle | undefined): number {
+  const requests = useReviewRequests(cycle?.parCycleId, workEmail);
+  const leadership = isPreviewEnabled("leadership360") && cycle !== undefined;
   const survey = useCurrentLeadership360Survey(leadership);
   const surveyId = leadership ? survey.data?.survey.surveyId : undefined;
   const mine = useMyLeadership360Feedback(surveyId);
-  const local = workEmail && surveyId !== undefined ? localDraftLeaders(workEmail, surveyId).length : 0;
-  return openRequests(requests.data ?? []).length + (mine.data?.drafts.length ?? 0) + local;
+  const leaders = useLeadership360Leaders(leadership);
+  if (!cycle) return 0;
+  return waitingCount(
+    giveFeedbackItems({
+      requests: requests.data ?? [],
+      leaderEmails: new Set((leaders.data ?? []).map((l) => l.workEmail.toLowerCase())),
+      mine: mine.data,
+      localDraftLeaders: workEmail && surveyId !== undefined ? localDraftLeaders(workEmail, surveyId) : [],
+      parDeadlinePassed: isDeadlinePassed(cycle.parThreeSixtyRatingDeadline),
+      surveyOpen: surveyId !== undefined,
+    }),
+  );
 }
 
 /** The index route of the group. In a PAR 2.0 cycle: Active cycle's

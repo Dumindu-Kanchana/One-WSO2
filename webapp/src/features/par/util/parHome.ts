@@ -19,7 +19,7 @@ import type { ParCycle, ParRating, Par360Reviewer, Par360ReviewRequest } from ".
 import { MIN_360_RESPONSES } from "../api/review360Types";
 import { isDeadlinePassed } from "./parDeadline";
 
-export type HomeStepKey = "self-review" | "360" | "lead-review" | "f2f" | "complete";
+export type HomeStepKey = "self-review" | "360" | "lead-review" | "f2f";
 export type HomeStepState = "done" | "current" | "upcoming";
 
 export interface HomeStep {
@@ -33,8 +33,6 @@ export interface HomeStep {
 export interface NextUp {
   title: string;
   body: string;
-  // Where under Me → Performance the action goes, if there is one.
-  action?: { label: string; segment: string };
 }
 
 export interface HomeInput {
@@ -44,6 +42,9 @@ export interface HomeInput {
   selfReviewProgress?: { answered: number; total: number };
   reviewers: Par360Reviewer[];
   requests: Par360ReviewRequest[];
+  /** A member of the leadership team: their 360° feedback is Leadership 360°, and only how many
+   * responded is known, not who. */
+  leadership?: { responseCount: number };
 }
 
 export function feedbackProgress(reviewers: Par360Reviewer[]) {
@@ -58,11 +59,12 @@ export function openRequests(requests: Par360ReviewRequest[]): Par360ReviewReque
   return requests.filter((r) => r.reviewStatus === "PENDING" || r.reviewStatus === "DRAFT");
 }
 
-export function homeSteps({ cycle, rating, selfReviewProgress, reviewers }: HomeInput): HomeStep[] {
+export function homeSteps({ cycle, rating, selfReviewProgress, reviewers, leadership }: HomeInput): HomeStep[] {
   const selfShared = rating.parEmployeeStatus === "SHARED" || rating.parEmployeeStatus === "SHARED_BLOCKED";
   const leadShared = rating.parLeadStatus === "SHARED";
   const f2fDone = rating.parF2fStatus === "COMPLETED";
-  const { asked, responded } = feedbackProgress(reviewers);
+  const { asked, responded: parResponded } = feedbackProgress(reviewers);
+  const responded = leadership ? leadership.responseCount : parResponded;
   const feedbackDone = responded >= MIN_360_RESPONSES || leadShared || isDeadlinePassed(cycle.parThreeSixtyRatingDeadline);
 
   const steps: Omit<HomeStep, "state">[] = [
@@ -81,13 +83,17 @@ export function homeSteps({ cycle, rating, selfReviewProgress, reviewers }: Home
     {
       key: "360",
       label: "360° feedback",
-      detail: asked === 0 ? "No one asked yet" : `${responded} of ${asked} responded`,
+      detail: leadership
+        ? `Leadership 360°: ${responded > 0 ? `${responded} submitted` : "none yet"}`
+        : asked === 0
+          ? "None requested yet"
+          : `${responded} of ${asked} submitted`,
       due: cycle.parThreeSixtyRatingDeadline,
     },
     {
       key: "lead-review",
       label: "Lead review",
-      detail: leadShared ? "Shared with you" : rating.parLeadStatus === "DRAFT" ? "In progress" : "Not started",
+      detail: leadShared ? "Shared with you" : rating.parLeadStatus === "DRAFT" ? "In progress" : "Not shared",
       due: cycle.parLeadDeadline,
     },
     {
@@ -96,14 +102,12 @@ export function homeSteps({ cycle, rating, selfReviewProgress, reviewers }: Home
       detail: f2fDone ? "Done" : rating.parF2fStatus === "SCHEDULED" ? "Booked" : "Not booked",
       due: cycle.parF2FDeadline,
     },
-    { key: "complete", label: "Complete", detail: leadShared && f2fDone ? "Download your PAR" : "" },
   ];
   const done: Record<HomeStepKey, boolean> = {
     "self-review": selfShared,
     "360": feedbackDone,
     "lead-review": leadShared,
     f2f: f2fDone,
-    complete: leadShared && f2fDone,
   };
   const current = steps.find((s) => !done[s.key])?.key;
   return steps.map((s) => ({ ...s, state: done[s.key] ? "done" : s.key === current ? "current" : "upcoming" }));
@@ -111,7 +115,7 @@ export function homeSteps({ cycle, rating, selfReviewProgress, reviewers }: Home
 
 // One next action, in the order the cycle needs them. Waiting on someone else
 // is said plainly rather than inventing something to do.
-export function nextUp({ cycle, rating, selfReviewProgress, reviewers, requests }: HomeInput): NextUp {
+export function nextUp({ cycle, rating, selfReviewProgress, reviewers, requests, leadership }: HomeInput): NextUp {
   const selfShared = rating.parEmployeeStatus === "SHARED" || rating.parEmployeeStatus === "SHARED_BLOCKED";
   const leadShared = rating.parLeadStatus === "SHARED";
   const { asked } = feedbackProgress(reviewers);
@@ -124,19 +128,22 @@ export function nextUp({ cycle, rating, selfReviewProgress, reviewers, requests 
           body: selfReviewProgress
             ? `${selfReviewProgress.answered} of ${selfReviewProgress.total} sections done. Your lead sees it once you share.`
             : "Your draft is saved. Your lead sees it once you share.",
-          action: { label: "Continue", segment: "cycle/self-review" },
         }
       : {
           title: "Start your self-review",
           body: "A few short sections on your impact and how you've grown. It saves as you type.",
-          action: { label: "Start", segment: "cycle/self-review" },
         };
   }
-  if (feedbackOpen && asked < MIN_360_RESPONSES) {
+  if (leadership && feedbackOpen && asked < MIN_360_RESPONSES && leadership.responseCount < MIN_360_RESPONSES) {
     return {
-      title: "Ask for 360° feedback",
-      body: `Ask at least ${MIN_360_RESPONSES} people who worked closely with you this cycle (${asked} so far).`,
-      action: { label: "Ask for feedback", segment: "cycle/360" },
+      title: "Request Leadership 360° feedback",
+      body: "Request it from people who work closely with you. They can answer named or anonymously, and anyone can give it unrequested.",
+    };
+  }
+  if (!leadership && feedbackOpen && asked < MIN_360_RESPONSES) {
+    return {
+      title: "Request 360° feedback",
+      body: `Request it from at least ${MIN_360_RESPONSES} people who worked closely with you this cycle (${asked} so far).`,
     };
   }
   const waiting = openRequests(requests);
@@ -146,9 +153,8 @@ export function nextUp({ cycle, rating, selfReviewProgress, reviewers, requests 
           title: `${waiting[0].employeeName ?? waiting[0].employeeEmail} asked for your feedback`,
           body:
             waiting.length > 1
-              ? `${waiting.length} people asked for your 360° feedback. It takes about five minutes each.`
-              : "They asked for your 360° feedback. It takes about five minutes.",
-          action: { label: "Respond", segment: "give-feedback" },
+              ? `${waiting.length} people asked for your 360° feedback, in Give feedback. About five minutes each.`
+              : "They asked for your 360° feedback, in Give feedback. It takes about five minutes.",
         }
       : undefined;
   // While the lead reviews, feedback others are waiting on is the thing to do.
@@ -166,18 +172,15 @@ export function nextUp({ cycle, rating, selfReviewProgress, reviewers, requests 
       ? {
           title: "Your face-to-face is booked",
           body: "Talk through your PAR with your lead, then mark the F2F as done.",
-          action: { label: "Open F2F", segment: "cycle/f2f" },
         }
       : {
           title: "Book your face-to-face",
           body: "Your lead has shared your PAR. Find a time to talk it through.",
-          action: { label: "Book F2F", segment: "cycle/f2f" },
         };
   }
   if (giveFeedback) return giveFeedback;
   return {
     title: "Your PAR is complete",
-    body: "Download the final PAR, with your lead's feedback and your 360° summary, for your records.",
-    action: { label: "Open your PAR", segment: "cycle/self-review" },
+    body: "Download the final PAR, with your lead's feedback and your 360° results, for your records.",
   };
 }

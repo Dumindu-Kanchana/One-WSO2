@@ -40,12 +40,12 @@ import type {
 } from "../api/leadership360Types";
 import { allQuestions, stepSections } from "../util/leadership360Form";
 import { formatShortDate } from "../util/parDate";
+import { formatIndex } from "../util/review360Form";
+import { SummaryMetric } from "./Par360SummaryView";
 
-// One leader's results in one survey, live while it's open. What it contains
-// depends on the view it's opened from — the backend decides: the leader
-// (SELF) gets averages and comments, with names on named comments; their
-// manager (REPORTS) and PAR admins (ALL) also get named responses in full;
-// admins also get the relationship breakdown.
+// One leader's results in one survey, live while it's open, in a dialog: for
+// lists of leaders (Lead View and Admin View → Leadership 360°). A single
+// leader's card shows the same results in place (Leadership360Results).
 export default function Leadership360SummaryDialog({
   open,
   onClose,
@@ -60,8 +60,6 @@ export default function Leadership360SummaryDialog({
   leader: Leadership360Leader;
 }) {
   const survey = useLeadership360SurveyWithTemplate(surveyId);
-  const summary = useLeadership360Summary(surveyId, view, leader.workEmail);
-  const definition = survey.data?.template.definition;
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
@@ -74,21 +72,7 @@ export default function Leadership360SummaryDialog({
         )}
       </DialogTitle>
       <DialogContent dividers>
-        {survey.isLoading || summary.isLoading ? (
-          <Skeleton variant="rectangular" height={240} sx={{ borderRadius: 1 }} />
-        ) : survey.isError || summary.isError ? (
-          <ErrorNotice
-            error={summary.error ?? survey.error}
-            onRetry={() => {
-              void survey.refetch();
-              void summary.refetch();
-            }}
-          >
-            Couldn't load the results.
-          </ErrorNotice>
-        ) : summary.data && definition ? (
-          <SummaryContent summary={summary.data} definition={definition} />
-        ) : null}
+        <Leadership360Results surveyId={surveyId} view={view} leaderEmail={leader.workEmail} />
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Button size="small" onClick={onClose}>
@@ -97,6 +81,43 @@ export default function Leadership360SummaryDialog({
       </DialogActions>
     </Dialog>
   );
+}
+
+// One leader's results in one survey. What they contain depends on the view
+// they're read from — the backend decides: the leader (SELF) gets averages and
+// comments, with names on named comments; their manager (REPORTS) and PAR
+// admins (ALL) also get named responses in full; admins also get the
+// relationship breakdown. Laid out like a PAR 360° summary.
+export function Leadership360Results({
+  surveyId,
+  view,
+  leaderEmail,
+}: {
+  surveyId: number;
+  view: Leadership360View;
+  leaderEmail: string;
+}) {
+  const survey = useLeadership360SurveyWithTemplate(surveyId);
+  const summary = useLeadership360Summary(surveyId, view, leaderEmail);
+  const definition = survey.data?.template.definition;
+
+  if (survey.isLoading || summary.isLoading) {
+    return <Skeleton variant="rectangular" height={240} sx={{ borderRadius: 1 }} />;
+  }
+  if (survey.isError || summary.isError) {
+    return (
+      <ErrorNotice
+        error={summary.error ?? survey.error}
+        onRetry={() => {
+          void survey.refetch();
+          void summary.refetch();
+        }}
+      >
+        Couldn't load the results.
+      </ErrorNotice>
+    );
+  }
+  return summary.data && definition ? <SummaryContent summary={summary.data} definition={definition} /> : null;
 }
 
 function SummaryContent({ summary, definition }: { summary: Leadership360Summary; definition: FormDefinition }) {
@@ -114,26 +135,24 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
   const choiceLabels = new Map(
     allQuestions(definition).flatMap((q) => (q.options ?? []).map((o) => [o.value, o.label] as const)),
   );
+  const heading = (text: string) => (
+    <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
+      {text}
+    </Typography>
+  );
 
   return (
-    <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" component="p">
-          {summary.overallAverage?.toFixed(2) ?? "—"}
-          <Typography component="span" variant="body1" color="text.secondary">
-            {" "}
-            / {max} overall, from {summary.responseCount} responses
-          </Typography>
-        </Typography>
+    <Stack spacing={2.5}>
+      <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        <SummaryMetric label="Overall" value={formatIndex(summary.overallAverage)} hint={`out of ${max}`} />
+        <SummaryMetric label="Responses" value={String(summary.responseCount)} />
       </Box>
 
       {stepSections(definition)
         .filter((s) => s.questions.some((q) => q.type === "RATING"))
         .map((section) => (
           <Box key={section.id}>
-            <Typography variant="h6" component="h3" sx={{ mb: 1 }}>
-              {section.title}
-            </Typography>
+            {heading(section.title)}
             <Stack spacing={1.25}>
               {section.questions
                 .filter((q) => q.type === "RATING")
@@ -142,9 +161,16 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
                   return (
                     <Box key={q.id}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
-                        <Typography variant="body2">{q.text}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {q.text}
+                        </Typography>
                         <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {average ? average.average.toFixed(2) : "—"}
+                          {formatIndex(average?.average)}
+                          {average && (
+                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
+                              {`${average.ratingCount} rating${average.ratingCount === 1 ? "" : "s"}`}
+                            </Typography>
+                          )}
                         </Typography>
                       </Box>
                       <LinearProgress
@@ -161,34 +187,18 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
         ))}
 
       <Box>
-        <Typography variant="h6" component="h3" sx={{ mb: 1 }}>
-          Comments
-        </Typography>
+        {heading("Comments")}
         {summary.comments.length === 0 && summary.namedComments.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No written comments.
           </Typography>
         ) : (
-          <Stack spacing={1}>
+          <Stack spacing={0.75}>
             {summary.namedComments.map((c, i) => (
-              <Box key={`named-${i}`} sx={{ pl: 1.5, borderLeft: 3, borderColor: "primary.light" }}>
-                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                  {c.comment}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {c.respondentName ?? c.respondentEmail}
-                </Typography>
-              </Box>
+              <Comment key={`named-${i}`} text={c.comment} by={c.respondentName ?? c.respondentEmail} />
             ))}
             {summary.comments.map((comment, i) => (
-              <Box key={`anonymous-${i}`} sx={{ pl: 1.5, borderLeft: 3, borderColor: "divider" }}>
-                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                  {comment}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Anonymous
-                </Typography>
-              </Box>
+              <Comment key={`anonymous-${i}`} text={comment} by="Anonymous" />
             ))}
           </Stack>
         )}
@@ -196,9 +206,7 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
 
       {summary.relationshipCounts && (
         <Box>
-          <Typography variant="h6" component="h3" sx={{ mb: 1 }}>
-            How respondents work with them
-          </Typography>
+          {heading("How respondents work with them")}
           {Object.entries(summary.relationshipCounts).map(([value, count]) => (
             <Typography key={value} variant="body2">
               {choiceLabels.get(value) ?? value}: {count}
@@ -209,9 +217,7 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
 
       {summary.namedResponses && (
         <Box>
-          <Typography variant="h6" component="h3" sx={{ mb: 1 }}>
-            Named responses ({summary.namedResponses.length})
-          </Typography>
+          {heading(`Named responses (${summary.namedResponses.length})`)}
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Only respondents who chose to submit with their name. The leader sees their comments with their name, not
             the whole response. When someone responded more than once, only their latest scores count.
@@ -237,5 +243,19 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
         </Box>
       )}
     </Stack>
+  );
+}
+
+// A comment in a shaded box, as in a PAR 360° summary, with who wrote it (or Anonymous).
+function Comment({ text, by }: { text: string; by: string }) {
+  return (
+    <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "action.hover" }}>
+      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+        {text}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {by}
+      </Typography>
+    </Box>
   );
 }

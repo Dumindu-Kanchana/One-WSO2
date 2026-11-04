@@ -14,13 +14,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useState, type ReactNode } from "react";
-import { Box, Button, Card, Typography, type SxProps, type Theme } from "@wso2/oxygen-ui";
+import type { ReactNode } from "react";
+import { Box, Card, Typography, type SxProps, type Theme } from "@wso2/oxygen-ui";
 import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from "../api/useLeadership360";
-import Leadership360SummaryDialog from "./Leadership360SummaryDialog";
+import { Leadership360Results } from "./Leadership360SummaryDialog";
 
 // One leader's Leadership 360° results in one PAR cycle's survey (live while
-// it's open): your own (view SELF), or a report's in the lead's review (view
+// it's open), shown in place like a PAR 360° summary once there are enough
+// responses: your own (view SELF), or a report's in the lead's review (view
 // REPORTS, which adds named responses). Renders `fallback` when there's
 // nothing to show: the person isn't in the leadership team, or the cycle has
 // no survey.
@@ -42,7 +43,6 @@ export default function Leadership360ResultsCard({
   const surveys = useLeadership360Surveys();
   const survey = cycleSurvey(surveys.data, parCycleId);
   const results = useLeadership360Results(survey?.surveyId, view);
-  const [viewing, setViewing] = useState(false);
 
   if (surveys.isLoading || results.isLoading) return null;
   const entry =
@@ -65,31 +65,19 @@ export default function Leadership360ResultsCard({
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
         {live
-          ? "Updates as feedback comes in, once 3 or more people have responded."
+          ? "Updates as feedback comes in, once 3 or more people have submitted."
           : "Results from a survey that has closed."}
         {view === "REPORTS" &&
           " As their manager you also see named responses in full; anonymous ones only count toward the averages."}
       </Typography>
       {entry.available ? (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Typography variant="body2">{responses}</Typography>
-          <Button size="small" variant="outlined" onClick={() => setViewing(true)}>
-            View results
-          </Button>
+        <Box sx={{ mt: 1 }}>
+          <Leadership360Results surveyId={survey.surveyId} view={view} leaderEmail={entry.leader.workEmail} />
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary">
           {responses} so far{live ? "; results show from 3." : "; fewer than 3, so no results."}
         </Typography>
-      )}
-      {viewing && (
-        <Leadership360SummaryDialog
-          open
-          onClose={() => setViewing(false)}
-          surveyId={survey.surveyId}
-          view={view}
-          leader={entry.leader}
-        />
       )}
     </Card>
   );

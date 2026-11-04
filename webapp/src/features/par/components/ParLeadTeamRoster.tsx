@@ -20,6 +20,7 @@ import {
   Box,
   Button,
   Card,
+  Chip,
   DataGrid,
   Dialog,
   DialogActions,
@@ -38,6 +39,7 @@ import {
 } from "@wso2/oxygen-ui";
 import { CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import { describeError } from "@api/errors";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
@@ -46,6 +48,7 @@ import { useParTeamDetails } from "../api/useLeadTeams";
 import { useSend360Reminder } from "../api/useLeadReminders";
 import { useLeadRatingUpdate } from "../api/useLeadRatingUpdate";
 import { useParShowsPar2, useReviewIndexes } from "../api/useReview360";
+import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from "../api/useLeadership360";
 import { formatIndex } from "../util/review360Form";
 import { useOkrsOf } from "../api/useOkrs";
 import { okrProgress, okrState, okrsForCycle } from "../util/okr";
@@ -128,6 +131,18 @@ export default function ParLeadTeamRoster({
     () => new Map((indexes.data?.members ?? []).map((m) => [m.employeeEmail.toLowerCase(), m.index])),
     [indexes.data],
   );
+  // Members in the leadership team get Leadership 360° feedback, not PAR 360°: how many responded
+  // to the cycle's survey shows instead.
+  const leadership = showsPar2 && isPreviewEnabled("leadership360");
+  const surveys = useLeadership360Surveys(leadership);
+  const leaderResults = useLeadership360Results(
+    leadership ? cycleSurvey(surveys.data, cycle.parCycleId)?.surveyId : undefined,
+    "REPORTS",
+  );
+  const leaderResponsesByEmail = useMemo(
+    () => new Map((leaderResults.data ?? []).map((r) => [r.leader.workEmail.toLowerCase(), r.responseCount])),
+    [leaderResults.data],
+  );
   // No org-wide employee directory of our own — reuses Leave's for avatars.
   const employees = useLeaveEmployees();
   const thumbnailByEmail = useMemo(
@@ -162,6 +177,8 @@ export default function ParLeadTeamRoster({
   }
 
   const members = details.data?.details ?? [];
+  // The 360° responses tile counts PAR 360° only; leaders' feedback is Leadership 360°.
+  const parMembers = members.filter((m) => !leaderResponsesByEmail.has(m.parEmployeeEmail.toLowerCase()));
   const filteredMembers = members
     .filter((member) =>
       `${member.parEmployeeName.toLowerCase()}${member.parEmployeeEmail.toLowerCase()}`.includes(
@@ -320,6 +337,17 @@ export default function ParLeadTeamRoster({
       align: "center",
       headerAlign: "center",
       renderCell: (params) => {
+        const leaderResponses = leaderResponsesByEmail.get(params.row.parEmployeeEmail.toLowerCase());
+        if (leaderResponses !== undefined) {
+          return (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.25 }}>
+              <Chip size="small" variant="outlined" label="Leadership 360°" />
+              <Typography variant="caption" color="text.secondary">
+                {leaderResponses} {leaderResponses === 1 ? "response" : "responses"}
+              </Typography>
+            </Box>
+          );
+        }
         const chip = (
           <ParStatusChip
             content={params.row.par360ReviewStatus}
@@ -488,9 +516,9 @@ export default function ParLeadTeamRoster({
         {showsPar2 && (
           <Grid size={{ xs: 12, sm: 3 }}>
             <ParCompletionKpiTile
-              label={`360° responses${indexes.data?.teamIndex !== undefined ? ` · team index ${formatIndex(indexes.data.teamIndex)}` : ""}`}
-              completed={members.reduce((n, m) => n + m.par360ReviewCounts.sharedReviewCount, 0)}
-              total={members.reduce((n, m) => n + m.par360ReviewCounts.requestedReviewCount, 0)}
+              label={`PAR 360° responses${indexes.data?.teamIndex !== undefined ? ` · team index ${formatIndex(indexes.data.teamIndex)}` : ""}`}
+              completed={parMembers.reduce((n, m) => n + m.par360ReviewCounts.sharedReviewCount, 0)}
+              total={parMembers.reduce((n, m) => n + m.par360ReviewCounts.requestedReviewCount, 0)}
             />
           </Grid>
         )}
