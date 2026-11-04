@@ -16,7 +16,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { FormDefinition } from "../api/leadership360Types";
-import { cleanAnswers, headerSections, missingRequired, sectionProgress, stepSections } from "./leadership360Form";
+import {
+  cleanAnswers,
+  headerSections,
+  missingRequired,
+  sectionComplete,
+  sectionProgress,
+  stepSections,
+} from "./leadership360Form";
 
 const definition: FormDefinition = {
   kind: "LEADERSHIP_360",
@@ -63,6 +70,14 @@ describe("leadership360Form", () => {
   it("counts answered rated questions per section", () => {
     expect(sectionProgress(definition.sections[1], { integrity: 4 })).toEqual({ answered: 1, total: 2 });
     expect(sectionProgress(definition.sections[2], { other: "Hi" })).toEqual({ answered: 0, total: 0 });
+  });
+
+  it("calls a step done once its required questions are answered, or something is written in an optional one", () => {
+    expect(sectionComplete(definition.sections[1], {})).toBe(false);
+    expect(sectionComplete(definition.sections[1], { ownership: 4 })).toBe(false);
+    expect(sectionComplete(definition.sections[1], { integrity: 4 })).toBe(true);
+    expect(sectionComplete(definition.sections[2], { other: " " })).toBe(false);
+    expect(sectionComplete(definition.sections[2], { other: "Hi" })).toBe(true);
   });
 
   it("drops blank answers before sending", () => {

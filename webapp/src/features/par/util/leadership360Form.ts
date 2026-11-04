@@ -46,6 +46,14 @@ export function sectionProgress(section: FormSection, answers: FormAnswers): { a
   return { answered: rated.filter((q) => isAnswered(answers[q.id])).length, total: rated.length };
 }
 
+/** Whether a step is done: every required question answered, and at least one
+ * answer in it (so a step of optional questions, like the written feedback, is
+ * done once something is written). */
+export function sectionComplete(section: FormSection, answers: FormAnswers): boolean {
+  const answered = section.questions.filter((q) => isAnswered(answers[q.id]));
+  return answered.length > 0 && section.questions.every((q) => !q.required || isAnswered(answers[q.id]));
+}
+
 /** Answers with empty strings and nulls removed — what gets sent to the backend. */
 export function cleanAnswers(answers: FormAnswers): FormAnswers {
   return Object.fromEntries(Object.entries(answers).filter(([, value]) => isAnswered(value)));

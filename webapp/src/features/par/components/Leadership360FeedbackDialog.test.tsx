@@ -104,14 +104,22 @@ beforeEach(() => {
 describe("Leadership360FeedbackDialog", () => {
   it("is anonymous by default and says nobody will see who you are", () => {
     renderDialog();
-    expect(screen.getByRole("switch", { name: "Submit anonymously" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Submit with my name" })).not.toBeChecked();
     expect(screen.getByText(/Nobody — not the leader, their manager or People Ops — can see who you are/)).toBeInTheDocument();
   });
 
-  it("says who will see the name once anonymity is switched off", () => {
+  it("says who will see the name once it's switched to named", () => {
     renderDialog();
-    fireEvent.click(screen.getByRole("switch", { name: "Submit anonymously" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Submit with my name" }));
     expect(screen.getByText(/Ada Lead sees your comments with your name/)).toBeInTheDocument();
+  });
+
+  it("shows the written-feedback step as just its question, with no heading", () => {
+    renderDialog();
+    expect(screen.getByRole("heading", { name: "Personal traits" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Anything else?")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Other feedback" })).not.toBeInTheDocument();
   });
 
   it("doesn't submit while a required question is unanswered", () => {
@@ -151,23 +159,23 @@ describe("Leadership360FeedbackDialog", () => {
     window.localStorage.setItem(LOCAL_KEY, JSON.stringify({ integrity: 2 }));
     renderDialog();
     expect(screen.getByRole("button", { name: "2 of 5" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("switch", { name: "Submit anonymously" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Submit with my name" })).not.toBeChecked();
   });
 
   it("opens a named draft as named, and removes it from the server when switched to anonymous", () => {
     renderDialog({ draft: { leaderEmail: "lead@wso2.com", answers: { integrity: 3 }, anonymous: false } });
     const toggle = screen.getByRole("switch", { name: "Submit with my name" });
-    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeChecked();
     fireEvent.click(toggle);
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
     expect(draftMutate).toHaveBeenCalledWith({ leaderEmail: "lead@wso2.com", answers: {}, anonymous: true });
     expect(JSON.parse(window.localStorage.getItem(LOCAL_KEY) ?? "null")).toEqual({ integrity: 3 });
   });
 
-  it("allows only named feedback once this month's anonymous one is used", () => {
+  it("allows only named feedback once this month's anonymous one is used, showing the switch on and greyed out", () => {
     renderDialog({ anonymousUsedThisMonth: true });
     const toggle = screen.getByRole("switch", { name: "Submit with my name" });
-    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeChecked();
     expect(toggle).toBeDisabled();
     expect(
       screen.getByText(/You gave anonymous feedback on Ada Lead in November\. .* again from 1 December\./),

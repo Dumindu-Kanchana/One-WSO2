@@ -43,11 +43,19 @@ import type {
   FormAnswers,
   FormQuestion,
   FormScale,
+  FormSection,
   Leadership360CurrentSurvey,
   Leadership360Draft,
   Leadership360Leader,
 } from "../api/leadership360Types";
-import { cleanAnswers, headerSections, missingRequired, sectionProgress, stepSections } from "../util/leadership360Form";
+import {
+  cleanAnswers,
+  headerSections,
+  missingRequired,
+  sectionComplete,
+  sectionProgress,
+  stepSections,
+} from "../util/leadership360Form";
 import { readLocalDraft, removeLocalDraft, writeLocalDraft } from "../util/leadership360LocalDraft";
 import { formatShortDate } from "../util/parDate";
 
@@ -63,6 +71,33 @@ function monthNames(month: string): { name: string; next: string } {
     name: MONTH_NAMES.format(new Date(Date.UTC(year, m - 1, 1))),
     next: `1 ${MONTH_NAMES.format(new Date(Date.UTC(year, m, 1)))}`,
   };
+}
+
+/** A step's number, green once the step is done (like the cycle tracker's). */
+function StepNumber({ number, done, current }: { number: number; done: boolean; current: boolean }) {
+  return (
+    <Box
+      sx={{
+        width: 24,
+        height: 24,
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 12,
+        fontWeight: 700,
+        bgcolor: done ? "success.main" : current ? "primary.main" : "action.selected",
+        color: done || current ? "common.white" : "text.secondary",
+      }}
+    >
+      {number}
+    </Box>
+  );
+}
+
+/** A step that is just one comment box, such as the written feedback at the end. */
+function isCommentOnly(section: FormSection): boolean {
+  return section.questions.length === 1 && section.questions[0].type === "TEXT";
 }
 
 // Feedback on one member of the leadership group: the relationship question,
@@ -213,11 +248,14 @@ export default function Leadership360FeedbackDialog({
           ))}
 
           <Stepper activeStep={step} alternativeLabel>
-            {steps.map((s) => {
+            {steps.map((s, i) => {
               const { answered, total } = sectionProgress(s, answers);
+              const done = sectionComplete(s, answers);
               return (
-                <Step key={s.id}>
+                // Done means answered, not just passed: a step you skipped keeps its number.
+                <Step key={s.id} completed={done}>
                   <StepLabel
+                    icon={<StepNumber number={i + 1} done={done} current={i === step} />}
                     optional={
                       <Typography variant="caption" color="text.secondary">
                         {total > 0 ? `${answered} of ${total} answered` : "Written comments"}
@@ -233,10 +271,14 @@ export default function Leadership360FeedbackDialog({
 
           {section && (
             <Box>
-              <Typography variant="h6" component="h2">
-                {section.title}
-              </Typography>
-              {section.hint && (
+              {/* The written-feedback step (one comment box) needs no heading: the
+                  question says what to write, and the stepper names the step. */}
+              {!isCommentOnly(section) && (
+                <Typography variant="h6" component="h2">
+                  {section.title}
+                </Typography>
+              )}
+              {!isCommentOnly(section) && section.hint && (
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   {section.hint}
                 </Typography>
@@ -256,18 +298,20 @@ export default function Leadership360FeedbackDialog({
           )}
 
           <Box>
+            {/* One fixed label, so the switch reads the same either way: off is
+                anonymous, and it stays on (greyed out) once anonymous is used up. */}
             <FormControlLabel
               control={
                 <Switch
-                  checked={anonymous}
+                  checked={!anonymous}
                   disabled={anonymousUsedThisMonth}
                   onChange={(e) => {
-                    setAnonymous(e.target.checked);
+                    setAnonymous(!e.target.checked);
                     setDirty(true);
                   }}
                 />
               }
-              label={anonymous ? "Submit anonymously" : "Submit with my name"}
+              label="Submit with my name"
             />
             {anonymousUsedThisMonth && (
               <Alert severity="info" sx={{ my: 1 }}>
@@ -278,8 +322,7 @@ export default function Leadership360FeedbackDialog({
             <Typography variant="body2" color="text.secondary">
               {anonymous
                 ? `Your name isn't stored with this response. Nobody — not the leader, their manager or People Ops — can see who you are. Anonymous feedback on a leader is once a month, and your draft is kept only in this browser.`
-                : `${leader.employeeName} sees your comments with your name. Their manager and People Ops see your whole response.`}{" "}
-              Results show as feedback comes in, once 3 or more people have responded.
+                : `${leader.employeeName} sees your comments with your name. Their manager and People Ops see your whole response.`}
             </Typography>
           </Box>
 
