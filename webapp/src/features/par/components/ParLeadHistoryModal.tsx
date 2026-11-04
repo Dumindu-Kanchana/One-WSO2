@@ -28,11 +28,14 @@ export default function ParLeadHistoryModal({
   onClose,
   employeeEmail,
   employeeName,
+  asAdmin = false,
 }: {
   open: boolean;
   onClose: () => void;
   employeeEmail: string;
   employeeName: string;
+  /** Opened from People Ops' Admin View rather than a lead's review. */
+  asAdmin?: boolean;
 }) {
   const thumbnails = useLeaveEmployees();
   const thumbnailByEmail = useMemo(
@@ -60,7 +63,7 @@ export default function ParLeadHistoryModal({
       </DialogTitle>
       <Divider />
       <DialogContent>
-        <ParEmployeeHistoryView employeeEmail={employeeEmail} employeeName={employeeName} />
+        <ParEmployeeHistoryView employeeEmail={employeeEmail} employeeName={employeeName} asAdmin={asAdmin} />
       </DialogContent>
     </Dialog>
   );

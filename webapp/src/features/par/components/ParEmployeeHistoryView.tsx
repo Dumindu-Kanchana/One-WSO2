@@ -63,9 +63,12 @@ function InfoItem({ label, value, secondaryValue }: { label: string; value: stri
 export default function ParEmployeeHistoryView({
   employeeEmail,
   employeeName,
+  asAdmin = false,
 }: {
   employeeEmail: string;
   employeeName: string;
+  /** Opened from People Ops' Admin View rather than a lead's review. */
+  asAdmin?: boolean;
 }) {
   const realCycles = useAllClosedParCycles();
   // This component is only ever rendered via ParLeadHistoryModal.tsx, for
@@ -215,7 +218,12 @@ export default function ParEmployeeHistoryView({
           </Card>
 
           {par2Cycle ? (
-            <ParLeadHistoryPar2Record cycle={par2Cycle} rating={rating.data} employeeEmail={employeeEmail} />
+            <ParLeadHistoryPar2Record
+              cycle={par2Cycle}
+              rating={rating.data}
+              employeeEmail={employeeEmail}
+              asAdmin={asAdmin}
+            />
           ) : (
             <>
               <Accordion

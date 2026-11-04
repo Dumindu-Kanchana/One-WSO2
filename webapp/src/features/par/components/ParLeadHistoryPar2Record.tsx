@@ -29,15 +29,18 @@ import Leadership360ResultsCard from "./Leadership360ResultsCard";
 // the lead's feedback, then what the lead had while reviewing. That's the
 // self-review and the PAR 360° responses with names, or, for a member of the
 // leadership team, their Leadership 360° results. No OKRs: they keep no
-// history, so today's list would stand in for what the lead saw then.
+// history, so today's list would stand in for what the lead saw then. Also
+// used by People Ops (`asAdmin`), who see any leader's results.
 export default function ParLeadHistoryPar2Record({
   cycle,
   rating,
   employeeEmail,
+  asAdmin = false,
 }: {
   cycle: Pick<ParCycle, "parCycleId">;
   rating: ParRating;
   employeeEmail: string;
+  asAdmin?: boolean;
 }) {
   const selfReview = useSelfReview(cycle.parCycleId, employeeEmail);
   const leader = Boolean(rating.parIsLeadershipEmployee);
@@ -65,7 +68,7 @@ export default function ParLeadHistoryPar2Record({
 
       {leader ? (
         <Leadership360ResultsCard
-          view="REPORTS"
+          view={asAdmin ? "ALL" : "REPORTS"}
           leaderEmail={employeeEmail}
           parCycleId={cycle.parCycleId}
           fallback={

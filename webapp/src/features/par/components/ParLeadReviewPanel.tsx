@@ -671,7 +671,7 @@ export default function ParLeadReviewPanel({
               ) : evidenceTab === 1 ? (
                 isLeadership ? (
                   <Leadership360ResultsCard
-                    view="REPORTS"
+                    view={isAdminView ? "ALL" : "REPORTS"}
                     leaderEmail={employeeEmail}
                     parCycleId={cycle.parCycleId}
                     fallback={<ParEmptyState text="No Leadership 360° results for this cycle yet" />}

@@ -21,8 +21,9 @@ import { Leadership360Results } from "./Leadership360SummaryDialog";
 
 // One leader's Leadership 360° results in one PAR cycle's survey (live while
 // it's open), shown in place like a PAR 360° summary once there are enough
-// responses: your own (view SELF), or a report's in the lead's review (view
-// REPORTS, which adds named responses). Renders `fallback` when there's
+// responses: your own (view SELF), a report's in the lead's review (view
+// REPORTS, which adds named responses), or anyone's for People Ops (view ALL,
+// which also adds named responses). Renders `fallback` when there's
 // nothing to show: the person isn't in the leadership team, or the cycle has
 // no survey.
 export default function Leadership360ResultsCard({
@@ -32,8 +33,8 @@ export default function Leadership360ResultsCard({
   fallback = null,
   sx,
 }: {
-  view: "SELF" | "REPORTS";
-  /** REPORTS only: the report whose results to show. */
+  view: "SELF" | "REPORTS" | "ALL";
+  /** REPORTS and ALL: the leader whose results to show. */
   leaderEmail?: string;
   /** The PAR cycle whose survey to show. */
   parCycleId: number;
@@ -69,6 +70,8 @@ export default function Leadership360ResultsCard({
           : "Results from a survey that has closed."}
         {view === "REPORTS" &&
           " As their manager you also see named responses in full; anonymous ones only count toward the averages."}
+        {view === "ALL" &&
+          " As People Ops you also see named responses in full; anonymous ones only count toward the averages."}
       </Typography>
       {entry.available ? (
         <Box sx={{ mt: 1 }}>

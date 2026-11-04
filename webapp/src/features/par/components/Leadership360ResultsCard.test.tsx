@@ -87,6 +87,19 @@ describe("Leadership360ResultsCard", () => {
     expect(screen.getByText("Results from a survey that has closed.")).toBeInTheDocument();
   });
 
+  it("shows any leader's results to People Ops, asking for every leader's", () => {
+    const bea = { ...ada, workEmail: "bea@example.com", employeeName: "Bea" };
+    results = [
+      { leader: ada, responseCount: 4, available: true },
+      { leader: bea, responseCount: 3, available: true },
+    ];
+    render(<Leadership360ResultsCard view="ALL" leaderEmail="Bea@example.com" parCycleId={9} />);
+    expect(screen.getByText("Leadership 360° results")).toBeInTheDocument();
+    expect(screen.getByText(/As People Ops you also see named responses in full/)).toBeInTheDocument();
+    expect(screen.getByText("Results of survey 5 (ALL)")).toBeInTheDocument();
+    expect(asked.every((a) => a.view === "ALL")).toBe(true);
+  });
+
   it("shows nothing for someone outside the leadership team", () => {
     const { container } = render(<Leadership360ResultsCard view="SELF" parCycleId={9} />);
     expect(container).toBeEmptyDOMElement();
