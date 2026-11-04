@@ -32,7 +32,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@wso2/oxygen-ui";
-import { LightbulbIcon, PlayCircleIcon, PlusIcon, Trash2Icon } from "@wso2/oxygen-ui-icons-react";
+import { CircleCheckIcon, PlayCircleIcon, PlusIcon, Trash2Icon } from "@wso2/oxygen-ui-icons-react";
 import { describeError } from "@api/errors";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import { useNotifications } from "@context/notifications/NotificationsContext";
@@ -51,7 +51,8 @@ import { answersToSave, goalsOf, isSectionAnswered, shareBlockers } from "../uti
 import ParRatingSummary from "./ParRatingSummary";
 import ParSelfReviewView from "./ParSelfReviewView";
 import { ParOkrCard } from "./ParOkrPanel";
-import { appendLine, okrCitation } from "../util/okr";
+import { appendLine, okrCitation, okrsForCycle } from "../util/okr";
+import { useOkrs } from "../api/useOkrs";
 
 const AUTOSAVE_DELAY_MS = 1200;
 const GOAL_MAX_LENGTH = 300;
@@ -90,6 +91,8 @@ export default function ParSelfReviewForm({
   const status = rating.parEmployeeStatus;
   const shared = status === "SHARED" || status === "SHARED_BLOCKED";
   const deadlinePassed = isDeadlinePassed(cycle.parEmployeeDeadline);
+  const okrs = useOkrs(workEmail);
+  const hasOkrs = okrsForCycle(okrs.data ?? [], cycle.parCycleEndDate).length > 0;
   const editable = !shared && !deadlinePassed && (started || status === "DRAFT");
   // Same rule as the single comment: unshare until the lead shares their side.
   const canUnshare = status === "SHARED" && rating.parLeadStatus !== "SHARED" && !deadlinePassed;
@@ -278,23 +281,28 @@ export default function ParSelfReviewForm({
           flexWrap: "wrap",
         }}
       >
-        <Typography variant="body2" color="text.secondary">
-          Goes to {leadEmail ?? "your lead"} when you share · You can unshare until they start their review · Due{" "}
-          {formatShortDate(cycle.parEmployeeDeadline)}
-        </Typography>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-          <Typography variant="caption" color="text.secondary">
-            {save.isPending
-              ? "Saving…"
-              : savedAt
-                ? `Saved ${savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                : ""}
-          </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
           <Chip size="small" label={`${answered} of ${definition.sections.length} sections`} />
-          <Button variant="contained" disabled={share.isPending || deadlinePassed} onClick={askToShare}>
-            Share with lead
-          </Button>
+          {!deadlinePassed && (
+            <Chip size="small" variant="outlined" label={`Due ${formatShortDate(cycle.parEmployeeDeadline)}`} />
+          )}
+          {save.isPending ? (
+            <Chip size="small" variant="outlined" label="Saving…" />
+          ) : (
+            savedAt && (
+              <Chip
+                size="small"
+                variant="outlined"
+                color="success"
+                icon={<CircleCheckIcon size={14} />}
+                label={`Saved ${savedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+              />
+            )
+          )}
         </Box>
+        <Button variant="contained" disabled={share.isPending || deadlinePassed} onClick={askToShare}>
+          Share with lead
+        </Button>
       </Box>
 
       {blockers.length > 0 && <Alert severity="warning">Before you share: {blockers.join("; ")}.</Alert>}
@@ -302,7 +310,8 @@ export default function ParSelfReviewForm({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 280px" },
+          // A column beside the sections only for OKRs to cite.
+          gridTemplateColumns: { xs: "1fr", md: hasOkrs ? "1fr 280px" : "1fr" },
           gap: 2,
           alignItems: "start",
         }}
@@ -370,31 +379,14 @@ export default function ParSelfReviewForm({
           ))}
         </Stack>
 
-        <Stack spacing={2}>
+        {hasOkrs && (
           <ParOkrCard
             ownerEmail={workEmail}
             cycleEndDate={cycle.parCycleEndDate}
             onCite={citeOkr}
             citeLabel={`Add to section ${citeSection + 1}`}
           />
-          <Card variant="outlined" sx={{ p: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-              <LightbulbIcon size={16} />
-              <Typography sx={{ fontWeight: 600 }}>Writing well</Typography>
-            </Box>
-            <Stack spacing={1}>
-              <Typography variant="body2" color="text.secondary">
-                Lead with outcomes, not activity.
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                One concrete example beats three adjectives.
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Be honest about what didn't go to plan: it builds trust.
-              </Typography>
-            </Stack>
-          </Card>
-        </Stack>
+        )}
       </Box>
 
       <Dialog open={confirming} onClose={() => setConfirming(false)} maxWidth="sm" fullWidth>

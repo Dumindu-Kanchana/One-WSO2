@@ -128,6 +128,16 @@ describe("ParSelfReviewForm", () => {
     expect(saveMutate).toHaveBeenCalledWith({ impact: "Shipped it" }, expect.anything());
   });
 
+  it("shows when it last saved as a chip, with the due date", () => {
+    vi.useFakeTimers();
+    saveMutate.mockImplementationOnce((_answers, options: { onSuccess: () => void }) => options.onSuccess());
+    show("DRAFT");
+    expect(screen.getByText("Due 31 Dec '99")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Impact this cycle" }), { target: { value: "Shipped it" } });
+    act(() => vi.advanceTimersByTime(1500));
+    expect(screen.getByText(/^Saved \d{1,2}:\d{2}/)).toBeInTheDocument();
+  });
+
   it("says what's missing instead of sharing an incomplete review", () => {
     show("DRAFT", { impact: "Shipped it" });
     fireEvent.click(screen.getByRole("button", { name: "Share with lead" }));
