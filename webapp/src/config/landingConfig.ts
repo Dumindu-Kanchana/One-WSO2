@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { DEMO_HOME, isParOnlyDemo } from "@config/parOnlyDemo";
 import { reachablePerspectives, type PerspectiveDef } from "@constants/perspectives";
 
 /**
@@ -105,5 +106,7 @@ export function setLandingPreference(key: string | undefined): void {
 
 /** Where the app opens: the user's choice if they made one, otherwise Me. */
 export function landingPath(): string {
+  // DEMO ONLY: the PAR-only demo opens on PAR.
+  if (isParOnlyDemo()) return DEMO_HOME;
   return landingPathFor(landingPreference());
 }

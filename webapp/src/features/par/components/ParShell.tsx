@@ -15,7 +15,8 @@
 // under the License.
 
 import type { ReactNode } from "react";
-import { Alert, Box, Typography } from "@wso2/oxygen-ui";
+import { Alert, Box, MenuItem, Select, Typography } from "@wso2/oxygen-ui";
+import { devActAs, devPersonas, isParOnlyDemo, setDevActAs } from "@config/devActAs";
 import { isParBackendConfigured } from "../api/useParData";
 
 // Shared page frame for the Employee and Lead Portals: a title + optional
@@ -35,8 +36,33 @@ export default function ParShell({
   children: ReactNode;
 }) {
   const configured = isParBackendConfigured();
+  // DEMO ONLY (devActAs): who the PAR screens are acting as, and a switch.
+  const personas = devPersonas();
+  const actingAs = devActAs();
+  const deployedDemo = isParOnlyDemo();
   return (
     <Box>
+      {personas.length > 0 && (
+        <Alert severity={actingAs ? "warning" : "info"} sx={{ mb: 2, alignItems: "center" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+            <span>{deployedDemo ? "Demo with made-up people — viewing PAR as" : "Local demo — viewing PAR as"}</span>
+            <Select
+              size="small"
+              value={actingAs?.email ?? ""}
+              displayEmpty
+              onChange={(e) => setDevActAs(e.target.value || null)}
+              sx={{ minWidth: 280, bgcolor: "background.paper" }}
+            >
+              {!deployedDemo && <MenuItem value="">Yourself</MenuItem>}
+              {personas.map((p) => (
+                <MenuItem key={p.email} value={p.email}>
+                  {p.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </Box>
+        </Alert>
+      )}
       <Typography component="h1" variant="h5" sx={{ mb: 0.5, fontWeight: 600 }}>
         {title}
       </Typography>

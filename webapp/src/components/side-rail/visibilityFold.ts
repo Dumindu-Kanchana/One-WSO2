@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { DEMO_RAIL_IDS, isParOnlyDemo } from "@config/parOnlyDemo";
 import type { Capability } from "@constants/appMenu";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import { ENGINEERING_ADMIN_ITEM_ID } from "@constants/downloadStatsApps";
@@ -284,6 +285,8 @@ export function foldVisibility(
   shell: VisibilityShell,
 ): FoldedVisibility {
   const canSee = (section: VisibilitySection): boolean => {
+    // DEMO ONLY: the PAR-only demo shows PAR alone.
+    if (isParOnlyDemo() && !DEMO_RAIL_IDS.has(section.id)) return false;
     if (shell.sriLankaOnlyIds.has(section.id) && !shell.isSriLankaEmployee) return false;
     const owner = adapters.find((adapter) => claimedIds(adapter, shell).has(section.id));
     if (owner) return owner.canSee(section.id);
@@ -295,6 +298,7 @@ export function foldVisibility(
   };
 
   const sectionAnswered = (section: VisibilitySection): boolean => {
+    if (isParOnlyDemo() && !DEMO_RAIL_IDS.has(section.id)) return true;
     // Capabilities and the Sri-Lanka check both read off the employee record,
     // which `canSee` consults before it even looks for an owning adapter — so
     // nothing is answered while that is still resolving, adapter or not.

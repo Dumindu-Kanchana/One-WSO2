@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { isParOnlyDemo } from "@config/parOnlyDemo";
 import { useMemo, useState, type JSX, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { alpha, Box, Link, List, Sidebar, Typography, useSidebar } from "@wso2/oxygen-ui";
@@ -277,7 +278,7 @@ export default function SideRail({ collapsed }: SideRailProps): JSX.Element {
               but as a rail row it would be a destination that bounces, and one
               that renders as selected for a split second on a screen you are
               about to leave. */}
-          {active.path && !active.forwardsToFirstItem && (
+          {active.path && !active.forwardsToFirstItem && !isParOnlyDemo() && (
             <Sidebar.Item id={OVERVIEW_ID} link={routeLink(active.path, active.key)}>
               <Sidebar.ItemIcon>
                 <active.icon />
@@ -318,6 +319,8 @@ export default function SideRail({ collapsed }: SideRailProps): JSX.Element {
         )}
       </Sidebar.Nav>
 
+      {/* DEMO ONLY: the PAR-only demo has no settings to offer. */}
+      {!isParOnlyDemo() && (
       <Sidebar.Footer showDivider>
         {/* The footer is not a list, and Sidebar.Item is an li, so it needs one. */}
         {/* The tour marker sits on the list, not inside the label. Oxygen
@@ -332,6 +335,7 @@ export default function SideRail({ collapsed }: SideRailProps): JSX.Element {
         </Sidebar.Item>
         </Box>
       </Sidebar.Footer>
+      )}
     </Sidebar>
   );
 }

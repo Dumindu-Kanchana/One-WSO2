@@ -19,6 +19,8 @@ import { useAsgardeo } from "@asgardeo/react";
 import { authedGet, HttpError, defaultQueryRetry } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
 import { peopleBackendUrl, peopleServiceUrls } from "@config/apiConfig";
+import { devActAs } from "@config/devActAs";
+import { demoEmployee, demoUserInfo, isParOnlyDemo } from "@config/parOnlyDemo";
 import { foldIdentityError, useAsgardeoSub } from "@hooks/useAsgardeoSub";
 import type { Employee, EmployeePersonalInfo, UserInfo } from "./types";
 
@@ -67,8 +69,10 @@ export function useMeProfile(employeeId?: string, enabled = true) {
     // to make it. The employee-detail page uses it to wait for the admin
     // check: without it the fetch fired on mount and PeopleOpsShell only hid
     // the result afterwards, which looks like a gate but is not one.
-    enabled: enabled && isSignedIn && backendConfigured && Boolean(userSub),
+    // DEMO ONLY: the PAR-only demo has no people backend; the persona stands in.
+    enabled: enabled && isSignedIn && (backendConfigured || (isParOnlyDemo() && !employeeId)) && Boolean(userSub),
     queryFn: async () => {
+      if (isParOnlyDemo() && !employeeId) return { userInfo: demoUserInfo(), employee: demoEmployee() };
       const accessToken = await getAccessToken();
 
       // Share the ["user-info", sub] cache slot with useUserInfo (the
@@ -86,7 +90,9 @@ export function useMeProfile(employeeId?: string, enabled = true) {
         peopleServiceUrls.employee(targetId),
         accessToken,
       );
-      return { userInfo, employee };
+      // LOCAL DEMO ONLY (devActAs): PAR screens look people up by this email.
+      const persona = employeeId ? null : devActAs();
+      return { userInfo: persona ? { ...userInfo, workEmail: persona.email } : userInfo, employee };
     },
     // Profile changes rarely — fetch once per session, don't retry on
     // 4xx (usually a token / role problem, not a transient failure).

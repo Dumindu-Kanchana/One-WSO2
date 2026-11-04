@@ -20,6 +20,7 @@ import { authedGet, defaultQueryRetry } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
 import { peopleBackendUrl, peopleServiceUrls } from "@config/apiConfig";
 import { foldIdentityError, useAsgardeoSub } from "@hooks/useAsgardeoSub";
+import { demoUserInfo, isParOnlyDemo } from "@config/parOnlyDemo";
 
 // Minimal shape returned by the people-app /user-info endpoint. Matches
 // the fields we consume in the shell — the full type lives in
@@ -60,8 +61,10 @@ export function useUserInfo() {
 
   const query = useQuery<UserInfoLite>({
     queryKey: ["user-info", userSub],
-    enabled: isSignedIn && Boolean(peopleBackendUrl) && Boolean(userSub),
+    // DEMO ONLY: the PAR-only demo has no people backend; the persona stands in.
+    enabled: isSignedIn && (Boolean(peopleBackendUrl) || isParOnlyDemo()) && Boolean(userSub),
     queryFn: async () => {
+      if (isParOnlyDemo()) return demoUserInfo();
       const accessToken = await getAccessToken();
       return authedGet<UserInfoLite>(peopleServiceUrls.userInfo, accessToken);
     },

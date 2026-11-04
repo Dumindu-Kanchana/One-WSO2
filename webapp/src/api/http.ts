@@ -23,6 +23,7 @@
 // non-2xx to get the right retry behavior.
 
 import { refreshAccessToken } from "@api/authBridge";
+import { devActAsHeaders, devActAsToken } from "@config/devActAs";
 import { classifyToken, noteUnauthorized, resetUnauthorizedOrigins } from "@api/tokenExpiry";
 
 // Thrown on non-2xx responses (and on unexpectedly-empty 2xx GETs). Carries
@@ -121,7 +122,11 @@ function buildHeaders(extraHeaders?: Record<string, string>, withJsonBody?: bool
 export async function fetchWithReauth(url: string, init: RequestInit, accessToken: string): Promise<Response> {
   const withAuth = (token: string): RequestInit => ({
     ...init,
-    headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` },
+    headers: {
+      ...(init.headers as Record<string, string>),
+      ...devActAsHeaders(url),
+      Authorization: `Bearer ${devActAsToken(url, token)}`,
+    },
   });
   const sentAt = Date.now();
   const first = await fetch(url, withAuth(accessToken));

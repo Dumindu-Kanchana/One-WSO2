@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { isParOnlyDemo } from "@config/parOnlyDemo";
 import { useEffect, type JSX } from "react";
 import {
   Box,
@@ -111,6 +112,7 @@ export default function TopBar({
   const hasPinned = usePinnedEntries().length > 0;
 
   useEffect(() => {
+    if (isParOnlyDemo()) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -194,6 +196,8 @@ export default function TopBar({
           belongs to PinnedTabs instead — the pinned strip is the part that
           benefits from spare room. It also narrows once anything is pinned,
           since the two share that row; at `xs` it collapses to an icon. */}
+      {/* DEMO ONLY: the PAR-only demo has nothing for Ask Novera to search. */}
+      {!isParOnlyDemo() && (
       <Box
         role="button"
         tabIndex={0}
@@ -249,10 +253,11 @@ export default function TopBar({
           <Typography variant="caption">{SHORTCUT_HINT}</Typography>
         </Box>
       </Box>
+      )}
 
       {/* Takes the flexible middle slot, collapsing to a plain spacer when
           nothing is pinned. */}
-      <PinnedTabs />
+      {isParOnlyDemo() ? <Box sx={{ flex: 1 }} /> : <PinnedTabs />}
 
       <Header.Actions>
         <Tooltip title="Switch app">
@@ -267,7 +272,7 @@ export default function TopBar({
             <AppsGridIcon size={20} />
           </IconButton>
         </Tooltip>
-        <PinThisPageButton />
+        {!isParOnlyDemo() && <PinThisPageButton />}
         {/* Palette, then light/dark within it — two separate choices, both
             persisted, deliberately adjacent. The tour treats them as one thing,
             so the marker sits on a wrapper rather than on either control. */}

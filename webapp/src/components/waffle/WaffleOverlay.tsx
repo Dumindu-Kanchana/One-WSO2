@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { DEMO_PERSPECTIVE_KEYS, isParOnlyDemo } from "@config/parOnlyDemo";
 import { useEffect, useRef, type JSX } from "react";
 import { Box, IconButton, Paper, Tooltip, Typography } from "@wso2/oxygen-ui";
 // Oxygen 0.6.0 re-exports neither of these (checked against its dist), and
@@ -77,7 +78,12 @@ export default function WaffleOverlay({ anchorEl, onClose }: WaffleOverlayProps)
   // a renamed or relocated perspective needs no migration.
   const favouriteItems = favourites
     .map((key) => PERSPECTIVES.find((p) => p.key === key))
-    .filter((p): p is PerspectiveDef => p !== undefined);
+    .filter((p): p is PerspectiveDef => p !== undefined)
+    // DEMO ONLY: the PAR-only demo offers Me and People Ops alone.
+    .filter((p) => !isParOnlyDemo() || DEMO_PERSPECTIVE_KEYS.has(p.key));
+  const apps = isParOnlyDemo()
+    ? FUNCTIONAL_PERSPECTIVES.filter((p) => DEMO_PERSPECTIVE_KEYS.has(p.key))
+    : FUNCTIONAL_PERSPECTIVES;
 
   useEffect(() => {
     // Captured at setup, not read in the cleanup: by teardown the ref may
@@ -204,7 +210,7 @@ export default function WaffleOverlay({ anchorEl, onClose }: WaffleOverlayProps)
               Apps
             </Typography>
             <WaffleGroup
-              items={FUNCTIONAL_PERSPECTIVES}
+              items={apps}
               activeKey={active.key}
               onPick={pick}
               isFavourite={isFavourite}

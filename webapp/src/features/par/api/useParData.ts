@@ -20,6 +20,7 @@ import { authedGet, HttpError, defaultQueryRetry } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
 import { parBackendUrl, parServiceUrls } from "@config/apiConfig";
 import { digiopsHeaders } from "@features/my/util/digiopsHeaders";
+import { devActAs } from "@config/devActAs";
 import type { ParCycle, ParEmployeeInfo, ParRating } from "./types";
 import { useParLeadEmployees } from "./useLeadHistory";
 
@@ -104,7 +105,9 @@ export function useParIsTeamLead(workEmail: string | undefined, enabled = true) 
  * isTeamLead resolves false. Fails CLOSED while either is unresolved, same
  * as useParIsTeamLead alone.
  */
-export function useParCanSeeLeadPortal(workEmail: string | undefined, enabled = true) {
+export function useParCanSeeLeadPortal(signedInEmail: string | undefined, enabled = true) {
+  // LOCAL DEMO ONLY (devActAs): the side rail passes the signed-in account; check the persona instead.
+  const workEmail = devActAs()?.email ?? signedInEmail;
   const employeeInfo = useParIsTeamLead(workEmail, enabled);
   const directReports = useParLeadEmployees(
     enabled && !employeeInfo.isLoading && !employeeInfo.isTeamLead ? workEmail : undefined,

@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { DEMO_HOME, isParOnlyDemo } from "@config/parOnlyDemo";
 import { Suspense, lazy } from "react";
 import { Skeleton } from "@wso2/oxygen-ui";
 import { Navigate, Route, Routes } from "react-router";
@@ -251,7 +252,8 @@ export default function App() {
           {/* Where the app opens: the user's own choice, or Me. */}
           <Route index element={<Navigate to={landingPath()} replace />} />
           {/* Me home — the full profile page including Connected apps. */}
-          <Route path="me" element={<MyProfilePage />} />
+          {/* DEMO ONLY: the PAR-only demo has no profile page; Me opens on PAR. */}
+          <Route path="me" element={isParOnlyDemo() ? <Navigate to={DEMO_HOME} replace /> : <MyProfilePage />} />
           {/* Engineering → Download Stats, routed as perspective / app / screen,
               with the earlier addresses forwarding. The feature owns the
               tree, as CadO2 and the GRC modules own theirs. */}

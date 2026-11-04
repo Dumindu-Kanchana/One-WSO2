@@ -14,6 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import { isParOnlyDemo } from "@config/parOnlyDemo";
 import { useEffect, useRef, useState, type JSX } from "react";
 import { Outlet, useLocation } from "react-router";
 import { Box, useAppShell } from "@wso2/oxygen-ui";
@@ -171,7 +172,8 @@ export default function AppLayout(): JSX.Element {
           setWaffleAnchor={setWaffleAnchor}
           holdLauncher={tourHoldsLauncher}
         />
-        <TourPrompt />
+        {/* DEMO ONLY: the tour is about the whole app, not the PAR-only demo. */}
+        {!isParOnlyDemo() && <TourPrompt />}
         <TourGuide />
         <AuthDebugPanel />
       </Box>
