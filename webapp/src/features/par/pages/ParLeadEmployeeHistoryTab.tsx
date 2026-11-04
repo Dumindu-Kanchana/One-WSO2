@@ -37,6 +37,7 @@ import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { useParRating } from "../api/useParData";
+import { useParShowsPar2 } from "../api/useReview360";
 import {
   useAllClosedParCycles,
   useParEmployeeReviews,
@@ -57,6 +58,7 @@ import { decodeParComment } from "../util/parComment";
 import ParEmptyState from "../components/ParEmptyState";
 import { ParCommentView } from "../components/ParContent";
 import ParHistoryReviewSection from "../components/ParHistoryReviewSection";
+import ParLeadHistoryPar2Record from "../components/ParLeadHistoryPar2Record";
 import ParStatusChip from "../components/ParStatusChip";
 import type { ParEmployee } from "../api/types";
 import type { ParLegacyHistoryByEmail, ParRatingByEmail } from "../api/useLeadHistory";
@@ -272,6 +274,9 @@ export default function ParLeadEmployeeHistoryTab() {
   // Powers the "all employees" table; picking one employee afterwards
   // reuses this cache (same query key as useParRating).
   const ratingFanOut = useParRatingFanOut(realCycleId, (employees.data ?? []).map((e) => e.workEmail));
+  // A PAR 2.0 cycle shows what the lead had while reviewing instead of the single comments.
+  const { showsPar2, isLoading: isPar2Loading } = useParShowsPar2(realCycleId);
+  const par2Cycle = showsPar2 ? realCycles.data?.find((c) => c.parCycleId === realCycleId) : undefined;
 
   if (profile.isLoading) {
     return <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 1.5 }} />;
@@ -354,10 +359,16 @@ export default function ParLeadEmployeeHistoryTab() {
   // — otherwise the details section and the loading skeleton can render at
   // once if the rating resolves first.
   const showRealDetails =
-    isRealCycle && Boolean(selectedEmployeeEmail) && rating.isSuccess && Boolean(rating.data) && isOwnRecord && reviews.isSuccess;
+    isRealCycle &&
+    Boolean(selectedEmployeeEmail) &&
+    rating.isSuccess &&
+    Boolean(rating.data) &&
+    isOwnRecord &&
+    reviews.isSuccess &&
+    !isPar2Loading;
 
   const isLoadingSelection =
-    (isRealCycle && Boolean(selectedEmployeeEmail) && (rating.isLoading || reviews.isLoading)) ||
+    (isRealCycle && Boolean(selectedEmployeeEmail) && (rating.isLoading || reviews.isLoading || isPar2Loading)) ||
     (isLegacyCycle && Boolean(selectedEmployeeEmail) && legacyIsLoadingForSelected);
 
   return (
@@ -528,22 +539,28 @@ export default function ParLeadEmployeeHistoryTab() {
             </Grid>
           </Card>
 
-          <Accordion variant="outlined" disabled={!rating.data.parEmployeeComment?.trim()}>
-            <AccordionSummary expandIcon={<ChevronDownIcon size={18} />}>Employee's Feedback</AccordionSummary>
-            <AccordionDetails>
-              <Divider sx={{ my: 1 }} />
-              <ParCommentView html={decodeParComment(rating.data.parEmployeeComment)} />
-            </AccordionDetails>
-          </Accordion>
-          <Accordion variant="outlined" disabled={!rating.data.parLeadComment?.trim()}>
-            <AccordionSummary expandIcon={<ChevronDownIcon size={18} />}>Lead's Feedback</AccordionSummary>
-            <AccordionDetails>
-              <Divider sx={{ my: 1 }} />
-              <ParCommentView html={decodeParComment(rating.data.parLeadComment)} />
-            </AccordionDetails>
-          </Accordion>
+          {par2Cycle && selectedEmployeeEmail ? (
+            <ParLeadHistoryPar2Record cycle={par2Cycle} rating={rating.data} employeeEmail={selectedEmployeeEmail} />
+          ) : (
+            <>
+              <Accordion variant="outlined" disabled={!rating.data.parEmployeeComment?.trim()}>
+                <AccordionSummary expandIcon={<ChevronDownIcon size={18} />}>Employee's Feedback</AccordionSummary>
+                <AccordionDetails>
+                  <Divider sx={{ my: 1 }} />
+                  <ParCommentView html={decodeParComment(rating.data.parEmployeeComment)} />
+                </AccordionDetails>
+              </Accordion>
+              <Accordion variant="outlined" disabled={!rating.data.parLeadComment?.trim()}>
+                <AccordionSummary expandIcon={<ChevronDownIcon size={18} />}>Lead's Feedback</AccordionSummary>
+                <AccordionDetails>
+                  <Divider sx={{ my: 1 }} />
+                  <ParCommentView html={decodeParComment(rating.data.parLeadComment)} />
+                </AccordionDetails>
+              </Accordion>
 
-          <ParHistoryReviewSection reviews={reviews.data ?? []} />
+              <ParHistoryReviewSection reviews={reviews.data ?? []} />
+            </>
+          )}
         </Stack>
       )}
     </Stack>
