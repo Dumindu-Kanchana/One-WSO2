@@ -93,6 +93,25 @@ describe("tilDisplayHtml", () => {
     );
   });
 
+  it("links each address in a list written without spaces", () => {
+    expect(tilDisplayHtml("<p>http://localhost:3000,https://wso2.com</p>")).toBe(
+      `<p>${link("http://localhost:3000")},${link("https://wso2.com")}</p>`,
+    );
+    expect(tilDisplayHtml("<p>“https://wso2.com/a”,https://wso2.com/b</p>")).toBe(
+      `<p>“${link("https://wso2.com/a")}”,${link("https://wso2.com/b")}</p>`,
+    );
+  });
+
+  it("keeps an address that carries another one whole", () => {
+    for (const url of [
+      "https://web.archive.org/web/2020/https://wso2.com/",
+      "https://wso2.com/login?next=https://wso2.com/docs",
+      "https://wso2.com/a,b",
+    ]) {
+      expect(tilDisplayHtml(`<p>${url}</p>`)).toBe(`<p>${link(url)}</p>`);
+    }
+  });
+
   it("keeps a query string intact", () => {
     expect(tilDisplayHtml("<p>https://wso2.com/s?q=a&amp;b=c</p>")).toBe(
       '<p><a href="https://wso2.com/s?q=a&amp;b=c" target="_blank" rel="noopener noreferrer">https://wso2.com/s?q=a&amp;b=c</a></p>',

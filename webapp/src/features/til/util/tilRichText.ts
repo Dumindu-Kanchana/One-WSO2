@@ -65,9 +65,12 @@ export function normalizeTilSpaces(html: string): string {
 }
 
 // A web address written out in the text: http:// or https:// up to the next
-// space. Punctuation that ends the sentence around it is trimmed off after
+// space, or up to a comma, semicolon or closing quote that runs straight into
+// another address, as in a list written without spaces. An address inside
+// one, as in https://web.archive.org/web/2020/https://wso2.com, stays part
+// of it. Punctuation that ends the sentence around it is trimmed off after
 // (trimUrlEnd).
-const URL_IN_TEXT = /\bhttps?:\/\/[^\s<>"]+/gi;
+const URL_IN_TEXT = /\bhttps?:\/\/(?:(?![,;'’”»]+https?:\/\/)[^\s<>"])+/gi;
 
 /** `url` without the punctuation a sentence puts after it: "see
  * https://example.com." links up to ".com". A closing bracket stays when the
