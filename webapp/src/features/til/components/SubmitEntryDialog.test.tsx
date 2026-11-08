@@ -80,17 +80,17 @@ describe("SubmitEntryDialog save errors", () => {
     mocks.update = stubMutation();
   });
 
-  it("explains a share that never reached the server under the editor", () => {
+  it("explains a share that failed on the network under the editor, as an alert", () => {
     mocks.create.error = new TypeError("Failed to fetch");
     render(<SubmitEntryDialog open onClose={vi.fn()} />);
-    expect(screen.getByText(/couldn't reach the server, so it wasn't saved/)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/so this may not have been saved/);
     expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
   });
 
-  it("explains an edit that never reached the server under the editor", () => {
+  it("explains an edit that failed on the network under the editor, as an alert", () => {
     mocks.update.error = new TypeError("Failed to fetch");
     render(<SubmitEntryDialog open onClose={vi.fn()} entry={ENTRY} />);
-    expect(screen.getByText(/couldn't reach the server, so it wasn't saved/)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/so this may not have been saved/);
   });
 
   it("shows no toast for a save that never reached the server", () => {
@@ -102,6 +102,6 @@ describe("SubmitEntryDialog save errors", () => {
   it("still toasts the server's own message for any other failure", () => {
     saveFailingWith(new HttpError("/x", 400, JSON.stringify({ message: "Title is required." })));
     expect(mocks.showError).toHaveBeenCalledWith("Title is required.");
-    expect(screen.queryByText(/couldn't reach the server/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

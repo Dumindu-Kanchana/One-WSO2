@@ -25,8 +25,9 @@ describe("unsentEntryMessage", () => {
 
   it("says commands in the text can be blocked when the request never got an answer", () => {
     const message = unsentEntryMessage(new TypeError("Failed to fetch"));
-    expect(message).toMatch(/couldn't reach the server/);
+    expect(message).toMatch(/may not have been saved/);
     expect(message).toMatch(/looks like a command/);
+    expect(message).toMatch(/check whether it was saved before trying again/);
     expect(message).not.toMatch(/Failed to fetch/);
   });
 

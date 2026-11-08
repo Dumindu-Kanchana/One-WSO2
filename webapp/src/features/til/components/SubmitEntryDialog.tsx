@@ -170,9 +170,10 @@ export default function SubmitEntryDialog({
   const [customerFieldFocused, setCustomerFieldFocused] = useState(false);
   const customerFieldOpen = customerFieldFocused;
   const { showSuccess, showError } = useNotifications();
-  // A save that never reached the server is explained under the editor
+  // A save that failed on the network is explained under the editor
   // (`unsent`) rather than in a toast: the toast closes before that much can
-  // be read, and the dialog stays open with the entry still in it.
+  // be read, and the dialog stays open with the entry still in it. The
+  // message is an alert, so a screen reader announces it as it did the toast.
   const showSaveError = (err: Error) => {
     if (!isNetworkFailure(err)) showError(describeError(err));
   };
@@ -495,7 +496,7 @@ export default function SubmitEntryDialog({
             </Typography>
           )}
           {unsent && (
-            <Typography variant="caption" color="error">
+            <Typography variant="caption" color="error" role="alert">
               {unsent}
             </Typography>
           )}
