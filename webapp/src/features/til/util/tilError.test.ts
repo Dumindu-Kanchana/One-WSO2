@@ -24,23 +24,36 @@ describe("unsentEntryMessage", () => {
   });
 
   it("says commands in the text can be blocked when the request never got an answer", () => {
-    const message = unsentEntryMessage(new TypeError("Failed to fetch"));
-    expect(message).toMatch(/may not have been saved/);
+    const message = unsentEntryMessage(new TypeError("Failed to fetch"), false);
+    expect(message).toMatch(/may not have been shared/);
     expect(message).toMatch(/looks like a command/);
-    expect(message).toMatch(/Check whether it was before trying again/);
     expect(message).not.toMatch(/Failed to fetch/);
+  });
+
+  it("asks to check the feed before a new entry is shared again, and says the draft stays", () => {
+    const message = unsentEntryMessage(new TypeError("Failed to fetch"), false);
+    expect(message).toMatch(/Check the feed before sharing it again: what you wrote stays here/);
+  });
+
+  it("says an edit can simply be saved again", () => {
+    const message = unsentEntryMessage(new TypeError("Failed to fetch"), true);
+    expect(message).toMatch(/may not have been saved\. Saving it again is safe\./);
+    expect(message).not.toMatch(/Check the feed/);
   });
 
   it("says offline instead when the browser knows it has no connection", () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
-    const message = unsentEntryMessage(new TypeError("Load failed"));
-    expect(message).toMatch(/offline, so this may not have been saved/);
-    expect(message).toMatch(/whether it was saved, before trying again/);
+    const message = unsentEntryMessage(new TypeError("Load failed"), false);
+    expect(message).toMatch(/offline, so this may not have been shared/);
+    expect(message).toMatch(/Check the feed before sharing it again/);
+    expect(message).not.toMatch(/looks like a command|reword/);
   });
 
   it("leaves every other failure to the usual error", () => {
-    expect(unsentEntryMessage(new HttpError("/x", 400, JSON.stringify({ message: "Title is required." })))).toBeUndefined();
-    expect(unsentEntryMessage(new TypeError("Cannot read properties of undefined (reading 'id')"))).toBeUndefined();
-    expect(unsentEntryMessage(null)).toBeUndefined();
+    const badRequest = new HttpError("/x", 400, JSON.stringify({ message: "Title is required." }));
+    expect(unsentEntryMessage(badRequest, false)).toBeUndefined();
+    const bug = new TypeError("Cannot read properties of undefined (reading 'id')");
+    expect(unsentEntryMessage(bug, false)).toBeUndefined();
+    expect(unsentEntryMessage(null, true)).toBeUndefined();
   });
 });

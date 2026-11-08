@@ -21,7 +21,8 @@ import type { TilSubmission } from "../api/tilTypes";
 
 // The data and mutation hooks are replaced with stand-ins the tests control.
 // They pull Asgardeo into the module graph, and that package does not resolve
-// under vitest's ESM loader. The editor is stubbed so Quill stays out of jsdom.
+// under vitest's ESM loader. The editor is a plain textarea, so Quill stays out
+// of jsdom.
 type MutationStub = { error: Error | null; isPending: boolean; mutate: ReturnType<typeof vi.fn>; reset: () => void };
 const mocks = vi.hoisted(() => ({
   showError: vi.fn(),
@@ -44,7 +45,11 @@ vi.mock("../api/useTilMutations", () => ({
 vi.mock("@context/notifications/NotificationsContext", () => ({
   useNotifications: () => ({ showError: mocks.showError, showSuccess: vi.fn(), showWarning: vi.fn() }),
 }));
-vi.mock("./TilRichTextField", () => ({ default: () => null }));
+vi.mock("./TilRichTextField", () => ({
+  default: ({ value, onChange }: { value: string; onChange: (html: string) => void }) => (
+    <textarea aria-label="What did you learn?" value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
+}));
 
 import SubmitEntryDialog from "./SubmitEntryDialog";
 
@@ -65,6 +70,17 @@ function stubMutation(): MutationStub {
   return { error: null, isPending: false, mutate: vi.fn(), reset: vi.fn() };
 }
 
+const NEW_TITLE = "Telnet isn't an HTTPS test";
+const TITLE_PLACEHOLDER = "e.g. API latency and connection pooling";
+
+/** Fills in a new entry: a title, the Internal source and what was learned. */
+function fillNewEntry() {
+  fireEvent.change(screen.getByPlaceholderText(TITLE_PLACEHOLDER), { target: { value: NEW_TITLE } });
+  fireEvent.mouseDown(screen.getByRole("combobox"));
+  fireEvent.click(screen.getByRole("option", { name: "Internal" }));
+  fireEvent.change(screen.getByLabelText("What did you learn?"), { target: { value: ENTRY.what } });
+}
+
 /** Edits the entry's title and saves, with the save failing as `error`. */
 function saveFailingWith(error: Error) {
   mocks.update.mutate.mockImplementation((_vars, options: { onError: (err: Error) => void }) => options.onError(error));
@@ -83,14 +99,47 @@ describe("SubmitEntryDialog save errors", () => {
   it("explains a share that failed on the network under the editor, as an alert", () => {
     mocks.create.error = new TypeError("Failed to fetch");
     render(<SubmitEntryDialog open onClose={vi.fn()} />);
-    expect(screen.getByRole("alert")).toHaveTextContent(/so this may not have been saved/);
+    expect(screen.getByRole("alert")).toHaveTextContent(/so this may not have been shared/);
     expect(screen.queryByText(/Failed to fetch/)).not.toBeInTheDocument();
+  });
+
+  it("shows no toast when sharing a new entry fails on the network", () => {
+    mocks.create.mutate.mockImplementation((_vars, options: { onError: (err: Error) => void }) =>
+      options.onError(new TypeError("Failed to fetch")),
+    );
+    render(<SubmitEntryDialog open onClose={vi.fn()} />);
+    fillNewEntry();
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    expect(mocks.create.mutate).toHaveBeenCalledOnce();
+    expect(mocks.showError).not.toHaveBeenCalled();
+  });
+
+  it("keeps a new entry's draft through a close after sharing it failed on the network", () => {
+    mocks.create.error = new TypeError("Failed to fetch");
+    const { rerender } = render(<SubmitEntryDialog open onClose={vi.fn()} />);
+    fillNewEntry();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mocks.create.reset).toHaveBeenCalledOnce();
+    mocks.create.error = null;
+    rerender(<SubmitEntryDialog open={false} onClose={vi.fn()} />);
+    rerender(<SubmitEntryDialog open onClose={vi.fn()} />);
+    expect(screen.getByPlaceholderText(TITLE_PLACEHOLDER)).toHaveValue(NEW_TITLE);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("still clears a new entry's draft on any other close", () => {
+    const { rerender } = render(<SubmitEntryDialog open onClose={vi.fn()} />);
+    fillNewEntry();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    rerender(<SubmitEntryDialog open={false} onClose={vi.fn()} />);
+    rerender(<SubmitEntryDialog open onClose={vi.fn()} />);
+    expect(screen.getByPlaceholderText(TITLE_PLACEHOLDER)).toHaveValue("");
   });
 
   it("explains an edit that failed on the network under the editor, as an alert", () => {
     mocks.update.error = new TypeError("Failed to fetch");
     render(<SubmitEntryDialog open onClose={vi.fn()} entry={ENTRY} />);
-    expect(screen.getByRole("alert")).toHaveTextContent(/so this may not have been saved/);
+    expect(screen.getByRole("alert")).toHaveTextContent(/so this may not have been saved\. Saving it again is safe\./);
   });
 
   it("shows no toast for a save that never reached the server", () => {

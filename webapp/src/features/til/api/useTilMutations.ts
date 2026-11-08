@@ -22,6 +22,7 @@
 // transient failure worth retrying.
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { isNetworkFailure } from "@api/errors";
 import { authedDelete, authedPost, authedPut } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
 import { tilServiceUrls } from "@config/apiConfig";
@@ -45,6 +46,12 @@ export function useCreateTilSubmission() {
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: submissionsKey });
+    },
+    // A connection lost after the server saved the entry fails like one that
+    // never got there, and the dialog asks to check the feed before sharing
+    // again, so the feed is fetched again for that check.
+    onError: async (error) => {
+      if (isNetworkFailure(error)) await qc.invalidateQueries({ queryKey: submissionsKey });
     },
   });
 }

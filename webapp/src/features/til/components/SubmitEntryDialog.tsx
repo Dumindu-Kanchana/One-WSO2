@@ -177,7 +177,7 @@ export default function SubmitEntryDialog({
   const showSaveError = (err: Error) => {
     if (!isNetworkFailure(err)) showError(describeError(err));
   };
-  const unsent = unsentEntryMessage(entry ? update.error : create.error);
+  const unsent = unsentEntryMessage(entry ? update.error : create.error, Boolean(entry));
 
   // The byline is the signed-in user's own name — never typed, so it can't
   // be used to credit (or blame) someone else. Name only, not "(email)" --
@@ -216,7 +216,11 @@ export default function SubmitEntryDialog({
   };
 
   const close = () => {
-    reset();
+    // A new entry that failed on the network keeps its draft through a close,
+    // so its author can check the feed and come back to it (see
+    // unsentEntryMessage). Only the error goes, so the next close clears it.
+    if (unsent && !entry) create.reset();
+    else reset();
     onClose();
   };
 
