@@ -27,13 +27,15 @@ describe("unsentEntryMessage", () => {
     const message = unsentEntryMessage(new TypeError("Failed to fetch"));
     expect(message).toMatch(/may not have been saved/);
     expect(message).toMatch(/looks like a command/);
-    expect(message).toMatch(/check whether it was saved before trying again/);
+    expect(message).toMatch(/Check whether it was before trying again/);
     expect(message).not.toMatch(/Failed to fetch/);
   });
 
   it("says offline instead when the browser knows it has no connection", () => {
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
-    expect(unsentEntryMessage(new TypeError("Load failed"))).toMatch(/offline/);
+    const message = unsentEntryMessage(new TypeError("Load failed"));
+    expect(message).toMatch(/offline, so this may not have been saved/);
+    expect(message).toMatch(/whether it was saved, before trying again/);
   });
 
   it("leaves every other failure to the usual error", () => {

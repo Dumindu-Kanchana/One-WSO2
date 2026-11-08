@@ -35,16 +35,19 @@ export function isNotFound(error: unknown): boolean {
  * shell command (a curl line, a path such as /dev/null) before the request
  * reaches the backend. That refusal carries no CORS headers, so all the page
  * ever sees is the browser's own "Failed to fetch". A connection lost after
- * the server saved the entry fails the same way, so the message doesn't say
- * it wasn't saved. */
+ * the server saved the entry fails the same way, offline included, so neither
+ * message says it wasn't saved and both ask to check before trying again. */
 export function unsentEntryMessage(error: unknown): string | undefined {
   if (!isNetworkFailure(error)) return undefined;
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    return "You seem to be offline, so this wasn't saved. Check your connection, then try again.";
+    return (
+      "You seem to be offline, so this may not have been saved. Check your connection, and whether it was saved, " +
+      "before trying again."
+    );
   }
   return (
-    "The connection to the server failed, so this may not have been saved. Text that looks like a command, such as " +
-    "a curl line or a file path, can be blocked on the way: reword or remove it, then try again. If there's none, " +
-    "check whether it was saved before trying again."
+    "The connection to the server failed, so this may not have been saved. Check whether it was before trying " +
+    "again. Text that looks like a command, such as a curl line or a file path, can be blocked on the way: reword " +
+    "or remove it before trying again."
   );
 }
