@@ -127,6 +127,20 @@ describe("SubmitEntryDialog save errors", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("clears a new entry's draft once sharing it again goes through", () => {
+    mocks.create.error = new TypeError("Failed to fetch");
+    mocks.create.mutate.mockImplementation((_vars, options: { onSuccess: () => void }) => options.onSuccess());
+    const onClose = vi.fn();
+    const { rerender } = render(<SubmitEntryDialog open onClose={onClose} />);
+    fillNewEntry();
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    expect(onClose).toHaveBeenCalledOnce();
+    mocks.create.error = null;
+    rerender(<SubmitEntryDialog open={false} onClose={onClose} />);
+    rerender(<SubmitEntryDialog open onClose={onClose} />);
+    expect(screen.getByPlaceholderText(TITLE_PLACEHOLDER)).toHaveValue("");
+  });
+
   it("still clears a new entry's draft on any other close", () => {
     const { rerender } = render(<SubmitEntryDialog open onClose={vi.fn()} />);
     fillNewEntry();

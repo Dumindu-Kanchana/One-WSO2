@@ -48,10 +48,10 @@ export function useCreateTilSubmission() {
       await qc.invalidateQueries({ queryKey: submissionsKey });
     },
     // A connection lost after the server saved the entry fails like one that
-    // never got there, and the dialog asks to check the feed before sharing
-    // again, so the feed is fetched again for that check.
-    onError: async (error) => {
-      if (isNetworkFailure(error)) await qc.invalidateQueries({ queryKey: submissionsKey });
+    // never got there, so the feed is fetched again for its author to check.
+    // Not awaited: React Query holds the error back until this settles.
+    onError: (error) => {
+      if (isNetworkFailure(error)) void qc.invalidateQueries({ queryKey: submissionsKey });
     },
   });
 }

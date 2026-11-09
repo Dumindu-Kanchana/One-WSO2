@@ -216,11 +216,18 @@ export default function SubmitEntryDialog({
   };
 
   const close = () => {
-    // A new entry that failed on the network keeps its draft through a close,
-    // so its author can check the feed and come back to it (see
-    // unsentEntryMessage). Only the error goes, so the next close clears it.
+    // Cancel, Escape or the backdrop. A new entry that failed on the network
+    // keeps its draft through it, so its author can check the feed and come
+    // back to it. Only the error goes, so the next close clears it.
     if (unsent && !entry) create.reset();
     else reset();
+    onClose();
+  };
+
+  // After a save that went through. Not close(): a save's callbacks run with
+  // the render its click came from, where a failure before it is still `unsent`.
+  const closeSaved = () => {
+    reset();
     onClose();
   };
 
@@ -241,7 +248,7 @@ export default function SubmitEntryDialog({
         {
           onSuccess: () => {
             showSuccess("Entry updated");
-            close();
+            closeSaved();
           },
           onError: showSaveError,
         },
@@ -259,7 +266,7 @@ export default function SubmitEntryDialog({
       {
         onSuccess: () => {
           showSuccess("Thanks for sharing what you learned!");
-          close();
+          closeSaved();
         },
         onError: showSaveError,
       },
