@@ -99,12 +99,10 @@ function isWebAddress(url: string): boolean {
   }
 }
 
-/** `html` with every web address in its text made a link that opens in a new
- * tab. The editor has no link format, so an address someone types or pastes
- * is saved as plain text; this is where it becomes clickable, for entries
- * already saved too. Runs on sanitized HTML: every anchor it adds is built
- * through the DOM, with an http(s) href that URL parsed, so nothing it writes
- * can carry markup. Text already inside a link is left alone. */
+/** `html` with every http or https address in its text made a link that opens
+ * in a new tab. Text already inside a link is left alone. `html` must already
+ * be sanitized: each link is built through the DOM, with an href that parses
+ * as an http(s) URL with a host, so nothing it adds can carry markup. */
 function linkifyTilUrls(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
