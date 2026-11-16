@@ -36,14 +36,19 @@ import {
 } from "@wso2/oxygen-ui";
 import { PlusIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { employeeDisplayName } from "@features/leave/util/employeeName";
 import { useReviewers, useRequestReviewers } from "../api/usePar360";
 import { useParEmployeeReviews } from "../api/useLeadHistory";
+import { relationshipLabel } from "../api/review360Types";
 import Par360RequestDialog from "./Par360RequestDialog";
+import Leadership360ResultsCard from "./Leadership360ResultsCard";
 import ParEmptyState from "./ParEmptyState";
+import ParLead360Evidence from "./ParLead360Evidence";
 import { Par360StatusChip } from "./ParChips";
+import { StatusChip } from "./Par360PeopleRows";
 import { ParCommentView } from "./ParContent";
 import { decodeParComment } from "../util/parComment";
 import { isDeadlinePassed } from "../util/parDeadline";
@@ -58,6 +63,8 @@ export default function ParLead360ReviewsTab({
   employeeEmail,
   leadStatus,
   leadStatusKnown,
+  structured = false,
+  leadership = false,
 }: {
   cycle: ParCycle;
   employeeEmail: string;
@@ -67,6 +74,13 @@ export default function ParLead360ReviewsTab({
    * is still loading or failed to load, the Request action must not open
    * just because `leadStatus` reads as `undefined !== "SHARED"`. */
   leadStatusKnown: boolean;
+  /** A PAR 2.0 cycle: the structured responses show above the reviewer list,
+   * which then has nothing of its own to open. */
+  structured?: boolean;
+  /** A member of the leadership team (PAR 2.0): their reviewers answer in
+   * Leadership 360°, whose results show instead, and only declines show in the
+   * list since that feedback can be anonymous. */
+  leadership?: boolean;
 }) {
   const profile = useMeProfile();
   const leadEmail = profile.data?.userInfo.workEmail;
@@ -102,7 +116,26 @@ export default function ParLead360ReviewsTab({
 
   return (
     <Box sx={{ pt: 0.5 }}>
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+      {structured && !leadership && (
+        <Box sx={{ mb: 3 }}>
+          <ParLead360Evidence parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} />
+        </Box>
+      )}
+      {leadership && isPreviewEnabled("leadership360") && (
+        <Leadership360ResultsCard
+          view="REPORTS"
+          leaderEmail={employeeEmail}
+          parCycleId={cycle.parCycleId}
+          fallback={
+            <Typography variant="body2" color="text.secondary">
+              Their Leadership 360° results show here once the cycle's survey has responses.
+            </Typography>
+          }
+          sx={{ mb: 3 }}
+        />
+      )}
+      <Box sx={{ display: "flex", justifyContent: structured ? "space-between" : "flex-end", alignItems: "center", mb: 2 }}>
+        {structured && <Typography sx={{ fontWeight: 600 }}>Reviewers</Typography>}
         <Tooltip title={requestBlocked ? "Action not available" : ""} arrow>
           <span>
             <Button
@@ -142,27 +175,46 @@ export default function ParLead360ReviewsTab({
                     />
                     <Box>
                       <Typography variant="body2">
-                        {nameByEmail.get(reviewer.reviewerEmail) || reviewer.reviewerEmail}
+                        {nameByEmail.get(reviewer.reviewerEmail) || reviewer.reviewerName || reviewer.reviewerEmail}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {reviewer.reviewerEmail}
+                        {[relationshipLabel(reviewer.relationship), reviewer.reviewerEmail].filter(Boolean).join(" · ")}
                       </Typography>
                     </Box>
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Par360StatusChip status={reviewer.reviewStatus} />
+                  {structured ? (
+                    <StatusChip status={reviewer.reviewStatus} leadership={leadership} />
+                  ) : (
+                    <Par360StatusChip status={reviewer.reviewStatus} />
+                  )}
                 </TableCell>
                 <TableCell>
-                  {reviewer.isLeadRequested && leadEmail && (
-                    <Chip size="small" variant="outlined" color="info" label={leadEmail} sx={{ mr: 0.5 }} />
-                  )}
-                  {reviewer.isEmployeeRequested && (
-                    <Chip size="small" variant="outlined" color="error" label={employeeEmail} />
+                  {structured ? (
+                    // PAR 2.0: who asked, by role; nobody asking means the reviewer offered.
+                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                      {reviewer.isEmployeeRequested && (
+                        <Chip size="small" variant="outlined" color="error" label="Employee" />
+                      )}
+                      {reviewer.isLeadRequested && <Chip size="small" variant="outlined" color="info" label="Lead" />}
+                      {!reviewer.isLeadRequested && !reviewer.isEmployeeRequested && (
+                        <Chip size="small" variant="outlined" label="Offered" />
+                      )}
+                    </Box>
+                  ) : (
+                    <>
+                      {reviewer.isLeadRequested && leadEmail && (
+                        <Chip size="small" variant="outlined" color="info" label={leadEmail} sx={{ mr: 0.5 }} />
+                      )}
+                      {reviewer.isEmployeeRequested && (
+                        <Chip size="small" variant="outlined" color="error" label={employeeEmail} />
+                      )}
+                    </>
                   )}
                 </TableCell>
                 <TableCell align="right">
-                  {(reviewer.reviewStatus === "SHARED" || reviewer.reviewStatus === "REJECTED") && (
+                  {!structured && (reviewer.reviewStatus === "SHARED" || reviewer.reviewStatus === "REJECTED") && (
                     <Button size="small" onClick={() => setViewingReviewerEmail(reviewer.reviewerEmail)}>
                       View
                     </Button>
@@ -180,11 +232,14 @@ export default function ParLead360ReviewsTab({
         selfEmail={employeeEmail}
         leadEmail={leadEmail}
         existingEmails={(reviewers.data ?? []).map((r) => r.reviewerEmail)}
-        onSubmit={(reviewerEmails) =>
-          requestReviewers.mutate({ reviewerEmails }, { onSuccess: () => setRequestDialogOpen(false) })
+        onSubmit={(reviewerEmails, relationships) =>
+          requestReviewers.mutate({ reviewerEmails, relationships }, { onSuccess: () => setRequestDialogOpen(false) })
         }
         isSubmitting={requestReviewers.isPending}
         error={requestReviewers.error ?? undefined}
+        parCycleId={structured ? cycle.parCycleId : undefined}
+        askRelationship={structured && !leadership}
+        subjectName={nameByEmail.get(employeeEmail) ?? "them"}
       />
 
       {/* Shows the reviewer's own info (name/avatar), not the employee's. */}

@@ -20,6 +20,7 @@ import {
   Box,
   Button,
   Card,
+  Chip,
   DataGrid,
   Dialog,
   DialogActions,
@@ -38,6 +39,7 @@ import {
 } from "@wso2/oxygen-ui";
 import { CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import { describeError } from "@api/errors";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
@@ -45,6 +47,9 @@ import { useMeProfile } from "@features/my/api/useMeProfile";
 import { useParTeamDetails } from "../api/useLeadTeams";
 import { useSend360Reminder } from "../api/useLeadReminders";
 import { useLeadRatingUpdate } from "../api/useLeadRatingUpdate";
+import { useParShowsPar2, useReviewIndexes } from "../api/useReview360";
+import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from "../api/useLeadership360";
+import { formatIndex } from "../util/review360Form";
 import { calculateCycleActiveStep } from "../util/parCycleActiveStep";
 import { resolveGridSelectedIds } from "../util/parGridSelection";
 import ParCycleDatesStepper from "./ParCycleDatesStepper";
@@ -77,7 +82,16 @@ function countCompletedStages(row: ParRatingMinimal): number {
 function StageProgress({ row }: { row: ParRatingMinimal }) {
   const done = countCompletedStages(row);
   return (
-    <Box sx={{ width: 120, height: 4, borderRadius: 2, bgcolor: "action.hover", overflow: "hidden", mt: 0.5 }}>
+    <Box
+      sx={{
+        width: 120,
+        height: 4,
+        borderRadius: 2,
+        bgcolor: "action.hover",
+        overflow: "hidden",
+        mt: 0.5,
+      }}
+    >
       <Box
         sx={{
           width: `${(done / 5) * 100}%`,
@@ -108,6 +122,25 @@ export default function ParLeadTeamRoster({
   const ratingUpdate = useLeadRatingUpdate(cycle.parCycleId);
   const { showSuccess, showError } = useNotifications();
   const leadEmail = useMeProfile().data?.userInfo.workEmail;
+  // A PAR 2.0 cycle adds each member's 360° index and the team's headline counts.
+  const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
+  const indexes = useReviewIndexes(cycle.parCycleId, leadEmail, showsPar2);
+  const indexByEmail = useMemo(
+    () => new Map((indexes.data?.members ?? []).map((m) => [m.employeeEmail.toLowerCase(), m.index])),
+    [indexes.data],
+  );
+  // Members in the leadership team get Leadership 360° feedback, not PAR 360°: how many responded
+  // to the cycle's survey shows instead.
+  const leadership = showsPar2 && isPreviewEnabled("leadership360");
+  const surveys = useLeadership360Surveys(leadership);
+  const leaderResults = useLeadership360Results(
+    leadership ? cycleSurvey(surveys.data, cycle.parCycleId)?.surveyId : undefined,
+    "REPORTS",
+  );
+  const leaderResponsesByEmail = useMemo(
+    () => new Map((leaderResults.data ?? []).map((r) => [r.leader.workEmail.toLowerCase(), r.responseCount])),
+    [leaderResults.data],
+  );
   // No org-wide employee directory of our own — reuses Leave's for avatars.
   const employees = useLeaveEmployees();
   const thumbnailByEmail = useMemo(
@@ -135,6 +168,8 @@ export default function ParLeadTeamRoster({
   }
 
   const members = details.data?.details ?? [];
+  // The 360° responses tile counts PAR 360° only; leaders' feedback is Leadership 360°.
+  const parMembers = members.filter((m) => !leaderResponsesByEmail.has(m.parEmployeeEmail.toLowerCase()));
   const filteredMembers = members
     .filter((member) =>
       `${member.parEmployeeName.toLowerCase()}${member.parEmployeeEmail.toLowerCase()}`.includes(
@@ -204,7 +239,14 @@ export default function ParLeadTeamRoster({
       headerName: "Team Member",
       flex: 1.5,
       renderCell: (params) => (
-        <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", height: "100%" }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            height: "100%",
+          }}
+        >
           <Box
             role="button"
             tabIndex={0}
@@ -217,14 +259,25 @@ export default function ParLeadTeamRoster({
                 onOpenReview(params.row.parEmployeeEmail);
               }
             }}
-            sx={{ cursor: "pointer", display: "flex", alignItems: "center", width: "fit-content" }}
+            sx={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              width: "fit-content",
+            }}
           >
             <Avatar
               src={thumbnailByEmail.get(params.row.parEmployeeEmail) || undefined}
               slotProps={{ img: { referrerPolicy: "no-referrer" } }}
               sx={{ mr: 1.5, height: "2.2rem", width: "2.2rem" }}
             />
-            <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+              }}
+            >
               <Typography variant="body2" sx={{ fontSize: 13, fontWeight: 600 }}>
                 {params.row.parEmployeeName}
               </Typography>
@@ -260,7 +313,7 @@ export default function ParLeadTeamRoster({
     },
     {
       field: "parEmployeeStatus",
-      headerName: "Employee PAR",
+      headerName: showsPar2 ? "Self-review" : "Employee PAR",
       flex: 0.8,
       display: "flex",
       align: "center",
@@ -274,15 +327,45 @@ export default function ParLeadTeamRoster({
       display: "flex",
       align: "center",
       headerAlign: "center",
-      renderCell: (params) => (
-        <ParStatusChip
-          content={params.row.par360ReviewStatus}
-          countDetails={{
-            completed: params.row.par360ReviewCounts.sharedReviewCount,
-            total: params.row.par360ReviewCounts.requestedReviewCount,
-          }}
-        />
-      ),
+      renderCell: (params) => {
+        const leaderResponses = leaderResponsesByEmail.get(params.row.parEmployeeEmail.toLowerCase());
+        if (leaderResponses !== undefined) {
+          return (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.25 }}>
+              <Chip size="small" variant="outlined" label="Leadership 360°" />
+              <Typography variant="caption" color="text.secondary">
+                {leaderResponses} {leaderResponses === 1 ? "response" : "responses"}
+              </Typography>
+            </Box>
+          );
+        }
+        const chip = (
+          <ParStatusChip
+            content={params.row.par360ReviewStatus}
+            countDetails={{
+              completed: params.row.par360ReviewCounts.sharedReviewCount,
+              total: params.row.par360ReviewCounts.requestedReviewCount,
+            }}
+          />
+        );
+        if (!showsPar2) return chip;
+        const index = indexByEmail.get(params.row.parEmployeeEmail.toLowerCase());
+        return (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 0.25,
+            }}
+          >
+            {chip}
+            <Typography variant="caption" color="text.secondary">
+              {index === undefined ? "No index yet" : `Index ${formatIndex(index)}`}
+            </Typography>
+          </Box>
+        );
+      },
     },
     {
       field: "parLeadStatus",
@@ -371,21 +454,30 @@ export default function ParLeadTeamRoster({
       </Stack>
 
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid size={{ xs: 12, sm: showsPar2 ? 3 : 4 }}>
           <ParCompletionKpiTile
-            label="Employee PAR"
+            label={showsPar2 ? "Self-reviews shared" : "Employee PAR"}
             completed={team.summary.employeeParCompletedCount}
             total={team.numberOfTeamMembers}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        {showsPar2 && (
+          <Grid size={{ xs: 12, sm: 3 }}>
+            <ParCompletionKpiTile
+              label={`PAR 360° responses${indexes.data?.teamIndex !== undefined ? ` · team index ${formatIndex(indexes.data.teamIndex)}` : ""}`}
+              completed={parMembers.reduce((n, m) => n + m.par360ReviewCounts.sharedReviewCount, 0)}
+              total={parMembers.reduce((n, m) => n + m.par360ReviewCounts.requestedReviewCount, 0)}
+            />
+          </Grid>
+        )}
+        <Grid size={{ xs: 12, sm: showsPar2 ? 3 : 4 }}>
           <ParCompletionKpiTile
-            label="Lead's PAR"
+            label={showsPar2 ? "Lead reviews done" : "Lead's PAR"}
             completed={team.summary.leadsReviewCompletedCount}
             total={team.numberOfTeamMembers}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 4 }}>
+        <Grid size={{ xs: 12, sm: showsPar2 ? 3 : 4 }}>
           <ParCompletionKpiTile
             label="F2F"
             completed={team.summary.f2fCompletedCount}

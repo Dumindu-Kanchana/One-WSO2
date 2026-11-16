@@ -161,6 +161,7 @@ export default function ParOrgEmployeeViewTab({
           onClose={() => setHistoryTarget(undefined)}
           employeeEmail={historyTarget.email}
           employeeName={historyTarget.name}
+          asAdmin
         />
       )}
     </Stack>

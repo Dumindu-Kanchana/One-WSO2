@@ -16,12 +16,27 @@
 
 import type { SxProps, Theme } from "@wso2/oxygen-ui";
 import { Box, Typography } from "@wso2/oxygen-ui";
-import { sanitizeParHtml } from "../util/parComment";
+import { decodeParComment, isEmptyHtml, sanitizeParHtml } from "../util/parComment";
 
 // The two places par-app's rich-text HTML gets rendered read-only: a
 // submitted comment (par-app's CommentPaper.tsx) and the admin-configured
 // question text (employeeParQuestion, threeSixtyReviewQuestion — real HTML
 // too, not plain strings).
+
+/** The lead's 360° summary (a rating's base64 parLead360Summary), read-only
+ * under their comment; nothing when there is none. */
+export function ParLead360SummaryView({ summary }: { summary: string | undefined }) {
+  const html = decodeParComment(summary);
+  if (isEmptyHtml(html)) return null;
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        360° summary
+      </Typography>
+      <ParCommentView html={html} />
+    </Box>
+  );
+}
 
 /** A submitted comment, read-only — body-text weight. List/indent styling
  * mirrors Quill's own so a bulleted or indented answer looks the same read

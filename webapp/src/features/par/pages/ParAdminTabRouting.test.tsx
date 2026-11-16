@@ -125,6 +125,22 @@ describe("a PAR admin", () => {
   });
 });
 
+describe("360° feedback", () => {
+  beforeEach(() => isAdmin(true));
+
+  it("has no tab of its own, even with Leadership 360° on", async () => {
+    const saved = window.config;
+    window.config = { ...(saved ?? {}), ONE_WSO2_PREVIEW_FEATURES: { leadership360: true } } as Window["config"];
+    try {
+      show();
+      expect(await screen.findByRole("tab", { name: "Ongoing" })).toBeInTheDocument();
+      expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Ongoing", "History", "Configurations"]);
+    } finally {
+      window.config = saved;
+    }
+  });
+});
+
 describe("someone who isn't a PAR admin", () => {
   beforeEach(() => isAdmin(false));
 

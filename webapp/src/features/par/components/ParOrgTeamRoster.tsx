@@ -15,11 +15,28 @@
 // under the License.
 
 import { useMemo, useState } from "react";
-import { Avatar, Box, Card, DataGrid, IconButton, InputAdornment, Link, Skeleton, Stack, TextField, Tooltip, Typography } from "@wso2/oxygen-ui";
+import {
+  Avatar,
+  Box,
+  Card,
+  Chip,
+  DataGrid,
+  IconButton,
+  InputAdornment,
+  Link,
+  Skeleton,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@wso2/oxygen-ui";
 import { HistoryIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
+import { isPreviewEnabled } from "@config/previewFeatures";
 import { useParTeamDetails } from "../api/useLeadTeams";
+import { useParShowsPar2 } from "../api/useReview360";
+import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from "../api/useLeadership360";
 import ParStatusChip from "./ParStatusChip";
 import ParLeadHistoryModal from "./ParLeadHistoryModal";
 import type { ParCycle, ParRatingMinimal, ParTeamSummary } from "../api/types";
@@ -46,6 +63,20 @@ export default function ParOrgTeamRoster({
   const thumbnailByEmail = useMemo(
     () => new Map(employees.data?.map((e) => [e.workEmail, e.employeeThumbnail]) ?? []),
     [employees.data],
+  );
+
+  // Members in the leadership team get Leadership 360° feedback, not PAR 360°: how many responded
+  // to the cycle's survey shows instead, as in the lead's own roster.
+  const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
+  const leadership = showsPar2 && isPreviewEnabled("leadership360");
+  const surveys = useLeadership360Surveys(leadership);
+  const leaderResults = useLeadership360Results(
+    leadership ? cycleSurvey(surveys.data, cycle.parCycleId)?.surveyId : undefined,
+    "ALL",
+  );
+  const leaderResponsesByEmail = useMemo(
+    () => new Map((leaderResults.data ?? []).map((r) => [r.leader.workEmail.toLowerCase(), r.responseCount])),
+    [leaderResults.data],
   );
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -113,15 +144,28 @@ export default function ParOrgTeamRoster({
       field: "par360ReviewStatus",
       headerName: "360° Feedback",
       flex: 0.9,
-      renderCell: (params) => (
-        <ParStatusChip
-          content={params.row.par360ReviewStatus}
-          countDetails={{
-            completed: params.row.par360ReviewCounts.sharedReviewCount,
-            total: params.row.par360ReviewCounts.requestedReviewCount,
-          }}
-        />
-      ),
+      renderCell: (params) => {
+        const leaderResponses = leaderResponsesByEmail.get(params.row.parEmployeeEmail.toLowerCase());
+        if (leaderResponses !== undefined) {
+          return (
+            <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 0.25, height: "100%" }}>
+              <Chip size="small" variant="outlined" label="Leadership 360°" sx={{ alignSelf: "flex-start" }} />
+              <Typography variant="caption" color="text.secondary">
+                {leaderResponses} {leaderResponses === 1 ? "response" : "responses"}
+              </Typography>
+            </Box>
+          );
+        }
+        return (
+          <ParStatusChip
+            content={params.row.par360ReviewStatus}
+            countDetails={{
+              completed: params.row.par360ReviewCounts.sharedReviewCount,
+              total: params.row.par360ReviewCounts.requestedReviewCount,
+            }}
+          />
+        );
+      },
     },
     {
       field: "parLeadStatus",
@@ -223,6 +267,7 @@ export default function ParOrgTeamRoster({
           onClose={() => setHistoryTarget(undefined)}
           employeeEmail={historyTarget.email}
           employeeName={historyTarget.name}
+          asAdmin
         />
       )}
     </Stack>

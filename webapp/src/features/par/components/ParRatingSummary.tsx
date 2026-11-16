@@ -14,12 +14,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Box, Button, Card, Chip, Stack, Typography } from "@wso2/oxygen-ui";
 import { FileDownIcon } from "@wso2/oxygen-ui-icons-react";
 import type { ParCycle, ParRating } from "../api/types";
 import { decodeParComment } from "../util/parComment";
-import { ParCommentView, ParQuestionText } from "./ParContent";
+import { ParCommentView, ParLead360SummaryView, ParQuestionText } from "./ParContent";
 import { ParAutoAssignedChip } from "./ParChips";
 import { employeeChipLabel } from "../util/parLabels";
 import { downloadParPdf } from "../util/parPdf";
@@ -34,9 +34,15 @@ import { employeeDisplayName } from "@features/leave/util/employeeName";
 export default function ParRatingSummary({
   cycle,
   rating,
+  selfReview,
+  onDownloadPdf,
 }: {
   cycle: Pick<ParCycle, "parCycleConfigurations">;
   rating: ParRating;
+  // A cycle with a guided self-review shows it here instead of the single
+  // employee comment, and builds its own PDF.
+  selfReview?: ReactNode;
+  onDownloadPdf?: () => void;
 }) {
   const selfComment = decodeParComment(rating.parEmployeeComment);
   // Presence, not parLeadStatus, is the visibility rule here: the backend's
@@ -54,19 +60,23 @@ export default function ParRatingSummary({
     () => new Map(employees.data?.map((e) => [e.workEmail, employeeDisplayName(e)]) ?? []),
     [employees.data],
   );
-  // NOT_ASSIGNED's generic "Not Assigned" label reads fine next to "PAR
-  // rating:", but standing alone on the special-rating chip it doesn't say
-  // what isn't assigned — spell that out instead of the bare label.
-  const specialRatingLabel =
-    rating.parSpecialRating === "NOT_ASSIGNED"
-      ? "No Top 5%/20% Rating"
-      : employeeChipLabel(rating.parSpecialRating ?? "").label;
+  // Only a Top 5% or Top 20% gets a chip: NOT_ASSIGNED, the usual case, isn't
+  // worth a chip of its own.
+  const specialRating =
+    rating.parSpecialRating && rating.parSpecialRating !== "NOT_ASSIGNED" ? rating.parSpecialRating : undefined;
 
   return (
     <Stack spacing={1.75}>
       {leadShared && (
         <Card variant="outlined" sx={{ p: 2 }}>
-          <Typography sx={{ fontWeight: 600, mb: 1 }}>Lead's feedback</Typography>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+            <Typography sx={{ fontWeight: 600 }}>Lead's feedback</Typography>
+            {selfReview && onDownloadPdf && (
+              <Button size="small" variant="outlined" startIcon={<FileDownIcon size={14} />} onClick={onDownloadPdf}>
+                Download PDF
+              </Button>
+            )}
+          </Box>
           <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: "wrap" }}>
             {rating.parRating && (
               <Chip
@@ -76,8 +86,13 @@ export default function ParRatingSummary({
                 label={`PAR rating: ${employeeChipLabel(rating.parRating).label}`}
               />
             )}
-            {rating.parSpecialRating && (
-              <Chip size="small" variant="outlined" color={employeeChipLabel(rating.parSpecialRating).color} label={specialRatingLabel} />
+            {specialRating && (
+              <Chip
+                size="small"
+                variant="outlined"
+                color={employeeChipLabel(specialRating).color}
+                label={employeeChipLabel(specialRating).label}
+              />
             )}
             {rating.parRatingSharedBy && (
               <Chip size="small" variant="outlined" label={`Shared by ${nameByEmail.get(rating.parRatingSharedBy) ?? rating.parRatingSharedBy}`} />
@@ -85,27 +100,30 @@ export default function ParRatingSummary({
             {rating.parRatingUpdatedBy === "SYSTEM" && <ParAutoAssignedChip />}
           </Stack>
           <ParCommentView html={leadComment} />
+          <ParLead360SummaryView summary={rating.parLead360Summary} />
         </Card>
       )}
 
-      <Card variant="outlined" sx={{ p: 2 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-          <ParQuestionText
-            html={cycle.parCycleConfigurations?.employeeParQuestion}
-            fallback="Employee feedback"
-          />
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<FileDownIcon size={14} />}
-            onClick={() => downloadParPdf(rating, selfComment, leadComment)}
-            sx={{ flexShrink: 0, ml: 1.5 }}
-          >
-            Download PDF
-          </Button>
-        </Box>
-        <ParCommentView html={selfComment} />
-      </Card>
+      {selfReview ?? (
+        <Card variant="outlined" sx={{ p: 2 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+            <ParQuestionText
+              html={cycle.parCycleConfigurations?.employeeParQuestion}
+              fallback="Employee feedback"
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FileDownIcon size={14} />}
+              onClick={() => downloadParPdf(rating, selfComment, leadComment)}
+              sx={{ flexShrink: 0, ml: 1.5 }}
+            >
+              Download PDF
+            </Button>
+          </Box>
+          <ParCommentView html={selfComment} />
+        </Card>
+      )}
     </Stack>
   );
 }
