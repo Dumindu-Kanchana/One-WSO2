@@ -131,6 +131,10 @@ describe("People Ops rail sections", () => {
       "promotion-cycle-history",
       "banking-admin",
     ]);
+    // Manage OKRs is for leads as well as admins: the people backend lets
+    // anyone above someone in their reporting chain set their OKRs, and a
+    // People Ops admin set anyone's.
+    const LEAD_OR_ADMIN = new Set(["people-okrs"]);
     const live = PEOPLE_OPS_SECTIONS.flatMap((s) => [s, ...(s.children ?? [])]).filter(
       (s) => s.path,
     );
@@ -138,6 +142,8 @@ describe("People Ops rail sections", () => {
     for (const s of live) {
       if (NOT_ADMIN_GATED.has(s.id)) {
         expect(s.requires).toBeUndefined();
+      } else if (LEAD_OR_ADMIN.has(s.id)) {
+        expect(s.requires).toEqual(["lead", "admin"]);
       } else {
         expect(s.requires).toEqual(["admin"]);
       }

@@ -116,7 +116,13 @@ export type PreviewFeature =
    * under Me → Performance, and the 360° evidence in the Lead View. Held back
    * until the PAR backend's structured 360 endpoints are deployed.
    */
-  | "par2";
+  | "par2"
+  /**
+   * OKRs: Me → My OKRs, People Ops → Manage OKRs, and the OKRs PAR shows
+   * beside the self-review and in the lead's review. Held back until the
+   * people backend's `/okrs` endpoints are deployed.
+   */
+  | "okrs";
 
 /**
  * Whether a preview feature should be shown.

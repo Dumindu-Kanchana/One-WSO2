@@ -50,6 +50,9 @@ import { useLeadRatingUpdate } from "../api/useLeadRatingUpdate";
 import { useParShowsPar2, useReviewIndexes } from "../api/useReview360";
 import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from "../api/useLeadership360";
 import { formatIndex } from "../util/review360Form";
+import { useOkrsOf } from "@features/okr/api/useOkrs";
+import { keyResultProgress } from "@features/okr/util/okr";
+import { okrsForCycle } from "../util/okr";
 import { calculateCycleActiveStep } from "../util/parCycleActiveStep";
 import { resolveGridSelectedIds } from "../util/parGridSelection";
 import ParCycleDatesStepper from "./ParCycleDatesStepper";
@@ -155,6 +158,14 @@ export default function ParLeadTeamRoster({
   const [shareConfirmOpen, setShareConfirmOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [syncEmployeeOpen, setSyncEmployeeOpen] = useState(false);
+  // A PAR 2.0 cycle also shows each member's OKRs: how many of their key results are completed,
+  // and any overdue.
+  const memberEmails = useMemo(() => (details.data?.details ?? []).map((m) => m.parEmployeeEmail), [details.data]);
+  const okrsByEmail = useOkrsOf(memberEmails, showsPar2);
+  // A lead none of whose members has OKRs (or whose OKRs they may read) gets no OKRs column.
+  const anyOkrs = [...okrsByEmail.entries()].some(
+    ([email, okrs]) => okrsForCycle(okrs ?? [], email, cycle.parCycleEndDate).length > 0,
+  );
 
   if (details.isLoading) {
     return <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 1.5 }} />;
@@ -367,6 +378,55 @@ export default function ParLeadTeamRoster({
         );
       },
     },
+    ...(showsPar2 && anyOkrs
+      ? [
+          {
+            field: "okrs",
+            headerName: "OKRs",
+            flex: 0.7,
+            display: "flex",
+            align: "center",
+            headerAlign: "center",
+            sortable: false,
+            renderCell: (params) => {
+              const all = okrsByEmail.get(params.row.parEmployeeEmail);
+              if (!all) return null;
+              const shown = okrsForCycle(all, params.row.parEmployeeEmail, cycle.parCycleEndDate);
+              if (shown.length === 0) {
+                return (
+                  <Typography variant="caption" color="text.secondary" aria-label="No OKRs">
+                    —
+                  </Typography>
+                );
+              }
+              // Their own key results; with none, how many objectives they own.
+              const { completed, total, overdue } = keyResultProgress(shown);
+              return (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {total > 0 ? `${completed} of ${total}` : shown.length}
+                  </Typography>
+                  <Typography variant="caption" color={overdue ? "error" : "text.secondary"}>
+                    {total === 0
+                      ? shown.length === 1
+                        ? "objective"
+                        : "objectives"
+                      : overdue
+                        ? `${overdue} overdue`
+                        : "completed"}
+                  </Typography>
+                </Box>
+              );
+            },
+          } satisfies DataGrid.GridColDef<ParRatingMinimal>,
+        ]
+      : []),
     {
       field: "parLeadStatus",
       headerName: "Lead's PAR",

@@ -50,6 +50,7 @@ import {
   NetworkIcon,
   RadioIcon,
   SatelliteDishIcon,
+  TargetIcon,
   ScaleIcon,
   ShieldIcon,
   TicketIcon,
@@ -277,6 +278,20 @@ export const PEOPLE_OPS_SECTIONS: PerspectiveSection[] = [
       },
     ],
   },
+  // Setting OKRs for the people below you: leads (anyone with a report) and
+  // People Ops admins, the same people the backend lets set them. OKRs run all
+  // year, for everyone.
+  ...(isPreviewEnabled("okrs")
+    ? [
+        {
+          id: "people-okrs",
+          label: "Manage OKRs",
+          icon: TargetIcon,
+          path: "/people-ops/okrs",
+          requires: ["lead", "admin"] satisfies Capability[],
+        },
+      ]
+    : []),
   // promotion-app's Lead Portal ("Time Based Promotions") — reviewing and
   // deciding on other people's promotions is People-Ops-team work, the same
   // split PAR's own Lead/Admin portals above already apply. Gated via
@@ -501,6 +516,9 @@ const MARKETING_OPS_SECTIONS: PerspectiveSection[] = [
 // (OPD/credit-card/expense — moved in from the retired Finance persona).
 const ME_SECTIONS: PerspectiveSection[] = [
   { id: "me-my-team", label: "My Team", icon: UsersRoundIcon, path: "/me/my-team", requires: ["lead"] },
+  // Your own OKRs, which you and your leads set. Everyone has the page; it says
+  // so when there are none.
+  ...(isPreviewEnabled("okrs") ? [{ id: "me-okrs", label: "My OKRs", icon: TargetIcon, path: "/me/okrs" }] : []),
   // Opting yourself in and out is something you do for yourself, so it sits
   // under Me. Managing it on someone else's behalf is an HR action and stays
   // under People Ops.

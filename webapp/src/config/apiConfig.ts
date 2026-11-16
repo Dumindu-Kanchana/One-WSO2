@@ -63,6 +63,35 @@ export const peopleServiceUrls = {
   // resolved server-side from the token, never sent.
   employeesSearch: `${peopleBackendUrl}/employees/search`,
 
+  // OKRs. GET with `ownerEmail` — one person's: the objectives they own and
+  // those with a key result of theirs (them, anyone above them in their
+  // reporting chain, People Ops admins); without it, a list: `team` (the
+  // caller's own and their reporting chain's) or `all` (People Ops admins).
+  // POST — set one.
+  okrs: (query: { ownerEmail: string } | { scope: "team" | "all" }) =>
+    "ownerEmail" in query
+      ? `${peopleBackendUrl}/okrs?ownerEmail=${encodeURIComponent(query.ownerEmail)}`
+      : `${peopleBackendUrl}/okrs?scope=${query.scope}`,
+  newOkr: `${peopleBackendUrl}/okrs`,
+  // PATCH — change an objective and its key results. DELETE — remove one
+  // nobody has worked on yet.
+  okr: (okrId: number) => `${peopleBackendUrl}/okrs/${okrId}`,
+  // PUT — complete, close or reopen an objective.
+  okrStatus: (okrId: number) => `${peopleBackendUrl}/okrs/${okrId}/status`,
+  // GET — who a key result of someone's objective can be given to: them and
+  // their team.
+  okrTeam: (ownerEmail: string, search: string) =>
+    `${peopleBackendUrl}/okr-team?ownerEmail=${encodeURIComponent(ownerEmail)}&search=${encodeURIComponent(search)}`,
+  // PATCH — a key result's baseline and target. PUT …/status — its status.
+  // POST …/actions — add an action.
+  okrKeyResult: (keyResultId: number) => `${peopleBackendUrl}/okr-key-results/${keyResultId}`,
+  okrKeyResultStatus: (keyResultId: number) => `${peopleBackendUrl}/okr-key-results/${keyResultId}/status`,
+  okrKeyResultActions: (keyResultId: number) => `${peopleBackendUrl}/okr-key-results/${keyResultId}/actions`,
+  // PATCH — rename or tick off an action. DELETE — remove it. GET/POST
+  // …/comments — its comments.
+  okrAction: (actionId: number) => `${peopleBackendUrl}/okr-actions/${actionId}`,
+  okrActionComments: (actionId: number) => `${peopleBackendUrl}/okr-actions/${actionId}/comments`,
+
   // Filter option lists. Five take an optional parent id — narrowing has to be
   // a round trip because the records carry no parent reference, so it cannot be
   // derived from lists already held. Omitting the id returns the full list.

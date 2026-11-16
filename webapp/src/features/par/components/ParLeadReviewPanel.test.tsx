@@ -19,11 +19,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { HttpError } from "@api/http";
 import type { ParCycle, ParRating } from "../api/types";
+import type { Okr } from "@features/okr/api/okrTypes";
+import { due, testKeyResult, testOkr } from "@features/okr/testing/fixtures";
 import { encodeParComment } from "../util/parComment";
 import type { ParRichTextFieldHandle } from "./ParRichTextField";
 
 let rating: ParRating;
 let responseCount = 3;
+// What the people backend answers for this person's OKRs.
+let okrs: { data?: Okr[]; isError?: boolean } = {};
 // What the suggestion query holds once it's asked for, and whether the last
 // render asked for it. (The render that seeds the saved summary starts with an
 // empty one, but React discards it before any query could fetch.)
@@ -94,6 +98,8 @@ vi.mock("./ParRichTextField", () => ({
 }));
 vi.mock("./ParLead360Evidence", () => ({ default: () => null, ParLead360Guidance: () => null }));
 vi.mock("./Leadership360ResultsCard", () => ({ default: () => null }));
+vi.mock("./ParOkrPanel", () => ({ ParOkrEvidence: () => null }));
+vi.mock("@features/okr/api/useOkrs", () => ({ useOkrs: () => okrs }));
 
 const { default: ParLeadReviewPanel } = await import("./ParLeadReviewPanel");
 
@@ -124,6 +130,7 @@ function show(overrides: Partial<ParRating> = {}) {
 
 beforeEach(() => {
   responseCount = 3;
+  okrs = {};
   suggestion = { data: SUGGESTED };
   suggestionAskedFor = false;
   save.mockReset();
@@ -245,5 +252,45 @@ describe("ParLeadReviewPanel: 360° summary", () => {
     expect(screen.getByText("Colleagues see real ownership.")).toBeInTheDocument();
     expect(suggestionAskedFor).toBe(false);
     expect(screen.queryByText("Suggested from 3 360° responses")).not.toBeInTheDocument();
+  });
+});
+
+describe("ParLeadReviewPanel: OKRs tab", () => {
+  const okr = (over: Partial<Okr>): Okr =>
+    testOkr({ ownerEmail: "alex@example.com", objective: "Automate the release checks", ...over });
+
+  it("is there for anyone with OKRs", () => {
+    okrs = { data: [okr({ keyResults: due("2999-06-30", { ownerEmail: "alex@example.com" }) })] };
+    show({ parIsLeadershipEmployee: false });
+    expect(screen.getByRole("tab", { name: "OKRs" })).toBeInTheDocument();
+  });
+
+  it("is there for a key result of theirs on someone else's objective", () => {
+    okrs = {
+      data: [okr({ ownerEmail: "lead@example.com", keyResults: [testKeyResult({ ownerEmail: "alex@example.com" })] })],
+    };
+    show();
+    expect(screen.getByRole("tab", { name: "OKRs" })).toBeInTheDocument();
+  });
+
+  it("isn't there when they have none for this cycle", () => {
+    okrs = {
+      data: [
+        okr({ status: "COMPLETED", keyResults: due("2000-01-31", { ownerEmail: "alex@example.com" }) }),
+        okr({ okrId: 2, status: "CLOSED" }),
+        okr({ okrId: 3, ownerEmail: "lead@example.com", keyResults: [testKeyResult({ ownerEmail: "sam@example.com" })] }),
+      ],
+    };
+    show({ parIsLeadershipEmployee: true });
+    expect(screen.queryByRole("tab", { name: "OKRs" })).not.toBeInTheDocument();
+  });
+
+  it("isn't there when the reviewer may not read them", () => {
+    // OKRs follow HR reporting lines: a PAR admin, or a PAR lead outside the
+    // person's line, is refused. The review shows no tab rather than an error.
+    okrs = { isError: true };
+    show();
+    expect(screen.queryByRole("tab", { name: "OKRs" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Self-review" })).toBeInTheDocument();
   });
 });

@@ -85,6 +85,9 @@ import { useLead360SummarySuggestion, useSaveLead360Summary } from "../api/useLe
 import { MIN_360_RESPONSES } from "../api/review360Types";
 import ParLead360Evidence, { ParLead360Guidance } from "./ParLead360Evidence";
 import ParLead360Suggestion from "./ParLead360Suggestion";
+import { ParOkrEvidence } from "./ParOkrPanel";
+import { useOkrs } from "@features/okr/api/useOkrs";
+import { okrsForCycle } from "../util/okr";
 
 type SpecialRatingUi = "NONE" | "TOP5P" | "TOP20P";
 
@@ -119,7 +122,12 @@ export default function ParLeadReviewPanel({
   // A PAR 2.0 cycle puts the evidence (self-review, 360° summary) beside the
   // assessment, with the 360° guidance under the rating.
   const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
-  const [evidenceTab, setEvidenceTab] = useState(0);
+  // Their OKRs get a tab when there are any for this cycle that the reviewer
+  // may read (OKR access follows HR reporting lines, not the PAR team).
+  const okrs = useOkrs(employeeEmail, showsPar2);
+  const hasOkrs = okrsForCycle(okrs.data ?? [], employeeEmail, cycle.parCycleEndDate).length > 0;
+  const [chosenEvidenceTab, setEvidenceTab] = useState(0);
+  const evidenceTab = chosenEvidenceTab === 2 && !hasOkrs ? 0 : chosenEvidenceTab;
   const { showSuccess, showError } = useNotifications();
 
   // Cycle-scoped value first (not on the wire yet — always undefined until
@@ -833,19 +841,24 @@ export default function ParLeadReviewPanel({
               <Tab label="Self-review" />
               {/* A leader's 360° feedback is Leadership 360°. */}
               <Tab label={isLeadership ? "Leadership 360°" : "PAR 360°"} />
+              {hasOkrs && <Tab label="OKRs" />}
             </Tabs>
             <CardContent>
               {evidenceTab === 0 ? (
                 selfReviewContent
-              ) : isLeadership ? (
-                <Leadership360ResultsCard
-                  view={isAdminView ? "ALL" : "REPORTS"}
-                  leaderEmail={employeeEmail}
-                  parCycleId={cycle.parCycleId}
-                  fallback={<ParEmptyState text="No Leadership 360° results for this cycle yet" />}
-                />
+              ) : evidenceTab === 1 ? (
+                isLeadership ? (
+                  <Leadership360ResultsCard
+                    view={isAdminView ? "ALL" : "REPORTS"}
+                    leaderEmail={employeeEmail}
+                    parCycleId={cycle.parCycleId}
+                    fallback={<ParEmptyState text="No Leadership 360° results for this cycle yet" />}
+                  />
+                ) : (
+                  <ParLead360Evidence parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} framed={false} />
+                )
               ) : (
-                <ParLead360Evidence parCycleId={cycle.parCycleId} employeeEmail={employeeEmail} framed={false} />
+                <ParOkrEvidence ownerEmail={employeeEmail} cycleEndDate={cycle.parCycleEndDate} />
               )}
             </CardContent>
           </Card>

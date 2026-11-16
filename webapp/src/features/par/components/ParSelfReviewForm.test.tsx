@@ -34,6 +34,48 @@ vi.mock("../api/useReview360", () => ({
   useReviewSummary: () => ({ data: undefined }),
 }));
 vi.mock("../api/useLeadership360", () => ({ useCycleLeadership360ForPdf: () => undefined }));
+vi.mock("@features/okr/api/useOkrs", () => ({
+  useOkrs: () => ({
+    isSuccess: true,
+    data: [
+      {
+        okrId: 1,
+        ownerEmail: "lead@wso2.com",
+        ownerName: "Lee Lead",
+        objective: "Grow enterprise retention",
+        status: "OPEN",
+        version: 1,
+        canManage: false,
+        keyResults: [
+          {
+            keyResultId: 3,
+            ownerEmail: "me@wso2.com",
+            title: "Gross retention at 92%",
+            dueDate: "2099-03-31",
+            status: "ON_TRACK",
+            statusHistory: [],
+            actions: [],
+            canUpdate: true,
+          },
+          {
+            keyResultId: 4,
+            ownerEmail: "lead@wso2.com",
+            title: "Not mine",
+            dueDate: "2099-06-30",
+            status: "NOT_STARTED",
+            statusHistory: [],
+            actions: [],
+            canUpdate: false,
+          },
+        ],
+        createdBy: "lead@wso2.com",
+        createdOn: "2099-01-01T00:00:00Z",
+        updatedBy: "lead@wso2.com",
+        updatedOn: "2099-01-01T00:00:00Z",
+      },
+    ],
+  }),
+}));
 vi.mock("@context/notifications/NotificationsContext", () => ({
   useNotifications: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
 }));
@@ -125,6 +167,17 @@ describe("ParSelfReviewForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Share with lead" }));
     expect(screen.getByText(/Growth & learning is empty/)).toBeInTheDocument();
     expect(screen.queryByText("Share your self-review?")).not.toBeInTheDocument();
+  });
+
+  it("shows your key results beside the form and cites one into the first section", () => {
+    show("DRAFT", { impact: "Shipped it" });
+    expect(screen.getByText("Grow enterprise retention")).toBeInTheDocument();
+    expect(screen.getByText("Lee Lead's objective")).toBeInTheDocument();
+    expect(screen.queryByText("Not mine")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add to section 1" }));
+    expect(screen.getByRole("textbox", { name: "Impact this cycle" })).toHaveValue(
+      "Shipped it\nOKR: Grow enterprise retention: Gross retention at 92% (on track, due 31 Mar '99)",
+    );
   });
 
   it("shows a draft past its deadline for reading, with the lead's review once they share", () => {

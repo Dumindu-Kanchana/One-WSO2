@@ -46,6 +46,9 @@ import { isDeadlinePassed } from "../util/parDeadline";
 import { answersToSave, isSectionAnswered, shareBlockers } from "../util/selfReviewForm";
 import ParRatingSummary from "./ParRatingSummary";
 import ParSelfReviewView from "./ParSelfReviewView";
+import { ParOkrCard } from "./ParOkrPanel";
+import { appendLine, okrCitation, okrsForCycle } from "../util/okr";
+import { useOkrs } from "@features/okr/api/useOkrs";
 import ParDueChip from "./ParDueChip";
 
 const AUTOSAVE_DELAY_MS = 1200;
@@ -84,6 +87,8 @@ export default function ParSelfReviewForm({
   const status = rating.parEmployeeStatus;
   const shared = status === "SHARED" || status === "SHARED_BLOCKED";
   const deadlinePassed = isDeadlinePassed(cycle.parEmployeeDeadline);
+  const okrs = useOkrs(workEmail);
+  const hasOkrs = okrsForCycle(okrs.data ?? [], workEmail, cycle.parCycleEndDate).length > 0;
   const editable = !shared && !deadlinePassed && (started || status === "DRAFT");
   // Same rule as the single comment: unshare until the lead shares their side.
   const canUnshare = status === "SHARED" && rating.parLeadStatus !== "SHARED" && !deadlinePassed;
@@ -154,6 +159,16 @@ export default function ParSelfReviewForm({
   };
 
   const answered = definition.sections.filter((s) => isSectionAnswered(s, answers)).length;
+  // Objectives and key results cite into the first section's text (Impact this cycle).
+  const citeSection = definition.sections.findIndex((sec) => sec.questions.some((q) => q.type === "TEXT"));
+  const citeQuestion = definition.sections[citeSection]?.questions.find((q) => q.type === "TEXT");
+  const citeOkr = citeQuestion
+    ? (...cited: Parameters<typeof okrCitation>) => {
+        const current = typeof answers[citeQuestion.id] === "string" ? (answers[citeQuestion.id] as string) : "";
+        setAnswer(citeQuestion.id, appendLine(current, okrCitation(...cited)));
+        showSuccess(`Added to section ${citeSection + 1}.`);
+      }
+    : undefined;
 
   // Past the deadline, an unshared draft is only for reading too, and the lead's review shows here
   // once they share (they can without it then).
@@ -302,59 +317,78 @@ export default function ParSelfReviewForm({
 
       {blockers.length > 0 && <Alert severity="warning">Before you share: {blockers.join("; ")}.</Alert>}
 
-      <Stack spacing={2}>
-        {definition.sections.map((section, i) => (
-          <Card key={section.id} variant="outlined" sx={{ p: 2 }}>
-            <Box sx={{ display: "flex", gap: 1.5, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: "50%",
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  bgcolor: isSectionAnswered(section, answers) ? "primary.main" : "action.selected",
-                  color: isSectionAnswered(section, answers) ? "primary.contrastText" : "text.secondary",
-                }}
-              >
-                {i + 1}
-              </Box>
-              <Box>
-                <Typography sx={{ fontWeight: 600 }}>
-                  {section.title}
-                  {section.questions.some((q) => q.required) ? "" : " (optional)"}
-                </Typography>
-                {section.hint && (
-                  <Typography variant="body2" color="text.secondary">
-                    {section.hint}
+      <Box
+        sx={{
+          display: "grid",
+          // A column beside the sections only for OKRs to cite.
+          gridTemplateColumns: { xs: "1fr", md: hasOkrs ? "1fr 280px" : "1fr" },
+          gap: 2,
+          alignItems: "start",
+        }}
+      >
+        <Stack spacing={2}>
+          {definition.sections.map((section, i) => (
+            <Card key={section.id} variant="outlined" sx={{ p: 2 }}>
+              <Box sx={{ display: "flex", gap: 1.5, mb: 1.5 }}>
+                <Box
+                  sx={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    bgcolor: isSectionAnswered(section, answers) ? "primary.main" : "action.selected",
+                    color: isSectionAnswered(section, answers) ? "primary.contrastText" : "text.secondary",
+                  }}
+                >
+                  {i + 1}
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 600 }}>
+                    {section.title}
+                    {section.questions.some((q) => q.required) ? "" : " (optional)"}
                   </Typography>
-                )}
+                  {section.hint && (
+                    <Typography variant="body2" color="text.secondary">
+                      {section.hint}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
-            </Box>
-            {section.questions.map((q) => (
-              <TextField
-                key={q.id}
-                fullWidth
-                multiline
-                minRows={4}
-                placeholder={q.placeholder}
-                value={answers[q.id] ?? ""}
-                onChange={(e) => setAnswer(q.id, e.target.value)}
-                slotProps={{
-                  htmlInput: {
-                    maxLength: q.maxLength,
-                    "aria-label": q.text,
-                  },
-                }}
-              />
-            ))}
-          </Card>
-        ))}
-      </Stack>
+              {section.questions.map((q) => (
+                <TextField
+                  key={q.id}
+                  fullWidth
+                  multiline
+                  minRows={4}
+                  placeholder={q.placeholder}
+                  value={answers[q.id] ?? ""}
+                  onChange={(e) => setAnswer(q.id, e.target.value)}
+                  slotProps={{
+                    htmlInput: {
+                      maxLength: q.maxLength,
+                      "aria-label": q.text,
+                    },
+                  }}
+                />
+              ))}
+            </Card>
+          ))}
+        </Stack>
+
+        {hasOkrs && (
+          <ParOkrCard
+            ownerEmail={workEmail}
+            cycleEndDate={cycle.parCycleEndDate}
+            onCite={citeOkr}
+            citeLabel={`Add to section ${citeSection + 1}`}
+          />
+        )}
+      </Box>
 
       <Dialog open={confirming} onClose={() => setConfirming(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Share your self-review?</DialogTitle>

@@ -28,8 +28,9 @@ import Leadership360ResultsCard from "./Leadership360ResultsCard";
 // One report's record in a past PAR 2.0 cycle, read-only, for their lead:
 // the lead's feedback, then what the lead had while reviewing. That's the
 // self-review and the PAR 360° responses with names, or, for a member of the
-// leadership team, their Leadership 360° results. Also used by People Ops
-// (`asAdmin`), who see any leader's results.
+// leadership team, their Leadership 360° results. No OKRs: they keep no
+// history, so today's list would stand in for what the lead saw then. Also
+// used by People Ops (`asAdmin`), who see any leader's results.
 export default function ParLeadHistoryPar2Record({
   cycle,
   rating,

@@ -106,6 +106,11 @@ const ParAdminHistoryTab = lazy(() => import("@features/par/pages/ParAdminHistor
 const ParAdminGlobalConfigTab = lazy(() => import("@features/par/pages/ParAdminGlobalConfigTab"));
 const ParGiveFeedbackTab = lazy(() => import("@features/par/pages/ParGiveFeedbackTab"));
 const ParCycleFeedbackSection = lazy(() => import("@features/par/pages/ParCycleFeedbackSection"));
+const MyOkrsPage = lazy(() => import("@features/okr/pages/MyOkrsPage"));
+const ManageOkrsPage = lazy(() => import("@features/okr/pages/ManageOkrsPage"));
+const RequiresOkrManagerRoute = lazy(() =>
+  import("@features/okr/pages/ManageOkrsPage").then((m) => ({ default: m.RequiresOkrManagerRoute })),
+);
 import EmailGroupsPage from "@features/my/email-groups/pages/EmailGroupsPage";
 import EmailSignaturePage from "@features/my/email-signature/pages/EmailSignaturePage";
 import BankingRoute from "@features/my/banking/components/BankingRoute";
@@ -321,6 +326,17 @@ export default function App() {
           {/* My Team — a lead's reporting chain, ported from people-app. */}
           <Route path="me/my-team" element={<MyTeamPage />} />
           <Route path="me/my-team/:employeeId" element={<TeamMemberPage />} />
+          {/* Me → My OKRs: your own, which you and your leads set. */}
+          {isPreviewEnabled("okrs") && (
+            <Route
+              path="me/okrs"
+              element={
+                <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                  <MyOkrsPage />
+                </Suspense>
+              }
+            />
+          )}
           {/* Me → Leave: native screens ported from leave-app. Lives here
               (not People Ops) — it's something every employee does for
               themself, not an HR-team tool. */}
@@ -856,6 +872,20 @@ export default function App() {
               }
             />
           </Route>
+          {/* People Ops → Manage OKRs: leads set OKRs for the people below
+              them, People Ops admins for anyone. */}
+          {isPreviewEnabled("okrs") && (
+            <Route
+              path="people-ops/okrs"
+              element={
+                <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                  <RequiresOkrManagerRoute>
+                    <ManageOkrsPage />
+                  </RequiresOkrManagerRoute>
+                </Suspense>
+              }
+            />
+          )}
           {/* People Ops → Promotion (Lead/Team History/Functional Lead/
               Board/Admin/Cycle History portals). Each portal's own role guard
               (PromotionRequires*Route) decides who can open it. */}

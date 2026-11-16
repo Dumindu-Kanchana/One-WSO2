@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 type Perspectives = typeof import("./perspectives");
 
 async function load(
-  preview: { quickquote?: boolean; nda?: boolean } = {},
+  preview: { quickquote?: boolean; nda?: boolean; okrs?: boolean } = {},
 ): Promise<Perspectives> {
   vi.resetModules();
   window.config = {
@@ -67,6 +67,34 @@ describe("PAR's People Ops rail entry", () => {
   it("leaves the sections that are not gated alone", async () => {
     const { PEOPLE_OPS_SECTIONS } = await load();
     expect(PEOPLE_OPS_SECTIONS.map((s) => s.id)).toContain("people-org-chart");
+  });
+});
+
+// OKRs: your own under Me, and setting them for the people below you under
+// People Ops, for leads and People Ops admins.
+describe("the OKR rail entries", () => {
+  const rows = (sections: readonly { id: string; children?: { id: string }[] }[]) =>
+    sections.flatMap((s) => [s, ...(s.children ?? [])]);
+
+  it("are My OKRs for everyone and Manage OKRs for leads and admins", async () => {
+    const perspectives = await load({ okrs: true });
+    const mine = rows(perspectives.findPerspectiveByKey("me")?.sections ?? []).find((s) => s.id === "me-okrs");
+    expect(mine).toMatchObject({ path: "/me/okrs" });
+    expect(mine).not.toHaveProperty("requires");
+    expect(rows(perspectives.PEOPLE_OPS_SECTIONS)).toContainEqual(
+      expect.objectContaining({ id: "people-okrs", path: "/people-ops/okrs", requires: ["lead", "admin"] }),
+    );
+    expect(rows(perspectives.PEOPLE_OPS_SECTIONS).map((s) => s.id)).not.toContain("par-okrs");
+  });
+
+  it("are hidden while the okrs flag is off", async () => {
+    const perspectives = await load({});
+    const ids = [
+      ...rows(perspectives.findPerspectiveByKey("me")?.sections ?? []),
+      ...rows(perspectives.PEOPLE_OPS_SECTIONS),
+    ].map((s) => s.id);
+    expect(ids).not.toContain("me-okrs");
+    expect(ids).not.toContain("people-okrs");
   });
 });
 
