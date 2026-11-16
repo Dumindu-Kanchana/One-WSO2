@@ -14,15 +14,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useRef, useState } from "react";
 import type { SxProps, Theme } from "@wso2/oxygen-ui";
-import { IconButton, InputAdornment, TextField } from "@wso2/oxygen-ui";
-import { CalendarIcon } from "@wso2/oxygen-ui-icons-react";
+import { Box } from "@wso2/oxygen-ui";
+import LeaveDateField from "@features/leave/components/LeaveDateField";
 
-// par-app's two F2F date fields both show an explicit calendar icon; a plain
-// native `type="date"` doesn't reliably (the browser's own indicator is too
-// faint/inconsistent). Hidden here and replaced with a real icon that opens
-// the same native picker via HTMLInputElement.showPicker().
+// PAR's date fields (the cycle dialogs and the F2F dates) with the same
+// calendar picker as Leave. The label sits inside the border like the other
+// fields in these forms, or is left out where the screen labels the field
+// itself. A typed date outside min/max is never handed on, since no PAR
+// backend re-checks the range, and the field says why it was refused.
 export default function ParDateField({
   value,
   onChange,
@@ -48,63 +48,21 @@ export default function ParDateField({
   fullWidth?: boolean;
   sx?: SxProps<Theme>;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [rejection, setRejection] = useState<string | undefined>(undefined);
-
   return (
-    <TextField
-      type="date"
-      label={label}
-      size="small"
-      fullWidth={fullWidth}
-      value={value}
-      disabled={disabled}
-      error={error || Boolean(rejection)}
-      helperText={rejection ?? helperText}
-      onChange={(e) => {
-        // min/max on a native date input only constrain the calendar widget
-        // — typing a value directly bypasses them, and neither consumer's
-        // backend re-validates the range. Reject rather than pass through,
-        // but say why: the field is controlled, so a silent reject snaps
-        // the value back with no visible feedback.
-        const v = e.target.value;
-        if (v && min && v < min) {
-          setRejection(`Must be on or after ${min}`);
-          return;
-        }
-        if (v && max && v > max) {
-          setRejection(`Must be on or before ${max}`);
-          return;
-        }
-        setRejection(undefined);
-        onChange(v);
-      }}
-      inputRef={inputRef}
-      slotProps={{
-        inputLabel: label ? { shrink: true } : undefined,
-        htmlInput: { min, max, "aria-label": ariaLabel },
-        input: {
-          endAdornment: (
-            <InputAdornment position="end">
-              <IconButton
-                size="small"
-                edge="end"
-                disabled={disabled}
-                aria-label="Open date picker"
-                onClick={() =>
-                  (inputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null)?.showPicker?.()
-                }
-              >
-                <CalendarIcon size={16} />
-              </IconButton>
-            </InputAdornment>
-          ),
-        },
-      }}
-      sx={{
-        "& input[type='date']::-webkit-calendar-picker-indicator": { display: "none" },
-        ...sx,
-      }}
-    />
+    <Box sx={[{ width: fullWidth ? "100%" : 200 }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
+      <LeaveDateField
+        label={label}
+        ariaLabel={ariaLabel}
+        floatingLabel
+        explainRange
+        value={value}
+        min={min}
+        max={max}
+        disabled={disabled}
+        error={error}
+        helperText={helperText}
+        onChange={onChange}
+      />
+    </Box>
   );
 }

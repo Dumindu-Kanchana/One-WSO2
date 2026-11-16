@@ -144,3 +144,15 @@ describe("a typed date", () => {
     expect(onChange).toHaveBeenLastCalledWith("");
   });
 });
+
+describe("Leave's own forms", () => {
+  // PAR's settings (a label inside the border, a reason for a refused date)
+  // are opt-in: a leave form keeps its label above the field and its own messages.
+  it("keep the label above the field and give no reason of their own", () => {
+    const { container } = render(<Form initial="2025-03-04" />);
+    expect(container.querySelector("label")).toBeNull();
+    expect(screen.getByText("Start")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Start"), { target: { value: "2020-01-01" } });
+    expect(screen.queryByText(/Must be on or/)).not.toBeInTheDocument();
+  });
+});

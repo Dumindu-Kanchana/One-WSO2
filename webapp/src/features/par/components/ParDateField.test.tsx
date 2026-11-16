@@ -16,25 +16,39 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import ParDateField from "./ParDateField";
 
-// A native date input's min/max only constrain its calendar widget — typing
-// a value directly bypasses them, and neither ParF2fTab nor
+/** A caller that holds the value, as every PAR form does. */
+function Held({ min }: { min?: string }) {
+  const [value, setValue] = useState("");
+  return (
+    <>
+      <ParDateField value={value} onChange={setValue} min={min} ariaLabel="date" />
+      <output aria-label="held">{value}</output>
+    </>
+  );
+}
+
+// A typed date can fall outside min/max, and neither ParF2fTab nor
 // ParScheduleF2fDialog's backend re-validates the range. ParDateField is the
-// one shared place that has to reject it.
+// one shared place that has to refuse it: the caller is told there is no date,
+// never handed the out-of-range one.
 describe("ParDateField", () => {
   it("rejects a typed date before min", () => {
     const onChange = vi.fn();
     render(<ParDateField value="" onChange={onChange} min="2026-01-10" ariaLabel="date" />);
     fireEvent.change(screen.getByLabelText("date"), { target: { value: "2026-01-01" } });
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalledWith("2026-01-01");
+    expect(onChange).toHaveBeenLastCalledWith("");
   });
 
   it("rejects a typed date after max", () => {
     const onChange = vi.fn();
     render(<ParDateField value="" onChange={onChange} max="2026-01-10" ariaLabel="date" />);
     fireEvent.change(screen.getByLabelText("date"), { target: { value: "2026-01-20" } });
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalledWith("2026-01-20");
+    expect(onChange).toHaveBeenLastCalledWith("");
   });
 
   it("accepts a date within bounds", () => {
@@ -66,11 +80,35 @@ describe("ParDateField", () => {
   });
 
   it("clears the rejection message once a valid date is accepted", () => {
-    const onChange = vi.fn();
-    render(<ParDateField value="" onChange={onChange} min="2026-01-10" ariaLabel="date" />);
+    render(<Held min="2026-01-10" />);
     fireEvent.change(screen.getByLabelText("date"), { target: { value: "2026-01-01" } });
     expect(screen.getByText("Must be on or after 2026-01-10")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("date"), { target: { value: "2026-01-15" } });
     expect(screen.queryByText("Must be on or after 2026-01-10")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("held")).toHaveTextContent("2026-01-15");
+  });
+
+  // The same calendar as Leave, not the browser's own.
+  it("opens the calendar picker, named after the field", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    render(<ParDateField value="" onChange={vi.fn()} label="Cycle starts" ariaLabel="PAR cycle start date" />);
+    await user.click(screen.getByRole("button", { name: /choose date/i }));
+    // Named by the field's visible label.
+    expect(await screen.findByRole("dialog", { name: "Cycle starts" })).toBeInTheDocument();
+  });
+
+  it("keeps the label inside the field's border, like the other fields in its form", () => {
+    const { container } = render(
+      <ParDateField value="" onChange={vi.fn()} label="Cycle starts" ariaLabel="PAR cycle start date" />,
+    );
+    expect(container.querySelector("label")).toHaveTextContent("Cycle starts");
+    expect(screen.getByLabelText("PAR cycle start date")).toBeInTheDocument();
+  });
+
+  it("shows no label when the screen labels the field itself", () => {
+    const { container } = render(<ParDateField value="" onChange={vi.fn()} ariaLabel="F2F completed date" />);
+    expect(screen.getByLabelText("F2F completed date")).toBeInTheDocument();
+    expect(container.querySelector("label")).toBeNull();
+    expect(container).not.toHaveTextContent("F2F completed date");
   });
 });

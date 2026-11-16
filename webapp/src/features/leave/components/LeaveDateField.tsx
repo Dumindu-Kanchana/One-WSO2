@@ -48,8 +48,15 @@ function toIso(d: Date | null): string {
 // never holds one the picker would have refused.
 //
 // Values stay `YYYY-MM-DD` strings in and out, so callers are unchanged.
+//
+// Also PAR's date field (ParDateField), which keeps its forms' look: the label
+// inside the field's border like their other fields, or no visible label at
+// all, and a message saying why a typed date was refused.
 export default function LeaveDateField({
   label,
+  ariaLabel = label,
+  floatingLabel = false,
+  explainRange = false,
   value,
   min,
   max,
@@ -58,7 +65,14 @@ export default function LeaveDateField({
   helperText,
   onChange,
 }: {
-  label: string;
+  /** Shown above the field, or inside its border with `floatingLabel`; leave
+   * it out for a field labelled by what's around it. */
+  label?: string;
+  /** The field's accessible name, when it isn't `label`. */
+  ariaLabel?: string;
+  floatingLabel?: boolean;
+  /** Says under the field why a typed date outside min/max was refused. */
+  explainRange?: boolean;
   value: string;
   min?: string;
   max?: string;
@@ -75,6 +89,12 @@ export default function LeaveDateField({
   // Once the caller holds a date again, the remembered one is spent.
   if (outOfRange && value !== "") setOutOfRange(null);
   const shown = value === "" && outOfRange ? outOfRange : fromIso(value);
+  const outOfRangeIso = value === "" && outOfRange ? toIso(outOfRange) : "";
+  const rangeMessage = !explainRange || !outOfRangeIso
+    ? undefined
+    : min && outOfRangeIso < min
+      ? `Must be on or after ${min}`
+      : `Must be on or before ${max}`;
 
   // The bounds can move without this field changing — a To whose min follows
   // From. Once the date on screen is allowed again, hand it to the caller, or
@@ -89,9 +109,12 @@ export default function LeaveDateField({
 
   return (
     <Box>
-      <Typography sx={{ fontSize: 11, color: "text.secondary", mb: 0.375 }}>{label}</Typography>
+      {label && !floatingLabel && (
+        <Typography sx={{ fontSize: 11, color: "text.secondary", mb: 0.375 }}>{label}</Typography>
+      )}
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <DatePicker
+          label={floatingLabel ? label : undefined}
           value={shown}
           minDate={fromIso(min) ?? undefined}
           maxDate={fromIso(max) ?? undefined}
@@ -113,10 +136,10 @@ export default function LeaveDateField({
               // undefined, not false: false would switch off the picker's own
               // min/max error state.
               error: error || undefined,
-              helperText,
+              helperText: rangeMessage ?? helperText,
               // The visible text above is a plain Typography, so the field
               // carries its accessible name itself.
-              inputProps: { "aria-label": label },
+              inputProps: { "aria-label": ariaLabel },
             },
             // The theme's Paper is translucent, which lets the form show through
             // the calendar. Give the popup (and its small-screen dialog) the
@@ -125,8 +148,8 @@ export default function LeaveDateField({
             mobilePaper: { sx: dialogPaperSx },
             // The popup is a dialog with no visible title, so name it after its
             // field; several date fields sit side by side.
-            popper: { "aria-label": `${label} calendar` },
-            dialog: { "aria-label": `${label} calendar` },
+            popper: { "aria-label": `${ariaLabel} calendar` },
+            dialog: { "aria-label": `${ariaLabel} calendar` },
           }}
         />
       </LocalizationProvider>
