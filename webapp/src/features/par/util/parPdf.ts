@@ -17,7 +17,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Par360Review, ParLegacyHistory, ParLegacyQuestionAnswer, ParRating } from "../api/types";
+import type { FormDefinition, Leadership360Summary } from "../api/leadership360Types";
+import type { Review360Summary } from "../api/review360Types";
+import type { SelfReviewAnswers } from "../api/selfReviewTypes";
 import { decodeParComment, sanitizeParHtml } from "./parComment";
+import { formatShortDate } from "./parDate";
 import { pdfRatingText } from "./parLabels";
 import {
   formatLegacyCycleName,
@@ -58,6 +62,14 @@ export function downloadParPdf(rating: ParRating, selfComment: string, leadComme
       { content: htmlToPdfText(leadComment), styles: { textColor: [50, 50, 50], cellPadding: 6 } },
     ]);
   }
+  const lead360Summary = htmlToPdfText(decodeParComment(rating.parLead360Summary));
+  if (lead360Summary.trim()) {
+    rows.push([
+      "360° Summary",
+      "",
+      { content: lead360Summary, styles: { textColor: [50, 50, 50], cellPadding: 6 } },
+    ]);
+  }
 
   if (reviews && reviews.length > 0) {
     rows.push([{ content: "360° Reviews", colSpan: 3, styles: { fontStyle: "bold", fillColor: [200, 200, 200], halign: "center" } }]);
@@ -92,6 +104,120 @@ export function downloadParPdf(rating: ParRating, selfComment: string, leadComme
     startY: 30,
     styles: { fontSize: 9, cellPadding: 4, overflow: "linebreak", valign: "top" },
     columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 60 }, 2: { cellWidth: "auto" } },
+  });
+
+  doc.save(`${rating.parEmployeeEmail}_par_summary.pdf`);
+}
+
+const SECTION_ROW = { fontStyle: "bold", fillColor: [225, 225, 225], halign: "left" } as const;
+const SUBSECTION_ROW = { fontStyle: "bold", textColor: [80, 80, 80], halign: "left" } as const;
+const TEXT_CELL = { textColor: [50, 50, 50], cellPadding: 6 } as const;
+
+/** A leader's own Leadership 360° results for the cycle, as they see them on screen. */
+export interface Leadership360PdfSection {
+  definition: FormDefinition;
+  summary: Leadership360Summary;
+  /** While the survey is still open, the date (YYYY-MM-DD) the results are as of. */
+  asOf?: string;
+}
+
+// The finished PAR of a PAR 2.0 cycle: the lead's feedback, the guided
+// self-review section by section, (when the employee may see it) the 360°
+// summary — averages only, never comments or names — and, for a leader, their
+// Leadership 360° results as they see them on screen.
+export function downloadPar2Pdf({
+  rating,
+  leadComment,
+  selfReview,
+  review360,
+  leadership360,
+}: {
+  rating: ParRating;
+  leadComment: string;
+  selfReview: { definition: FormDefinition; answers: SelfReviewAnswers };
+  review360?: Review360Summary;
+  leadership360?: Leadership360PdfSection;
+}): void {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+  const rows: PdfRow[] = [];
+  const section = (title: string) => rows.push([{ content: title, colSpan: 2, styles: SECTION_ROW }]);
+
+  if (leadComment) {
+    section("Lead's feedback");
+    rows.push(["Lead comment", { content: htmlToPdfText(leadComment), styles: TEXT_CELL }]);
+    const lead360Summary = decodeParComment(rating.parLead360Summary);
+    if (htmlToPdfText(lead360Summary).trim()) {
+      rows.push(["360° summary", { content: htmlToPdfText(lead360Summary), styles: TEXT_CELL }]);
+    }
+  }
+
+  section("Self-review");
+  for (const s of selfReview.definition.sections) {
+    for (const q of s.questions) {
+      const text = selfReview.answers[q.id] ?? "";
+      rows.push([s.title, { content: text || "-", styles: TEXT_CELL }]);
+    }
+  }
+
+  if (review360?.available) {
+    const definition = review360.template.definition;
+    const questions = definition.sections.flatMap((s) => s.questions);
+    section("PAR 360° results");
+    rows.push(["360° index", { content: review360.index?.toFixed(1) ?? "-", styles: TEXT_CELL }]);
+    // In the form's order, not the order the averages arrive in.
+    for (const q of questions.filter((x) => x.type === "RATING")) {
+      const a = review360.questionAverages.find((x) => x.questionId === q.id);
+      if (a) rows.push([q.text, { content: a.average.toFixed(1), styles: TEXT_CELL }]);
+    }
+  }
+
+  if (leadership360?.summary.available) {
+    const { definition, summary, asOf } = leadership360;
+    section(
+      `Leadership 360° results (${summary.responseCount} responses${asOf ? `, as of ${formatShortDate(asOf)}` : ""})`,
+    );
+    rows.push(["Overall", { content: summary.overallAverage?.toFixed(2) ?? "-", styles: TEXT_CELL }]);
+    // Grouped under the form's own sections, in its order, as on screen.
+    for (const s of definition.sections) {
+      const rated = s.questions.filter((q) => q.type === "RATING");
+      if (rated.length === 0) continue;
+      rows.push([{ content: s.title, colSpan: 2, styles: SUBSECTION_ROW }]);
+      for (const q of rated) {
+        const a = summary.questionAverages.find((x) => x.questionId === q.id);
+        if (a) {
+          rows.push([q.text, { content: `${a.average.toFixed(2)} (${a.ratingCount} ratings)`, styles: TEXT_CELL }]);
+        }
+      }
+    }
+    const comments = [
+      ...summary.namedComments.map((c) => `• ${c.comment} (${c.respondentName ?? c.respondentEmail})`),
+      ...summary.comments.map((c) => `• ${c} (Anonymous)`),
+    ];
+    if (comments.length > 0) rows.push(["Comments", { content: comments.join("\n"), styles: TEXT_CELL }]);
+  }
+
+  // A Top 5%/20% line only for a Top 5% or Top 20%, as on screen.
+  const specialRating =
+    rating.parSpecialRating && rating.parSpecialRating !== "NOT_ASSIGNED" ? rating.parSpecialRating : undefined;
+  autoTable(doc, {
+    head: [
+      [
+        {
+          content:
+            ` - Employee: ${rating.parEmployeeEmail}\n` +
+            ` - PAR Rating: ${pdfRatingText(rating.parRating)}\n` +
+            (specialRating ? ` - Top 5%/20% Rating: ${specialRating}\n` : "") +
+            ` - PAR Shared By: ${rating.parRatingSharedBy || "Not Provided"}`,
+          colSpan: 2,
+          styles: { halign: "left", fontSize: 12, cellPadding: 10 },
+        },
+      ],
+    ],
+    showHead: "firstPage",
+    body: rows,
+    startY: 30,
+    styles: { fontSize: 9, cellPadding: 4, overflow: "linebreak", valign: "top" },
+    columnStyles: { 0: { cellWidth: 160 }, 1: { cellWidth: "auto" } },
   });
 
   doc.save(`${rating.parEmployeeEmail}_par_summary.pdf`);

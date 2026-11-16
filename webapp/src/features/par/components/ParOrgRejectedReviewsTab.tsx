@@ -104,8 +104,8 @@ export default function ParOrgRejectedReviewsTab({ cycle }: { cycle: ParCycle })
       renderCell: (params) => (
         <Chip
           size="small"
-          color={params.row.isOfferedFeedback === "offered" ? "info" : "warning"}
-          label={params.row.isOfferedFeedback === "offered" ? "Was offered a review by" : "Requested a review from"}
+          color={params.row.isOfferedFeedback === "TRUE" ? "info" : "warning"}
+          label={params.row.isOfferedFeedback === "TRUE" ? "Was offered a review by" : "Requested a review from"}
         />
       ),
     },

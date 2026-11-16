@@ -35,6 +35,12 @@ const DATE_PREFIX_RE = /^(\d{4})-(\d{2})-(\d{2})/;
  * guards against elsewhere in this file's sibling. String slicing sidesteps
  * that entirely.
  */
+/** A moment in the browser's own timezone, as "11 Nov '26, 5:29 pm". */
+export function formatShortDateTime(value: Date): string {
+  const day = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  return `${formatShortDate(day)}, ${value.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+}
+
 export function formatShortDate(value: string | undefined): string {
   if (!value) return "—";
   const match = DATE_PREFIX_RE.exec(value);

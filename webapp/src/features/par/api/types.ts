@@ -124,12 +124,20 @@ export interface ParRating {
   // the employee has saved a draft.
   parEmployeeComment?: string;
   parEmployeeStatus: ParEmployeeStatus;
-  // The three fields below are all sanitizeParRatingForSelf-gated: the
+  // The four fields below are all sanitizeParRatingForSelf-gated: the
   // backend omits them from the response entirely while parLeadStatus is
   // PENDING/DRAFT, so their presence already means "the lead has shared".
   parRating?: string;
   parSpecialRating?: string;
   parLeadComment?: string;
+  // The lead's summary of the employee's PAR 360° feedback, shared with their
+  // comment (base64 HTML, like parLeadComment). PAR 2.0 cycles only.
+  parLead360Summary?: string;
+  // How many more AI suggestions can be written for that summary in this
+  // cycle, and how many submitted 360° responses the last one was written
+  // from. Never sent to the employee.
+  parLead360SuggestionsLeft?: number;
+  parLead360SuggestionResponses?: number;
   parLeadStatus: ParLeadStatus;
   // Who invoked the share (a lead, or an admin sharing on a lead's behalf),
   // shown to the employee as "PAR Shared By".
@@ -177,11 +185,18 @@ export interface Par360Reviewer {
   reviewStatus: Par360ReviewStatus;
   isLeadRequested: boolean;
   isEmployeeRequested: boolean;
+  // PAR 2.0 cycles only.
+  reviewerName?: string;
+  // How they work with the employee, as whoever asked said (PAR 2.0 cycles only).
+  relationship?: string;
 }
 
 // Body for POST .../employees/{email}/reviewers.
 export interface Par360ReviewRequestCreate {
   reviewerEmails: string[];
+  // How each reviewer works with the employee, by email. Required in PAR 2.0 cycles, except for a
+  // member of the leadership team.
+  relationships?: Record<string, string>;
 }
 
 // One request FOR you to review someone else. GET .../employees/{email}/review-requests
@@ -192,6 +207,8 @@ export interface Par360ReviewRequest {
   reviewStatus: Par360ReviewStatus;
   isEmployeeRequested: boolean;
   isLeadRequested: boolean;
+  // PAR 2.0 cycles only.
+  employeeName?: string;
 }
 
 // Your own review of one employee. GET .../employees/{email}/review.
@@ -482,6 +499,8 @@ export interface ParCycleCreate {
   parEmployeeDeadline: string;
   parLeadDeadline: string;
   parCycleConfigurations: ParCycleConfigurations;
+  // PAR 2.0: the cycle uses the guided self-review and structured 360° forms.
+  par2Forms?: boolean;
 }
 
 export type ParCycleConfigurationsOptionalized = Partial<ParCycleConfigurations>;
@@ -544,6 +563,6 @@ export interface ParSpecialRatingGroupQuota {
 export interface ParRejectedReview {
   employeeEmail: string;
   reviewerEmail: string;
-  // Literal "offered" | "requested", not a boolean.
-  isOfferedFeedback: string;
+  // The backend's "TRUE" | "FALSE" string, not a boolean.
+  isOfferedFeedback: "TRUE" | "FALSE";
 }

@@ -143,7 +143,7 @@ export function Par360OfferConfirmDialog({
 
   const handleConfirm = () => {
     if (!employee) return;
-    offer.mutate(employee.workEmail, {
+    offer.mutate({ employeeEmail: employee.workEmail }, {
       onSuccess: () => {
         const email = employee.workEmail;
         onClose();

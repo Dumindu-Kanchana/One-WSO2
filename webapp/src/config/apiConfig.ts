@@ -63,6 +63,35 @@ export const peopleServiceUrls = {
   // resolved server-side from the token, never sent.
   employeesSearch: `${peopleBackendUrl}/employees/search`,
 
+  // OKRs. GET with `ownerEmail` — one person's: the objectives they own and
+  // those with a key result of theirs (them, anyone above them in their
+  // reporting chain, People Ops admins); without it, a list: `team` (the
+  // caller's own and their reporting chain's) or `all` (People Ops admins).
+  // POST — set one.
+  okrs: (query: { ownerEmail: string } | { scope: "team" | "all" }) =>
+    "ownerEmail" in query
+      ? `${peopleBackendUrl}/okrs?ownerEmail=${encodeURIComponent(query.ownerEmail)}`
+      : `${peopleBackendUrl}/okrs?scope=${query.scope}`,
+  newOkr: `${peopleBackendUrl}/okrs`,
+  // PATCH — change an objective and its key results. DELETE — remove one
+  // nobody has worked on yet.
+  okr: (okrId: number) => `${peopleBackendUrl}/okrs/${okrId}`,
+  // PUT — complete, close or reopen an objective.
+  okrStatus: (okrId: number) => `${peopleBackendUrl}/okrs/${okrId}/status`,
+  // GET — who a key result of someone's objective can be given to: them and
+  // their team.
+  okrTeam: (ownerEmail: string, search: string) =>
+    `${peopleBackendUrl}/okr-team?ownerEmail=${encodeURIComponent(ownerEmail)}&search=${encodeURIComponent(search)}`,
+  // PATCH — a key result's baseline and target. PUT …/status — its status.
+  // POST …/actions — add an action.
+  okrKeyResult: (keyResultId: number) => `${peopleBackendUrl}/okr-key-results/${keyResultId}`,
+  okrKeyResultStatus: (keyResultId: number) => `${peopleBackendUrl}/okr-key-results/${keyResultId}/status`,
+  okrKeyResultActions: (keyResultId: number) => `${peopleBackendUrl}/okr-key-results/${keyResultId}/actions`,
+  // PATCH — rename or tick off an action. DELETE — remove it. GET/POST
+  // …/comments — its comments.
+  okrAction: (actionId: number) => `${peopleBackendUrl}/okr-actions/${actionId}`,
+  okrActionComments: (actionId: number) => `${peopleBackendUrl}/okr-actions/${actionId}/comments`,
+
   // Filter option lists. Five take an optional parent id — narrowing has to be
   // a round trip because the records carry no parent reference, so it cannot be
   // derived from lists already held. Omitting the id returns the full list.
@@ -270,6 +299,14 @@ export const parServiceUrls = {
   // parEmployeeStatus / parLeadStatus we use for the chip + copy).
   parRating: (parCycleId: number, workEmail: string) =>
     `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/par-ratings`,
+  // GET (the employee, their leads, PAR admins) and PUT (the employee's
+  // draft) a cycle's guided self-review; 404 for a cycle without one.
+  parSelfReview: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/self-review`,
+  // POST — share the saved self-review with the lead. Unsharing is the
+  // par-ratings PATCH back to DRAFT.
+  parSelfReviewShare: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/self-review/share`,
   // PATCH .../par-ratings/{parRatingId} — save a draft or submit the
   // self-review (parEmployeeStatus: DRAFT | SHARED). Backend enforces which
   // fields the caller may set for their own record — see ParRatingModify.
@@ -295,6 +332,38 @@ export const parServiceUrls = {
   // GET/PATCH .../review — the caller's own review OF `employeeWorkEmail`.
   par360Review: (parCycleId: number, employeeWorkEmail: string) =>
     `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(employeeWorkEmail)}/review`,
+
+  // ---- PAR 2.0 structured 360° ------------------------------------------------
+  //
+  // GET — the PAR 2.0 forms a cycle uses (SELF_REVIEW, PEER_360); empty for a
+  // cycle that keeps the single comment, rating and 360.
+  parCycleForms: (parCycleId: number) => `${parBackendUrl}/par-cycles/${parCycleId}/forms`,
+  // GET/PUT — the caller's own structured feedback ON `employeeWorkEmail`.
+  parReviewForm: (parCycleId: number, employeeWorkEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(employeeWorkEmail)}/review-form`,
+  // POST — submit it.
+  parReviewFormSubmission: (parCycleId: number, employeeWorkEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(employeeWorkEmail)}/review-form/submission`,
+  // GET — every response about an employee with names (their leads, report chain, PAR admins).
+  parReviewResponses: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/review-responses`,
+  // GET — the caller's own anonymised summary.
+  parReviewSummary: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/review-summary`,
+  // PUT — the lead's 360° summary of an employee, shared with their comment
+  // (the employee's leads and PAR admins).
+  parLead360Summary: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/lead-360-summary`,
+  // GET — the AI-suggested 360° summary for the lead to start from.
+  parLead360SummarySuggestion: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/lead-360-summary/suggestion`,
+  // GET — people to ask for 360° feedback, from the employee's calendar (the
+  // employee, their leads and PAR admins).
+  parReviewerSuggestions: (parCycleId: number, workEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/employees/${encodeURIComponent(workEmail)}/reviewer-suggestions`,
+  // GET — a lead's members' 360° indexes and the team average.
+  parReviewIndexes: (parCycleId: number, leadEmail: string) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/review-indexes?leadEmail=${encodeURIComponent(leadEmail)}`,
 
   // GET /par-cycles/{cycleId}/participants — the people IN THIS CYCLE (name +
   // email only), leadEmail omitted (par-app's OfferFeedbackView.tsx always
@@ -423,6 +492,27 @@ export const parServiceUrls = {
   // have the query-parameter route yet (see fetchLegacyCycleParticipants in useParAdmin.ts).
   legacyParHistoryCyclesParticipantsByPath: (cycleName: string, summary = false) =>
     `${parBackendUrl}/legacy-par-history-cycles/${encodeURIComponent(cycleName)}/participants${summary ? "?summary=true" : ""}`,
+
+  // ---- Leadership 360° ------------------------------------------------------
+  //
+  // The leader a respondent writes about goes in the request body of the
+  // drafts/submissions calls, never the URL, so gateway access logs don't
+  // record who gave feedback on whom.
+  leadership360CurrentSurvey: () => `${parBackendUrl}/leadership-360/current-survey`,
+  leadership360Leaders: () => `${parBackendUrl}/leadership-360/leaders`,
+  // GET: every survey, newest first (anyone).
+  leadership360Surveys: () => `${parBackendUrl}/leadership-360/surveys`,
+  leadership360Survey: (surveyId: number) => `${parBackendUrl}/leadership-360/surveys/${surveyId}`,
+  leadership360MyFeedback: (surveyId: number) => `${parBackendUrl}/leadership-360/surveys/${surveyId}/my-feedback`,
+  leadership360Drafts: (surveyId: number) => `${parBackendUrl}/leadership-360/surveys/${surveyId}/drafts`,
+  leadership360Submissions: (surveyId: number) => `${parBackendUrl}/leadership-360/surveys/${surveyId}/submissions`,
+  // The leaders whose results the caller may see from one view: SELF (the
+  // caller themself), REPORTS (leaders reporting to the caller) or ALL
+  // (every leader, PAR admins only).
+  leadership360Results: (surveyId: number, view: "SELF" | "REPORTS" | "ALL") =>
+    `${parBackendUrl}/leadership-360/surveys/${surveyId}/results?view=${view}`,
+  leadership360Summary: (surveyId: number, view: "SELF" | "REPORTS" | "ALL", leaderEmail: string) =>
+    `${parBackendUrl}/leadership-360/surveys/${surveyId}/summary?view=${view}&leaderEmail=${encodeURIComponent(leaderEmail)}`,
 };
 
 // Leave app backend (people-ops-suite/apps/leave-app). Its own service

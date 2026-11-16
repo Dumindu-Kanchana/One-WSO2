@@ -180,7 +180,9 @@ export default function ParLead360ReviewsTab({
         selfEmail={employeeEmail}
         leadEmail={leadEmail}
         existingEmails={(reviewers.data ?? []).map((r) => r.reviewerEmail)}
-        onSubmit={(emails) => requestReviewers.mutate(emails, { onSuccess: () => setRequestDialogOpen(false) })}
+        onSubmit={(reviewerEmails) =>
+          requestReviewers.mutate({ reviewerEmails }, { onSuccess: () => setRequestDialogOpen(false) })
+        }
         isSubmitting={requestReviewers.isPending}
         error={requestReviewers.error ?? undefined}
       />

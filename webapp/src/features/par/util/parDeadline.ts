@@ -34,3 +34,26 @@ export function isDeadlinePassed(deadline: string): boolean {
   if (Number.isNaN(parsed.getTime())) return true;
   return new Date() > parsed;
 }
+
+/** When a `YYYY-MM-DD` deadline has ended in every timezone: the end of that day at UTC-12, the
+ * last place to reach it. From then nobody can still meet it, which is when the backend lets a lead
+ * share a PAR whose self-review was never shared. */
+export function deadlineEndsEverywhereAt(deadline: string): Date {
+  return new Date(`${deadline}T23:59:59-12:00`);
+}
+
+/** Whole days from today to a `YYYY-MM-DD` deadline, in the browser's timezone: 0 on the day
+ * itself, negative once it has passed. */
+export function daysLeft(deadline: string, today = new Date()): number {
+  const [y, m, d] = deadline.split("-").map(Number);
+  const due = Date.UTC(y, m - 1, d);
+  const now = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((due - now) / 86_400_000);
+}
+
+/** How a deadline still ahead reads next to a task: "6 days left", "1 day left", "Due today". Once
+ * it has passed there's nothing left to do (the task locks), so there's no label for that. */
+export function daysLeftLabel(days: number): string {
+  if (days === 0) return "Due today";
+  return days === 1 ? "1 day left" : `${days} days left`;
+}

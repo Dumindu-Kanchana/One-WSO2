@@ -37,6 +37,19 @@ export function encodeParComment(value: string): string {
   return btoa(encodeURIComponent(value));
 }
 
+/** Plain text, one paragraph per line (an AI-suggested 360° summary), as the
+ * rich-text HTML a comment field holds. */
+export function paragraphsToHtml(text: string): string {
+  const escape = (line: string) =>
+    line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escape(line)}</p>`)
+    .join("");
+}
+
 /** Returns "" for an absent/malformed field rather than throwing — a
  * comment that hasn't been saved yet is not an error. Sanitized before
  * being handed back, since callers either seed an editable field with it

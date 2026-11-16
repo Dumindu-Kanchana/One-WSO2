@@ -23,6 +23,7 @@ import { digiopsHeaders } from "@features/my/util/digiopsHeaders";
 import type {
   Par360Review,
   Par360ReviewRequest,
+  Par360ReviewRequestCreate,
   Par360ReviewUpdate,
   Par360Reviewer,
   ParParticipant,
@@ -36,7 +37,7 @@ export function useReviewers(parCycleId: number | undefined, workEmail: string |
   const backendConfigured = Boolean(parBackendUrl);
   return useQuery<Par360Reviewer[]>({
     queryKey: ["par-360-reviewers", parCycleId, workEmail],
-    enabled: isSignedIn && backendConfigured && Boolean(parCycleId) && Boolean(workEmail),
+    enabled: isSignedIn && backendConfigured && parCycleId !== undefined && Boolean(workEmail),
     queryFn: async () => {
       const accessToken = await getAccessToken();
       return authedGet<Par360Reviewer[]>(
@@ -50,18 +51,19 @@ export function useReviewers(parCycleId: number | undefined, workEmail: string |
   });
 }
 
-// POST more reviewers onto the caller's own 360° request list.
+// POST more reviewers onto an employee's 360° request list (yours, or a report's as their lead), with how each
+// works with them in a PAR 2.0 cycle.
 export function useRequestReviewers(parCycleId: number | undefined, workEmail: string | undefined) {
   const getAccessToken = useAccessToken();
   const qc = useQueryClient();
-  return useMutation<void, Error, string[]>({
-    mutationFn: async (reviewerEmails) => {
-      if (!parCycleId || !workEmail) throw new Error("Missing cycle or employee email");
+  return useMutation<void, Error, Par360ReviewRequestCreate>({
+    mutationFn: async (request) => {
+      if (parCycleId === undefined || !workEmail) throw new Error("Missing cycle or employee email");
       const accessToken = await getAccessToken();
       await authedPost<void>(
         parServiceUrls.par360Reviewers(parCycleId, workEmail),
         accessToken,
-        { reviewerEmails },
+        request,
         digiopsHeaders(),
       );
     },
@@ -79,7 +81,7 @@ export function useReviewRequests(parCycleId: number | undefined, workEmail: str
   const backendConfigured = Boolean(parBackendUrl);
   return useQuery<Par360ReviewRequest[]>({
     queryKey: ["par-360-review-requests", parCycleId, workEmail],
-    enabled: isSignedIn && backendConfigured && Boolean(parCycleId) && Boolean(workEmail),
+    enabled: isSignedIn && backendConfigured && parCycleId !== undefined && Boolean(workEmail),
     queryFn: async () => {
       const accessToken = await getAccessToken();
       return authedGet<Par360ReviewRequest[]>(
@@ -101,7 +103,7 @@ export function useMyReview(parCycleId: number | undefined, employeeWorkEmail: s
   const backendConfigured = Boolean(parBackendUrl);
   return useQuery<Par360Review | null>({
     queryKey: ["par-360-review", parCycleId, employeeWorkEmail],
-    enabled: enabled && isSignedIn && backendConfigured && Boolean(parCycleId) && Boolean(employeeWorkEmail),
+    enabled: enabled && isSignedIn && backendConfigured && parCycleId !== undefined && Boolean(employeeWorkEmail),
     queryFn: async () => {
       const accessToken = await getAccessToken();
       try {
@@ -127,7 +129,7 @@ export function useSubmitReview(parCycleId: number | undefined) {
   const qc = useQueryClient();
   return useMutation<void, Error, { employeeWorkEmail: string; payload: Par360ReviewUpdate }>({
     mutationFn: async ({ employeeWorkEmail, payload }) => {
-      if (!parCycleId) throw new Error("Missing cycle");
+      if (parCycleId === undefined) throw new Error("Missing cycle");
       const accessToken = await getAccessToken();
       await authedPatch<void>(
         parServiceUrls.par360Review(parCycleId, employeeWorkEmail),
@@ -145,6 +147,8 @@ export function useSubmitReview(parCycleId: number | undefined) {
         // reviewed is), so there's no narrower key available to target here
         // without threading it through as an extra hook argument.
         qc.invalidateQueries({ queryKey: ["par-360-review-requests"] }),
+        // Declining a leader's request also deletes your Leadership 360° draft on them.
+        qc.invalidateQueries({ queryKey: ["leadership360-my-feedback"] }),
       ]);
     },
   });
@@ -160,7 +164,7 @@ export function useParticipants(parCycleId: number | undefined, enabled = true) 
   const backendConfigured = Boolean(parBackendUrl);
   return useQuery<ParParticipant[]>({
     queryKey: ["par-360-participants", parCycleId],
-    enabled: enabled && isSignedIn && backendConfigured && Boolean(parCycleId),
+    enabled: enabled && isSignedIn && backendConfigured && parCycleId !== undefined,
     queryFn: async () => {
       const accessToken = await getAccessToken();
       return authedGet<ParParticipant[]>(
@@ -177,17 +181,21 @@ export function useParticipants(parCycleId: number | undefined, enabled = true) 
 // POST yourself as a reviewer onto SOMEONE ELSE's list — same endpoint
 // useRequestReviewers uses, aimed at another employee's record instead of
 // your own, so it invalidates the request list that now appears for you.
+// In a PAR 2.0 cycle you also say how you work with them (`relationship`).
 export function useOfferToReview(parCycleId: number | undefined, reviewerEmail: string | undefined) {
   const getAccessToken = useAccessToken();
   const qc = useQueryClient();
-  return useMutation<void, Error, string>({
-    mutationFn: async (employeeEmail) => {
-      if (!parCycleId || !reviewerEmail) throw new Error("Missing cycle or reviewer email");
+  return useMutation<void, Error, { employeeEmail: string; relationship?: string }>({
+    mutationFn: async ({ employeeEmail, relationship }) => {
+      if (parCycleId === undefined || !reviewerEmail) throw new Error("Missing cycle or reviewer email");
       const accessToken = await getAccessToken();
       await authedPost<void>(
         parServiceUrls.par360Reviewers(parCycleId, employeeEmail),
         accessToken,
-        { reviewerEmails: [reviewerEmail] },
+        {
+          reviewerEmails: [reviewerEmail],
+          ...(relationship ? { relationships: { [reviewerEmail]: relationship } } : {}),
+        } satisfies Par360ReviewRequestCreate,
         digiopsHeaders(),
       );
     },

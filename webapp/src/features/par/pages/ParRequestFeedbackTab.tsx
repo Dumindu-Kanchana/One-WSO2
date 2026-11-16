@@ -101,7 +101,7 @@ export default function ParRequestFeedbackTab() {
             selfEmail={workEmail}
             leadEmail={leadEmail}
             existingEmails={(reviewers.data ?? []).map((r) => r.reviewerEmail)}
-            onSubmit={(emails) => requestReviewers.mutate(emails, { onSuccess: () => setAdding(false) })}
+            onSubmit={(reviewerEmails) => requestReviewers.mutate({ reviewerEmails }, { onSuccess: () => setAdding(false) })}
             onCancel={() => setAdding(false)}
             isSubmitting={requestReviewers.isPending}
             error={requestReviewers.error ?? undefined}

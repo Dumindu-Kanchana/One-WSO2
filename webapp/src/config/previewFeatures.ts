@@ -104,7 +104,25 @@ export type PreviewFeature =
    * backend calls. Held back until the store's first release is ready for
    * the pilot.
    */
-  | "swagStore";
+  | "swagStore"
+  /**
+   * Leadership 360° feedback on members of the leadership group, in Give
+   * feedback, with the results in a leader's PAR and their lead's review. Held
+   * back until the PAR backend's `/leadership-360` endpoints are deployed.
+   */
+  | "leadership360"
+  /**
+   * PAR 2.0 in a PAR 2.0 cycle: Active cycle, Give feedback and History
+   * under Me → Performance, and the 360° evidence in the Lead View. Held back
+   * until the PAR backend's structured 360 endpoints are deployed.
+   */
+  | "par2"
+  /**
+   * OKRs: Me → My OKRs, People Ops → Manage OKRs, and the OKRs PAR shows
+   * beside the self-review and in the lead's review. Held back until the
+   * people backend's `/okrs` endpoints are deployed.
+   */
+  | "okrs";
 
 /**
  * Whether a preview feature should be shown.
