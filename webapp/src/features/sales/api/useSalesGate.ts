@@ -21,6 +21,7 @@
 // authorised group. 
 
 import type { VisibilityAnswer } from "@components/side-rail/visibilityFold";
+import { SALES_ECHO_STATS_ITEM_ID } from "@constants/perspectives";
 import { useMemo } from "react";
 import { SALES_PRIVILEGE } from "./salesTypes";
 import { isSalesBackendConfigured, useSalesUserInfo } from "./useSalesData";
@@ -79,15 +80,19 @@ export interface SalesRailGate {
  * @param enabled - Whether Sales is the active perspective
  */
 export function useSalesRailGate(enabled: boolean): SalesRailGate {
-  const { isPending, isLoading, isError, error, refetch } = useSalesUserInfo(enabled);
+  const { data, isPending, isLoading, isError, error, refetch } = useSalesUserInfo(enabled);
   const active = enabled && isSalesBackendConfigured();
   // isPending as well as isLoading: while the caller's identity is still resolving the query
   // is disabled, which React Query reports as pending but NOT loading -- checking isLoading
   // alone let the row show for that moment and then vanish when the 403 arrived.
   const isResolving = active && (isPending || isLoading);
   const failed = active && isError && !isForbidden(error);
+  const open = !isResolving && !(active && isError);
+  // Echo stats is for admins: shown only once meet-app has said this caller is one. With no
+  // backend configured there is no one to ask, so it stays hidden rather than open.
+  const isAdmin = (data?.privileges ?? []).includes(SALES_PRIVILEGE.ADMIN);
   return {
-    canSee: () => !isResolving && !(active && isError),
+    canSee: (itemId) => open && (itemId !== SALES_ECHO_STATS_ITEM_ID || (active && isAdmin)),
     isResolving,
     isError: failed,
     errorMessage: failed ? describeError(error) : undefined,

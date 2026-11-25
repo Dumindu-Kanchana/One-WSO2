@@ -91,6 +91,7 @@ import { INFRA_APPS } from "@constants/infraApps";
 import { UMT_PATH, umtPaths } from "@features/umt/lib/umtPaths";
 import { UMT_DOCUMENTATION_ITEM_ID, openUmtDocumentation } from "@features/umt/lib/umtDocumentation";
 import { SMART_SEARCH_LIBRARY_PATH } from "@features/sales/smartSearch/smartSearchPaths";
+import { ECHO_STATS_PATH } from "@features/sales/util/salesPaths";
 import { swagStorePaths } from "@features/swag-store/swagStorePaths";
 import { SWAG_STORE_ADMIN_GROUP_ID, SWAG_STORE_ADMIN_SCREENS } from "@features/swag-store/admin/swagStoreAdminItems";
 import {
@@ -672,8 +673,15 @@ const SALES_OPPORTUNITIES_ROW: PerspectiveSection = {
   icon: HandshakeIcon,
   path: "/sales/deals",
 };
-// Echo: the calls it recorded, with their transcripts and notes. A group even with one
-// screen, so the rail names both the product and the screen, as Sales Pitstop's does.
+/**
+ * Echo stats, for Sales admins only. Still one of SALES_ITEM_IDS, so the Sales gate decides
+ * it, and useSalesRailGate shows it only to a meet-app admin.
+ */
+export const SALES_ECHO_STATS_ITEM_ID = "sales-echo-stats";
+
+// Echo: the calls it recorded, with their transcripts and notes, and, for admins, its stats.
+// A group even with one screen, so the rail names both the product and the screen, as Sales
+// Pitstop's does.
 const SALES_ECHO_SECTION: PerspectiveSection = {
   id: "sales-echo",
   label: "Echo",
@@ -682,6 +690,7 @@ const SALES_ECHO_SECTION: PerspectiveSection = {
   children: [
     // The id is an internal key and does not need to match the label.
     { id: "sales-meetings", label: "Calls", icon: VideoIcon, path: "/sales/meetings" },
+    { id: SALES_ECHO_STATS_ITEM_ID, label: "Stats", icon: BarChart3, path: ECHO_STATS_PATH },
   ],
 };
 

@@ -34,18 +34,9 @@ import {
 } from "@wso2/oxygen-ui";
 import type { RejectFailure } from "../api/useMeddpiccMutations";
 import type { DealField, RejectProposalRequest, RejectReason } from "../types";
-import { formatFieldValue } from "../util/meddpiccFormat";
+import { REJECT_REASONS as REASONS, formatFieldValue } from "../util/meddpiccFormat";
 
 const NOTE_LIMIT = 1000;
-
-/** The contract's reasons, in the AM's words. */
-const REASONS: readonly { value: RejectReason; label: string }[] = [
-  { value: "WRONG_VALUE", label: "Wrong value" },
-  { value: "WRONG_PERSON", label: "Wrong person" },
-  { value: "NOT_SUPPORTED", label: "Quote doesn't show it" },
-  { value: "OUTDATED", label: "Out of date" },
-  { value: "OTHER", label: "Other" },
-];
 
 /**
  * Turn down one field's suggestion: why, and a note if the reason needs one. Nothing is

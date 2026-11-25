@@ -2682,6 +2682,9 @@ export const echoServiceUrls = {
   // Ask AI: a question about the opportunity, answered from it and the Library passages sent.
   ask: (opportunityId: string): string =>
     `${echoBackendUrl}/deals/${encodeURIComponent(opportunityId)}/ask`,
+  // Echo stats, for Sales admins only (anyone else gets 403): usage, calls, AM decisions,
+  // Salesforce completeness and Claude usage over the last `days` (7, 30 or 90).
+  adminStats: (days: number): string => `${echoBackendUrl}/admin/stats?days=${days}`,
 };
 
 /**

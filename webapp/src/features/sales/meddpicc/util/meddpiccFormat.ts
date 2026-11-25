@@ -25,6 +25,7 @@ import type {
   FieldValue,
   GateLetter,
   LetterKey,
+  RejectReason,
   RoleHolder,
   RoleProposalValue,
 } from "../types";
@@ -51,6 +52,20 @@ export const LETTER_KEYS: readonly LetterKey[] = LETTERS.map((letter) => letter.
 
 export function letterLabel(key: LetterKey): string {
   return LETTERS.find((letter) => letter.key === key)?.label ?? key;
+}
+
+/** The contract's reasons for turning a Proposal down, in the AM's words. */
+export const REJECT_REASONS: readonly { value: RejectReason; label: string }[] = [
+  { value: "WRONG_VALUE", label: "Wrong value" },
+  { value: "WRONG_PERSON", label: "Wrong person" },
+  { value: "NOT_SUPPORTED", label: "Quote doesn't show it" },
+  { value: "OUTDATED", label: "Out of date" },
+  { value: "OTHER", label: "Other" },
+];
+
+/** A reject reason's label; a code this screen doesn't know yet is shown as sent. */
+export function rejectReasonLabel(reason: string): string {
+  return REJECT_REASONS.find((option) => option.value === reason)?.label ?? reason;
 }
 
 export const COVERAGE_LABELS: Record<CoverageLevel, string> = {
