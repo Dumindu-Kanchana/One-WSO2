@@ -421,7 +421,7 @@ export const parServiceUrls = {
   // here on the reviewee's behalf by an admin — no separate endpoint.
   // Distinct from parSchedule360Reminders above (a different resource,
   // gated on isLeadInActiveParCycle, scoped to the caller's own reports).
-  parBulkReminder: (kind: "employee" | "lead" | "special-rating") =>
+  parBulkReminder: (kind: "employee") =>
     `${parBackendUrl}/reminders/schedule-${kind}-reminders`,
   // GET every distinct legacy (pre-par-app) cycle, org-wide — the History
   // tab's merged cycle list, admin-gated the same way as the per-employee
