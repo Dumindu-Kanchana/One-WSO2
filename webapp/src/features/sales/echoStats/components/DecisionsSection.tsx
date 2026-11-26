@@ -30,7 +30,7 @@ import type {
   RejectReasonCount,
   UserDecisions,
 } from "../types";
-import { formatCount, formatRate, mergeStatusLabel, statsRejectReasonLabel } from "../util/statsFormat";
+import { formatCount, formatRate, mergeStatusLabel, regionLabel, statsRejectReasonLabel } from "../util/statsFormat";
 import { StatTiles, StatsPair, StatsSection, StatsTable, type StatsColumn } from "./StatsParts";
 
 const FIELD_COLUMNS: readonly StatsColumn<FieldDecisions>[] = [
@@ -72,6 +72,7 @@ const MERGE_COLUMNS: readonly StatsColumn<MergeStatusDecisions>[] = [
 
 const USER_COLUMNS: readonly StatsColumn<UserDecisions>[] = [
   { key: "email", label: "User", render: (u) => u.email },
+  { key: "region", label: "Region", render: (u) => regionLabel(u.region) },
   { key: "approved", label: "Approved as proposed", numeric: true, render: (u) => formatCount(u.approved) },
   { key: "edited", label: "Edited", numeric: true, render: (u) => formatCount(u.edited) },
   { key: "rejected", label: "Rejected", numeric: true, render: (u) => formatCount(u.rejected) },

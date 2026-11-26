@@ -16,17 +16,25 @@
 
 import { Box } from "@wso2/oxygen-ui";
 import { formatDateTime } from "../../util/salesTime";
-import type { MeetingTypeStats, RecorderStats, RecordingStats } from "../types";
-import { formatCount, formatDay } from "../util/statsFormat";
+import type { MeetingTypeStats, RecorderStats, RecordingByRegion, RecordingStats } from "../types";
+import { formatCount, formatDay, regionLabel } from "../util/statsFormat";
 import StatsBarChart from "./StatsBarChart";
 import { StatTiles, StatsPair, StatsSection, StatsSubheading, StatsTable, type StatsColumn } from "./StatsParts";
 
 const RECORDER_COLUMNS: readonly StatsColumn<RecorderStats>[] = [
   { key: "email", label: "Recorder", render: (r) => r.email },
+  { key: "region", label: "Region", render: (r) => regionLabel(r.region) },
   { key: "calls", label: "Calls", numeric: true, render: (r) => formatCount(r.calls) },
   { key: "withTranscript", label: "With transcript", numeric: true, render: (r) => formatCount(r.withTranscript) },
   { key: "analysed", label: "Analysed", numeric: true, render: (r) => formatCount(r.analysed) },
   { key: "lastCallAt", label: "Last call", render: (r) => formatDateTime(r.lastCallAt) },
+];
+
+const REGION_COLUMNS: readonly StatsColumn<RecordingByRegion>[] = [
+  { key: "region", label: "Region", render: (r) => r.region },
+  { key: "calls", label: "Calls", numeric: true, render: (r) => formatCount(r.calls) },
+  { key: "analysed", label: "Analysed", numeric: true, render: (r) => formatCount(r.analysed) },
+  { key: "recorders", label: "Recorders", numeric: true, render: (r) => formatCount(r.recorders) },
 ];
 
 const TYPE_COLUMNS: readonly StatsColumn<MeetingTypeStats>[] = [
@@ -34,31 +42,25 @@ const TYPE_COLUMNS: readonly StatsColumn<MeetingTypeStats>[] = [
   { key: "calls", label: "Calls", numeric: true, render: (t) => formatCount(t.calls) },
 ];
 
-/** The sales calls Echo recorded in range, and how far each got through analysis. */
+/**
+ * The sales calls Echo recorded in range, and who recorded them. How the analysis of those
+ * calls went is the Quality tab's AnalysisSection.
+ */
 export default function RecordingSection({ recording, days }: { recording: RecordingStats; days: number }) {
   return (
     <StatsSection
       title="Calls recorded"
-      subtitle="Sales calls held in this range that Echo can analyse: not internal, not cancelled."
+      subtitle="Sales calls held in this range that Echo can analyse: not internal, not cancelled. By the recorder's region."
     >
       <StatTiles
         tiles={[
           { label: "Calls", value: formatCount(recording.calls) },
-          { label: "With transcript", value: formatCount(recording.withTranscript) },
-          // Not parts of "With transcript": a call analysed once and then failed on a
-          // re-analysis counts in both, so the hints say what each one is.
-          { label: "Analysed", value: formatCount(recording.analysed), hint: "a finished analysis" },
-          {
-            label: "Analysis failed",
-            value: formatCount(recording.failed),
-            hint: "latest run failed; may also be analysed",
-          },
-          { label: "Empty transcript", value: formatCount(recording.emptyTranscript) },
           { label: "Recorders", value: formatCount(recording.recorders) },
+          { label: "Analysed", value: formatCount(recording.analysed) },
         ]}
       />
       <Box>
-        <StatsSubheading>Calls and analysed, by week</StatsSubheading>
+        <StatsSubheading>Calls by week</StatsSubheading>
         <StatsBarChart
           data={recording.weekly}
           xKey="weekStart"
@@ -79,6 +81,13 @@ export default function RecordingSection({ recording, days }: { recording: Recor
         empty="No calls recorded in this range."
       />
       <StatsPair>
+        <StatsTable
+          title="By region"
+          columns={REGION_COLUMNS}
+          rows={recording.byRegion}
+          rowKey={(r) => r.region}
+          empty="No calls recorded in this range."
+        />
         <StatsTable
           title="By meeting type"
           columns={TYPE_COLUMNS}

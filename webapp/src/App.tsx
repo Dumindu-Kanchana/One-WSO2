@@ -1139,7 +1139,8 @@ export default function App() {
           {/* One deal, as a page rather than a drawer: it can be linked, refreshed and
               returned to with Back. ?letter= opens it filtered to one MEDDPICC Letter. */}
           <Route path="sales/deals/:opportunityId" element={<DealPage />} />
-          {/* Echo stats: usage, calls, AM decisions, Salesforce completeness and Claude usage.
+          {/* Echo stats: an Adoption tab (usage, calls, deal progress, quiet deals) and a
+              Quality tab (AM decisions, analysis outcomes, Salesforce completeness), ?tab=.
               Sales admins only. The rail shows it to Sales admins alone; anyone else who
               opens the address is told it is for admins, and the ONE_WSO2_ECHO_BACKEND_URL
               backend refuses them (403) on its own account. */}

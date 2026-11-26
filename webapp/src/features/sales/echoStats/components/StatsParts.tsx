@@ -18,9 +18,11 @@
 // figures, and a small table. Theme tokens only, so both colour schemes follow.
 
 import type { ReactNode } from "react";
+import { Link as RouterLink } from "react-router";
 import {
   Box,
   Card,
+  Link,
   Table,
   TableBody,
   TableCell,
@@ -29,6 +31,7 @@ import {
   TableRow,
   Typography,
 } from "@wso2/oxygen-ui";
+import { dealPath } from "../../util/salesPaths";
 
 /** One section of the page: a card with its heading, and a line on what it counts. */
 export function StatsSection({
@@ -185,5 +188,14 @@ export function StatsPair({ children }: { children: ReactNode }) {
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 2.5, alignItems: "start" }}>
       {children}
     </Box>
+  );
+}
+
+/** An opportunity's name, linking to its deal page. */
+export function DealLink({ opportunityId, name }: { opportunityId: string; name: string }) {
+  return (
+    <Link component={RouterLink} to={dealPath(opportunityId)} underline="hover" sx={{ fontWeight: 600 }}>
+      {name}
+    </Link>
   );
 }

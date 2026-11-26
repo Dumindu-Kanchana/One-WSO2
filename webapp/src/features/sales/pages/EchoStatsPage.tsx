@@ -15,7 +15,7 @@
 // under the License.
 
 import { useSearchParams } from "react-router";
-import { Alert, Box, CircularProgress, Stack, Typography } from "@wso2/oxygen-ui";
+import { Alert, Box, CircularProgress, Stack, Tab, Tabs, Typography } from "@wso2/oxygen-ui";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import SalesShell from "../components/SalesShell";
 import ScopeSwitch from "../components/ScopeSwitch";
@@ -24,20 +24,62 @@ import { useSalesGate } from "../api/useSalesGate";
 import { isEchoBackendConfigured } from "../meddpicc/api/useMeddpiccData";
 import { isForbidden } from "../util/salesError";
 import { useEchoAdminStats } from "../echoStats/api/useEchoAdminStats";
-import { DEFAULT_STATS_DAYS, STATS_DAYS, type StatsDays } from "../echoStats/types";
+import { DEFAULT_STATS_DAYS, STATS_DAYS, type EchoAdminStats, type StatsDays } from "../echoStats/types";
 import { formatRange } from "../echoStats/util/statsFormat";
 import UsageSection from "../echoStats/components/UsageSection";
 import RecordingSection from "../echoStats/components/RecordingSection";
+import ProgressSection from "../echoStats/components/ProgressSection";
+import QuietDealsSection from "../echoStats/components/QuietDealsSection";
 import DecisionsSection from "../echoStats/components/DecisionsSection";
+import AnalysisSection from "../echoStats/components/AnalysisSection";
 import SalesforceSection from "../echoStats/components/SalesforceSection";
-import ModelSection from "../echoStats/components/ModelSection";
 
 const RANGE_OPTIONS = STATS_DAYS.map((days) => ({ value: String(days), label: `${days} days` }));
+
+/**
+ * Two readers, two tabs. Adoption is for AM leadership: who uses Echo, who records calls, how
+ * deals move and which have gone quiet. Quality is for the team building Echo: what AMs do
+ * with its suggestions, how analysis went, and what is still missing in Salesforce.
+ */
+type StatsTab = "adoption" | "quality";
+const STATS_TABS: readonly { value: StatsTab; label: string }[] = [
+  { value: "adoption", label: "Adoption" },
+  { value: "quality", label: "Quality" },
+];
+const DEFAULT_TAB: StatsTab = "adoption";
 
 /** The range in the URL, or the default for anything the endpoint would refuse. */
 function daysFrom(params: URLSearchParams): StatsDays {
   const raw = Number(params.get("days"));
   return (STATS_DAYS as readonly number[]).includes(raw) ? (raw as StatsDays) : DEFAULT_STATS_DAYS;
+}
+
+/** The tab in the URL, or Adoption for anything else. */
+function tabFrom(params: URLSearchParams): StatsTab {
+  const raw = params.get("tab");
+  return STATS_TABS.some((tab) => tab.value === raw) ? (raw as StatsTab) : DEFAULT_TAB;
+}
+
+function AdoptionTab({ stats }: { stats: EchoAdminStats }) {
+  const days = stats.range.days;
+  return (
+    <>
+      <UsageSection usage={stats.usage} range={stats.range} />
+      <RecordingSection recording={stats.recording} days={days} />
+      <ProgressSection progress={stats.progress} days={days} />
+      <QuietDealsSection quietDeals={stats.quietDeals} days={days} />
+    </>
+  );
+}
+
+function QualityTab({ stats }: { stats: EchoAdminStats }) {
+  return (
+    <>
+      <DecisionsSection decisions={stats.decisions} />
+      <AnalysisSection recording={stats.recording} />
+      <SalesforceSection salesforce={stats.salesforce} />
+    </>
+  );
 }
 
 /**
@@ -48,20 +90,24 @@ function daysFrom(params: URLSearchParams): StatsDays {
  * The Echo backend also decides for itself: its 403 is met with the same explanation rather
  * than an error.
  *
- * The range lives in the URL (?days=), so a link to the 90-day view opens on it.
+ * The tab and the range live in the URL (?tab=, ?days=), so a link to the 90-day Quality view
+ * opens on it. Both tabs read the one response, so switching tabs asks for nothing.
  */
 export default function EchoStatsPage() {
-  const meetAppConfigured = isSalesBackendConfigured();
+  const salesConfigured = isSalesBackendConfigured();
   const echoConfigured = isEchoBackendConfigured();
   const { isAdmin } = useSalesGate();
   const [params, setParams] = useSearchParams();
   const days = daysFrom(params);
+  const tab = tabFrom(params);
   const query = useEchoAdminStats(days, isAdmin);
 
-  const showDays = (next: StatsDays) => {
+  // Replaced rather than pushed, as on the deal page: Back leaves the page instead of stepping
+  // through every tab and range looked at. The defaults stay out of the address.
+  const setParam = (key: string, value: string, fallback: string) => {
     const nextParams = new URLSearchParams(params);
-    if (next === DEFAULT_STATS_DAYS) nextParams.delete("days");
-    else nextParams.set("days", String(next));
+    if (value === fallback) nextParams.delete(key);
+    else nextParams.set(key, value);
     setParams(nextParams, { replace: true });
   };
 
@@ -71,10 +117,10 @@ export default function EchoStatsPage() {
   return (
     <SalesShell
       title="Echo stats"
-      subtitle="How Echo is used, the calls it recorded, and what account managers did with its suggestions."
-      configured={meetAppConfigured && echoConfigured}
-      configKey={meetAppConfigured ? "ONE_WSO2_ECHO_BACKEND_URL" : "ONE_WSO2_REVOPS_BACKEND_URL"}
-      configLabel={meetAppConfigured ? "the MEDDPICC backend URL" : undefined}
+      subtitle="How Echo is used and how deals move, by account manager and region; and how good its suggestions are."
+      configured={salesConfigured && echoConfigured}
+      configKey={salesConfigured ? "ONE_WSO2_ECHO_BACKEND_URL" : "ONE_WSO2_REVOPS_BACKEND_URL"}
+      configLabel={salesConfigured ? "the MEDDPICC backend URL" : undefined}
     >
       {!isAdmin ? (
         <Alert severity="warning">Echo stats are for Sales admins only.</Alert>
@@ -85,6 +131,28 @@ export default function EchoStatsPage() {
         </Alert>
       ) : (
         <Box>
+          <Tabs
+            value={tab}
+            onChange={(_, next: StatsTab) => setParam("tab", next, DEFAULT_TAB)}
+            aria-label="Echo stats views"
+            sx={{
+              mb: 2,
+              minHeight: 40,
+              borderBottom: 1,
+              borderColor: "divider",
+              "& .MuiTab-root": { minHeight: 40, textTransform: "none" },
+            }}
+          >
+            {STATS_TABS.map((option) => (
+              <Tab
+                key={option.value}
+                value={option.value}
+                label={option.label}
+                id={`echo-stats-tab-${option.value}`}
+                aria-controls={`echo-stats-panel-${option.value}`}
+              />
+            ))}
+          </Tabs>
           <Stack
             direction="row"
             spacing={1.5}
@@ -95,7 +163,7 @@ export default function EchoStatsPage() {
               label="Range"
               value={String(days)}
               options={RANGE_OPTIONS}
-              onChange={(value) => showDays(Number(value) as StatsDays)}
+              onChange={(value) => setParam("days", value, String(DEFAULT_STATS_DAYS))}
             />
             {stats && (
               <Typography variant="body2" color="text.secondary">
@@ -118,12 +186,14 @@ export default function EchoStatsPage() {
             </Stack>
           ) : (
             // The previous range stays on screen, dimmed, while the new one loads.
-            <Stack spacing={3} sx={{ opacity: query.isPlaceholderData ? 0.6 : 1, transition: "opacity 120ms" }}>
-              <UsageSection usage={stats.usage} range={stats.range} />
-              <RecordingSection recording={stats.recording} days={stats.range.days} />
-              <DecisionsSection decisions={stats.decisions} />
-              <SalesforceSection salesforce={stats.salesforce} />
-              <ModelSection model={stats.model} />
+            <Stack
+              spacing={3}
+              role="tabpanel"
+              id={`echo-stats-panel-${tab}`}
+              aria-labelledby={`echo-stats-tab-${tab}`}
+              sx={{ opacity: query.isPlaceholderData ? 0.6 : 1, transition: "opacity 120ms" }}
+            >
+              {tab === "adoption" ? <AdoptionTab stats={stats} /> : <QualityTab stats={stats} />}
             </Stack>
           )}
         </Box>

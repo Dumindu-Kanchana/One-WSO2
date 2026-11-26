@@ -22,7 +22,7 @@
 import type { MergeStatus } from "../../meddpicc/types";
 import { rejectReasonLabel } from "../../meddpicc/util/meddpiccFormat";
 import { parseUtc } from "../../util/salesTime";
-import type { StatsRange, UsageAction, UsageStats } from "../types";
+import { UNASSIGNED_REGION, type StageDirection, type StatsRange, type UsageStats } from "../types";
 
 const COUNT = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
@@ -31,11 +31,21 @@ export function formatCount(value: number): string {
   return COUNT.format(value);
 }
 
+/** A person's or a deal's region; none is "Unassigned", as the by-region lists name it. */
+export function regionLabel(region: string | null | undefined): string {
+  return region ?? UNASSIGNED_REGION;
+}
+
 /** 0.727 → "72.7%"; null (nothing to divide by) → "—". */
 export function formatRate(rate: number | null | undefined): string {
   if (rate === null || rate === undefined || !Number.isFinite(rate)) return "—";
   const percent = Math.round(rate * 1000) / 10;
   return `${percent}%`;
+}
+
+/** `part` of `whole` as a rate, or "—" when there is no whole. */
+export function formatShare(part: number, whole: number): string {
+  return formatRate(whole === 0 ? null : part / whole);
 }
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -55,6 +65,14 @@ const FULL_DAY = new Intl.DateTimeFormat("en-GB", {
 export function formatDay(date: string): string {
   const parsed = new Date(`${date}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? date : DAY.format(parsed);
+}
+
+/** The Monday (UTC) of the ISO week holding a yyyy-MM-dd date, as yyyy-MM-dd. */
+export function weekStartOf(date: string): string {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  parsed.setUTCDate(parsed.getUTCDate() - ((parsed.getUTCDay() + 6) % 7));
+  return parsed.toISOString().slice(0, 10);
 }
 
 /** An instant as its date in the viewer's zone ("2026-11-26T09:00:00Z" → "26 Nov 2026"). */
@@ -90,25 +108,6 @@ export function usageTrackingNote(usage: UsageStats, range: StatsRange): string 
   return `Usage is counted only since tracking started on ${formatInstantDay(usage.trackedSince)}, so this range shows nothing before then.`;
 }
 
-/** What each logged action is, in an admin's words. */
-const ACTION_LABELS: Record<UsageAction, string> = {
-  "deals.list": "Opened the Opportunities list",
-  "deal.view": "Opened an opportunity",
-  "deal.approve": "Approved to Salesforce",
-  "deal.reject": "Rejected a suggestion",
-  "deal.ask": "Asked about an opportunity",
-  "deal.move_stage": "Moved a stage",
-  "deal.include_calls": "Added calls to an opportunity",
-  "meetings.coverage": "Viewed calls' MEDDPICC",
-  "meeting.reanalyse": "Re-analysed a call",
-  "admin.stats": "Opened Echo stats",
-};
-
-/** An action's label; one this screen doesn't know yet is shown as sent. */
-export function actionLabel(action: string): string {
-  return ACTION_LABELS[action as UsageAction] ?? action;
-}
-
 /**
  * A reject reason's label. The stats can also carry UNSPECIFIED, for a rejection stored
  * without one, which the dialog never offers.
@@ -126,4 +125,16 @@ const MERGE_STATUS_LABELS: Record<MergeStatus, string> = {
 
 export function mergeStatusLabel(status: string): string {
   return MERGE_STATUS_LABELS[status as MergeStatus] ?? status;
+}
+
+/** Which way a stage change went, in a word. */
+const DIRECTION_LABELS: Record<StageDirection, string> = {
+  FORWARD: "Forward",
+  BACK: "Back",
+  WON: "Won",
+  LOST: "Lost",
+};
+
+export function directionLabel(direction: string): string {
+  return DIRECTION_LABELS[direction as StageDirection] ?? direction;
 }

@@ -20,6 +20,10 @@
 // Timestamps are RFC 3339 UTC; `date` and `weekStart` are calendar dates (yyyy-MM-dd, UTC).
 // Counts are integers. Rates are 0..1, and null when their denominator is 0. Every list
 // arrives sorted and capped as noted, so nothing here re-sorts it.
+//
+// Regions: a person's region is the Sales Region found most often among the open deals they
+// own on the Deals list (null when none has one); a deal's is its own Sales Region (null when
+// unset). Every "by region" list reports a null region as "Unassigned".
 
 import type { MergeStatus } from "../meddpicc/types";
 
@@ -27,6 +31,9 @@ import type { MergeStatus } from "../meddpicc/types";
 export const STATS_DAYS = [7, 30, 90] as const;
 export type StatsDays = (typeof STATS_DAYS)[number];
 export const DEFAULT_STATS_DAYS: StatsDays = 30;
+
+/** How a by-region list names the deals and people with no region. */
+export const UNASSIGNED_REGION = "Unassigned";
 
 export interface StatsRange {
   from: string;
@@ -56,8 +63,17 @@ export interface UsageDay {
   events: number;
 }
 
+/** Weekly active users, for the trend line beside the daily one. */
+export interface UsageWeek {
+  /** The Monday (UTC) the ISO week starts on, yyyy-MM-dd. Weeks touching the range, oldest first, zero-filled. */
+  weekStart: string;
+  users: number;
+  events: number;
+}
+
 export interface UsageUser {
   email: string;
+  region: string | null;
   lastSeen: string;
   /** Every action. */
   events: number;
@@ -75,22 +91,32 @@ export interface UsageByAction {
   users: number;
 }
 
+export interface UsageByRegion {
+  region: string;
+  users: number;
+  events: number;
+}
+
 export interface UsageStats {
   /** The oldest usage event there is; null while there are none. Usage is only counted from here. */
   trackedSince: string | null;
   /** Distinct users with any event in range. */
   activeUsers: number;
   daily: UsageDay[];
+  weekly: UsageWeek[];
   /** Most events first, max 200. */
   users: UsageUser[];
   /** Most events first. */
   byAction: UsageByAction[];
+  /** Active users by their region, most users first. */
+  byRegion: UsageByRegion[];
 }
 
 // ---- recording: the calls Echo can analyse ---------------------------------
 
 export interface RecorderStats {
   email: string;
+  region: string | null;
   calls: number;
   withTranscript: number;
   analysed: number;
@@ -101,6 +127,14 @@ export interface MeetingTypeStats {
   /** "Unspecified" when the meeting has no type. */
   type: string;
   calls: number;
+}
+
+/** Recorded calls by the recorder's region. */
+export interface RecordingByRegion {
+  region: string;
+  calls: number;
+  analysed: number;
+  recorders: number;
 }
 
 export interface RecordingWeek {
@@ -127,6 +161,8 @@ export interface RecordingStats {
   /** Most calls first. */
   byMeetingType: MeetingTypeStats[];
   weekly: RecordingWeek[];
+  /** Most calls first. */
+  byRegion: RecordingByRegion[];
 }
 
 // ---- decisions: what AMs did with Echo's suggestions -----------------------
@@ -162,6 +198,7 @@ export interface MergeStatusDecisions {
 
 export interface UserDecisions {
   email: string;
+  region: string | null;
   approved: number;
   edited: number;
   rejected: number;
@@ -224,7 +261,109 @@ export interface SalesforceStats {
   dealsWithMostGaps: DealGaps[];
 }
 
-// ---- model: Claude usage ---------------------------------------------------
+// ---- progress: how deals move ----------------------------------------------
+//
+// The open deals on the Deals list now, and the stage changes and closes in range, from
+// Salesforce stage history.
+
+export interface StageCount {
+  stage: string;
+  deals: number;
+}
+
+export type StageDirection = "FORWARD" | "BACK" | "WON" | "LOST";
+
+export interface StageChange {
+  opportunityId: string;
+  name: string;
+  ownerEmail: string | null;
+  region: string | null;
+  from: string;
+  to: string;
+  at: string;
+  /** A StageDirection; typed as string so a newer backend's value still renders. */
+  direction: string;
+}
+
+export interface ProgressByRegion {
+  region: string;
+  openDeals: number;
+  stageChanges: number;
+  closedWon: number;
+  closedLost: number;
+}
+
+export interface ProgressByOwner {
+  ownerEmail: string;
+  region: string | null;
+  openDeals: number;
+  stageChanges: number;
+  closedWon: number;
+  closedLost: number;
+}
+
+export interface ProgressStats {
+  asOf: string;
+  openDeals: number;
+  /** In stage order where known, else by name. */
+  byStage: StageCount[];
+  /** Deals whose stage changed at least once in range. */
+  stageChanges: number;
+  /** Of those, whose latest change in range moved to a later stage. */
+  movedForward: number;
+  movedBack: number;
+  /** Deals that reached a won stage in range. */
+  closedWon: number;
+  closedLost: number;
+  /** Stage changes in range, newest first, max 50. */
+  changes: StageChange[];
+  /** Most open deals first. */
+  byRegion: ProgressByRegion[];
+  /** Most open deals first, max 200. */
+  byOwner: ProgressByOwner[];
+}
+
+// ---- quietDeals: open deals with no customer email in range -----------------
+
+export interface QuietDeal {
+  opportunityId: string;
+  name: string;
+  ownerEmail: string | null;
+  region: string | null;
+  stage: string;
+  /** Null when no customer email was ever logged. */
+  lastEmailAt: string | null;
+  lastActivityAt: string | null;
+  lastCallAt: string | null;
+}
+
+export interface QuietByOwner {
+  ownerEmail: string;
+  region: string | null;
+  openDeals: number;
+  quiet: number;
+}
+
+export interface QuietByRegion {
+  region: string;
+  openDeals: number;
+  quiet: number;
+}
+
+export interface QuietDealsStats {
+  asOf: string;
+  openDeals: number;
+  /** Of the open deals, with no customer email in range. */
+  quiet: number;
+  /** Max 100; never emailed first, then longest since the last email. */
+  deals: QuietDeal[];
+  /** Most quiet first, max 200. */
+  byOwner: QuietByOwner[];
+  /** Most quiet first. */
+  byRegion: QuietByRegion[];
+}
+
+// ---- model: Claude usage (still sent; the page does not show it) -----------
 
 export interface ModelPurposeStats {
   purpose: string;
@@ -253,4 +392,6 @@ export interface EchoAdminStats {
   decisions: DecisionStats;
   salesforce: SalesforceStats;
   model: ModelStats;
+  progress: ProgressStats;
+  quietDeals: QuietDealsStats;
 }

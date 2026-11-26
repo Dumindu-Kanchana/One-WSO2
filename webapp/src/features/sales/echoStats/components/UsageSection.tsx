@@ -16,13 +16,14 @@
 
 import { Alert, Box, Typography } from "@wso2/oxygen-ui";
 import { formatDateTime } from "../../util/salesTime";
-import type { StatsRange, UsageByAction, UsageStats, UsageUser } from "../types";
-import { actionLabel, formatCount, formatDay, usageTrackingNote } from "../util/statsFormat";
-import StatsBarChart from "./StatsBarChart";
+import type { StatsRange, UsageByRegion, UsageStats, UsageUser } from "../types";
+import { formatCount, regionLabel, usageTrackingNote } from "../util/statsFormat";
+import ActiveUsersTrend from "./ActiveUsersTrend";
 import { StatTiles, StatsPair, StatsSection, StatsSubheading, StatsTable, type StatsColumn } from "./StatsParts";
 
 const USER_COLUMNS: readonly StatsColumn<UsageUser>[] = [
   { key: "email", label: "User", render: (u) => u.email },
+  { key: "region", label: "Region", render: (u) => regionLabel(u.region) },
   { key: "lastSeen", label: "Last seen", render: (u) => formatDateTime(u.lastSeen) },
   { key: "events", label: "Events", numeric: true, render: (u) => formatCount(u.events) },
   { key: "dealViews", label: "Opportunity views", numeric: true, render: (u) => formatCount(u.dealViews) },
@@ -32,21 +33,10 @@ const USER_COLUMNS: readonly StatsColumn<UsageUser>[] = [
   { key: "reanalyses", label: "Re-analyses", numeric: true, render: (u) => formatCount(u.reanalyses) },
 ];
 
-const ACTION_COLUMNS: readonly StatsColumn<UsageByAction>[] = [
-  {
-    key: "action",
-    label: "Action",
-    render: (a) => (
-      <>
-        {actionLabel(a.action)}
-        <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75, fontFamily: "monospace" }}>
-          {a.action}
-        </Typography>
-      </>
-    ),
-  },
-  { key: "events", label: "Events", numeric: true, render: (a) => formatCount(a.events) },
-  { key: "users", label: "Users", numeric: true, render: (a) => formatCount(a.users) },
+const REGION_COLUMNS: readonly StatsColumn<UsageByRegion>[] = [
+  { key: "region", label: "Region", render: (r) => r.region },
+  { key: "users", label: "Active users", numeric: true, render: (r) => formatCount(r.users) },
+  { key: "events", label: "Events", numeric: true, render: (r) => formatCount(r.events) },
 ];
 
 /** Who uses Echo: from Echo's usage log, so only since that log began. */
@@ -55,7 +45,10 @@ export default function UsageSection({ usage, range }: { usage: UsageStats; rang
   const events = usage.daily.reduce((sum, day) => sum + day.events, 0);
 
   return (
-    <StatsSection title="Usage" subtitle="Who opened Echo in this range, and what they did there.">
+    <StatsSection
+      title="Usage"
+      subtitle="Who opened Echo in this range, and how much. A person's region is the one most of their open opportunities are in."
+    >
       {note && (
         <Alert severity="info" variant="outlined">
           {note}
@@ -68,17 +61,14 @@ export default function UsageSection({ usage, range }: { usage: UsageStats; rang
         ]}
       />
       <Box>
-        <StatsSubheading>Daily active users</StatsSubheading>
-        <StatsBarChart
-          data={usage.daily}
-          xKey="date"
-          series={[{ key: "users", name: "Active users" }]}
-          formatX={formatDay}
-          label={`Daily active users, ${range.days} days`}
-          empty="No one used Echo in this range."
+        <StatsSubheading>Active users</StatsSubheading>
+        <ActiveUsersTrend
+          daily={usage.daily}
+          weekly={usage.weekly}
+          label={`Daily and weekly active users, ${range.days} days`}
         />
         <Typography variant="caption" color="text.secondary">
-          Days in UTC. The last one is today, so far.
+          Days and weeks in UTC, weeks from Monday. The last day and week are still running.
         </Typography>
       </Box>
       <StatsTable
@@ -90,11 +80,11 @@ export default function UsageSection({ usage, range }: { usage: UsageStats; rang
       />
       <StatsPair>
         <StatsTable
-          title="Actions"
-          columns={ACTION_COLUMNS}
-          rows={usage.byAction}
-          rowKey={(a) => a.action}
-          empty="No actions in this range."
+          title="Active users by region"
+          columns={REGION_COLUMNS}
+          rows={usage.byRegion}
+          rowKey={(r) => r.region}
+          empty="No one used Echo in this range."
         />
       </StatsPair>
     </StatsSection>

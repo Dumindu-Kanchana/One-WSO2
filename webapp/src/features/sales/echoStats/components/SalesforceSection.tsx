@@ -14,13 +14,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { Link as RouterLink } from "react-router";
-import { Link } from "@wso2/oxygen-ui";
-import { dealPath } from "../../util/salesPaths";
 import { formatDateTime } from "../../util/salesTime";
 import type { DealGaps, SalesforceFieldGaps, SalesforceStats } from "../types";
 import { formatCount, formatRate } from "../util/statsFormat";
-import { StatTiles, StatsSection, StatsTable, type StatsColumn } from "./StatsParts";
+import { DealLink, StatTiles, StatsSection, StatsTable, type StatsColumn } from "./StatsParts";
 
 const FIELD_COLUMNS: readonly StatsColumn<SalesforceFieldGaps>[] = [
   { key: "label", label: "Field", render: (f) => f.label },
@@ -34,11 +31,7 @@ const DEAL_COLUMNS: readonly StatsColumn<DealGaps>[] = [
   {
     key: "name",
     label: "Opportunity",
-    render: (d) => (
-      <Link component={RouterLink} to={dealPath(d.opportunityId)} underline="hover" sx={{ fontWeight: 600 }}>
-        {d.name}
-      </Link>
-    ),
+    render: (d) => <DealLink opportunityId={d.opportunityId} name={d.name} />,
   },
   { key: "owner", label: "Owner", render: (d) => d.ownerEmail ?? "—" },
   { key: "stage", label: "Stage", render: (d) => d.stage },

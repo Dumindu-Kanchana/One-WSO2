@@ -71,6 +71,8 @@ import { MemoryRouter, useLocation } from "react-router";
 import EchoStatsPage from "./EchoStatsPage";
 import { emptyEchoAdminStats, mockEchoAdminStats } from "../echoStats/testing/mockEchoStats";
 import type { EchoAdminStats, StatsDays } from "../echoStats/types";
+import { formatCount, formatRate, formatShare } from "../echoStats/util/statsFormat";
+import { formatDateTime } from "../util/salesTime";
 
 function Where() {
   const { pathname, search } = useLocation();
@@ -93,8 +95,17 @@ function renderPage(entry = "/sales/echo-stats") {
 
 const section = (name: string) => within(screen.getByRole("region", { name }));
 const tile = (scope: ReturnType<typeof section>, name: string) => scope.getByRole("group", { name });
+const rowOf = (scope: ReturnType<typeof section>, table: string, cell: string) =>
+  within(within(scope.getByRole("table", { name: table })).getByRole("cell", { name: cell }).closest("tr") as HTMLElement);
+const headersOf = (scope: ReturnType<typeof section>, table: string) =>
+  within(scope.getByRole("table", { name: table }))
+    .getAllByRole("columnheader")
+    .map((h) => h.textContent);
 const answer = (build: (days: StatsDays) => EchoAdminStats) =>
   adminStats.mockImplementation(async (days: StatsDays) => build(days));
+
+/** The demo answer the page is showing, for figures to compare against. */
+const demo = mockEchoAdminStats(30);
 
 beforeEach(() => {
   access.isAdmin = true;
@@ -102,71 +113,215 @@ beforeEach(() => {
   answer(mockEchoAdminStats);
 });
 
-// Every test mounts five sections of tables and two recharts charts.
+const ADOPTION = ["Usage", "Calls recorded", "Deal progress", "Quiet deals"];
+const QUALITY = ["AM decisions on Echo's suggestions", "Analysis outcomes", "Salesforce completeness"];
+const sectionTitles = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+
+// Every test mounts several sections of tables and recharts charts.
 describe("EchoStatsPage", { timeout: 20000 }, () => {
-  it("shows every section, in order, from a full response", async () => {
+  it("opens on Adoption, with its four sections in order, and no Claude usage anywhere", async () => {
     renderPage();
     await screen.findByRole("region", { name: "Usage" });
 
-    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
-      "Usage",
-      "Calls recorded",
-      "AM decisions on Echo's suggestions",
-      "Salesforce completeness",
-      "Claude usage",
-    ]);
+    const tabs = within(screen.getByRole("tablist", { name: "Echo stats views" }));
+    expect(tabs.getByRole("tab", { name: "Adoption" })).toHaveAttribute("aria-selected", "true");
+    expect(tabs.getByRole("tab", { name: "Quality" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tabpanel", { name: "Adoption" })).toBeInTheDocument();
+    expect(sectionTitles()).toEqual(ADOPTION);
     expect(screen.getByText("27 Oct – 26 Nov 2026")).toBeInTheDocument();
-
-    const usage = section("Usage");
-    expect(tile(usage, "Active users")).toHaveTextContent("12");
-    expect(usage.getByRole("figure", { name: "Daily active users, 30 days" })).toBeInTheDocument();
-    const nadia = within(usage.getByRole("cell", { name: "nadia@wso2.com" }).closest("tr") as HTMLElement);
-    expect(nadia.getByRole("cell", { name: "1,240" })).toBeInTheDocument();
-    expect(nadia.getByRole("cell", { name: "620" })).toBeInTheDocument();
-    expect(usage.getByRole("table", { name: "Actions" })).toHaveTextContent("Opened an opportunity");
-
-    const calls = section("Calls recorded");
-    // Thousands separators.
-    expect(tile(calls, "Calls")).toHaveTextContent("1,285");
-    expect(tile(calls, "Empty transcript")).toHaveTextContent("3");
-    expect(calls.getByRole("figure", { name: "Calls and analysed calls by week, 30 days" })).toBeInTheDocument();
-    expect(calls.getByRole("table", { name: "By recorder" })).toHaveTextContent("kasun@wso2.com");
-    expect(calls.getByRole("table", { name: "By meeting type" })).toHaveTextContent("Discovery Call");
-
-    const decisions = section("AM decisions on Echo's suggestions");
-    expect(tile(decisions, "Approved as proposed")).toHaveTextContent("120");
-    expect(tile(decisions, "Approved as proposed rate")).toHaveTextContent("72.7%");
-    // Never called accuracy, and it says why.
-    expect(decisions.getByText(/not how accurate they were: measuring accuracy needs the labelled gold set/)).toBeInTheDocument();
-    expect(decisions.queryByText(/^accuracy$/i)).not.toBeInTheDocument();
-    const economicBuyer = within(decisions.getByRole("cell", { name: "Economic Buyer" }).closest("tr") as HTMLElement);
-    expect(economicBuyer.getByRole("cell", { name: "62.5%" })).toBeInTheDocument();
-    expect(decisions.getByRole("table", { name: "Reject reasons" })).toHaveTextContent("Wrong value");
-    expect(decisions.getByRole("table", { name: "Reject reasons" })).toHaveTextContent("No reason given");
-    // Every PROPOSED suggestion, on any deal: labelled so it isn't read as the Deals list's count.
-    expect(tile(decisions, "Pending suggestions (all deals)")).toHaveTextContent("48");
-    expect(decisions.getByRole("table", { name: "By confidence" })).toHaveTextContent("0.8-0.9");
-    const merge = decisions.getByRole("table", { name: "By merge status" });
-    for (const status of ["SINGLE", "MERGED", "FALLBACK"]) expect(merge).toHaveTextContent(status);
-    expect(decisions.getByRole("table", { name: "By user" })).toHaveTextContent("nadia@wso2.com");
-
-    const salesforce = section("Salesforce completeness");
-    expect(tile(salesforce, "Fill rate")).toHaveTextContent("41.7%");
-    expect(tile(salesforce, "Fill rate")).toHaveTextContent("150 of 360 fields");
-    expect(tile(salesforce, "Echo can fill")).toHaveTextContent("60");
-    expect(salesforce.getByRole("table", { name: "By field, most missing first" })).toHaveTextContent("Paper Process");
-    expect(salesforce.getByRole("link", { name: "Harbourline – API platform" })).toHaveAttribute(
-      "href",
-      "/sales/deals/006MOCK0000HARB",
-    );
-
-    const model = section("Claude usage");
-    expect(tile(model, "Input tokens")).toHaveTextContent("9,000,000");
-    expect(tile(model, "Cache write tokens")).toHaveTextContent("900,000");
-    expect(model.getByRole("table", { name: "By purpose, most input tokens first" })).toHaveTextContent("call.vote");
+    expect(screen.queryByText(/Claude/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/tokens/i)).not.toBeInTheDocument();
   });
 
-  it("asks for 30 days first, and the range toggle asks again for the range picked", async () => {
+  it("switches to Quality and back, keeping the tab in the address and asking for nothing new", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("region", { name: "Usage" });
+    expect(adminStats).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("tab", { name: "Quality" }));
+    expect(sectionTitles()).toEqual(QUALITY);
+    expect(screen.getByRole("tabpanel", { name: "Quality" })).toBeInTheDocument();
+    expect(screen.getByTestId("where")).toHaveTextContent(/^\/sales\/echo-stats\?tab=quality$/);
+    expect(screen.queryByText(/Claude/)).not.toBeInTheDocument();
+    // Both tabs read the one answer.
+    expect(adminStats).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("tab", { name: "Adoption" }));
+    expect(sectionTitles()).toEqual(ADOPTION);
+    // Adoption is the default, so it stays out of the address.
+    expect(screen.getByTestId("where")).toHaveTextContent(/^\/sales\/echo-stats$/);
+  });
+
+  it("opens on the tab in the address, and on Adoption for one it doesn't know", async () => {
+    const first = renderPage("/sales/echo-stats?tab=quality&days=90");
+    await screen.findByRole("region", { name: "Analysis outcomes" });
+    expect(sectionTitles()).toEqual(QUALITY);
+    expect(adminStats).toHaveBeenLastCalledWith(90);
+    first.unmount();
+
+    renderPage("/sales/echo-stats?tab=claude");
+    await screen.findByRole("region", { name: "Usage" });
+    expect(sectionTitles()).toEqual(ADOPTION);
+  });
+
+  it("shows usage with the active-users trend, a Region column and active users by region", async () => {
+    renderPage();
+    const usage = within(await screen.findByRole("region", { name: "Usage" }));
+    expect(tile(usage, "Active users")).toHaveTextContent(String(demo.usage.activeUsers));
+    // Thousands separators.
+    const events = demo.usage.daily.reduce((total, day) => total + day.events, 0);
+    expect(events).toBeGreaterThan(999);
+    expect(tile(usage, "Events")).toHaveTextContent(formatCount(events));
+
+    // A line of daily active users with weekly active users beside it, not the old daily bars.
+    const trend = usage.getByRole("figure", { name: "Daily and weekly active users, 30 days" });
+    expect(within(trend).getByText("Active that day")).toBeInTheDocument();
+    expect(within(trend).getByText("Active that week")).toBeInTheDocument();
+    expect(trend.querySelectorAll(".recharts-line")).toHaveLength(2);
+    expect(trend.querySelector(".recharts-bar")).toBeNull();
+
+    expect(headersOf(usage, "Users").slice(0, 3)).toEqual(["User", "Region", "Last seen"]);
+    const top = demo.usage.users[0];
+    const row = rowOf(usage, "Users", top.email);
+    expect(row.getByRole("cell", { name: top.region ?? "Unassigned" })).toBeInTheDocument();
+    expect(row.getByRole("cell", { name: formatCount(top.events) })).toBeInTheDocument();
+    // Someone who owns no open deal with a region is Unassigned, as in the by-region lists.
+    const unassigned = demo.usage.users.find((u) => u.region === null);
+    expect(unassigned).toBeDefined();
+    expect(rowOf(usage, "Users", (unassigned as { email: string }).email).getByRole("cell", { name: "Unassigned" })).toBeInTheDocument();
+
+    const [region] = demo.usage.byRegion;
+    expect(rowOf(usage, "Active users by region", region.region).getByRole("cell", { name: String(region.users) })).toBeInTheDocument();
+    expect(usage.queryByRole("table", { name: "Actions" })).not.toBeInTheDocument();
+  });
+
+  it("shows calls recorded with the recorder's Region, by region and by meeting type", async () => {
+    renderPage();
+    const calls = within(await screen.findByRole("region", { name: "Calls recorded" }));
+    expect(tile(calls, "Calls")).toHaveTextContent(formatCount(demo.recording.calls));
+    expect(tile(calls, "Recorders")).toHaveTextContent(String(demo.recording.recorders));
+    expect(tile(calls, "Analysed")).toHaveTextContent(formatCount(demo.recording.analysed));
+    // How the analysis went is the Quality tab's.
+    expect(calls.queryByRole("group", { name: "Empty transcript" })).not.toBeInTheDocument();
+    expect(calls.getByRole("figure", { name: "Calls and analysed calls by week, 30 days" })).toBeInTheDocument();
+
+    expect(headersOf(calls, "By recorder").slice(0, 2)).toEqual(["Recorder", "Region"]);
+    const recorder = demo.recording.byRecorder[0];
+    expect(rowOf(calls, "By recorder", recorder.email).getByRole("cell", { name: recorder.region ?? "Unassigned" })).toBeInTheDocument();
+    const [region] = demo.recording.byRegion;
+    const regionRow = rowOf(calls, "By region", region.region);
+    expect(regionRow.getAllByRole("cell").map((c) => c.textContent)).toEqual([
+      region.region,
+      formatCount(region.calls),
+      formatCount(region.analysed),
+      formatCount(region.recorders),
+    ]);
+    expect(calls.getByRole("table", { name: "By meeting type" })).toHaveTextContent("Discovery Call");
+  });
+
+  it("shows deal progress: the tiles, open deals by stage, recent changes linking to the deal, by region and by owner", async () => {
+    renderPage();
+    const progress = within(await screen.findByRole("region", { name: "Deal progress" }));
+    const p = demo.progress;
+    expect(tile(progress, "Open opportunities")).toHaveTextContent(String(p.openDeals));
+    expect(tile(progress, "Stage changes")).toHaveTextContent(String(p.stageChanges));
+    expect(tile(progress, "Moved forward")).toHaveTextContent(String(p.movedForward));
+    expect(tile(progress, "Moved back")).toHaveTextContent(String(p.movedBack));
+    expect(tile(progress, "Won")).toHaveTextContent(String(p.closedWon));
+    expect(tile(progress, "Lost")).toHaveTextContent(String(p.closedLost));
+    const byStage = progress.getByRole("figure", { name: "Open opportunities by stage" });
+    expect(byStage.querySelectorAll(".recharts-bar-rectangle")).toHaveLength(p.byStage.length);
+
+    expect(headersOf(progress, "Recent stage changes")).toEqual([
+      "Opportunity",
+      "Owner",
+      "Region",
+      "Stage change",
+      "Direction",
+      "When",
+    ]);
+    const [latest] = p.changes;
+    const link = within(progress.getByRole("table", { name: "Recent stage changes" })).getAllByRole("link", { name: latest.name })[0];
+    expect(link).toHaveAttribute("href", `/sales/deals/${latest.opportunityId}`);
+    const row = within(link.closest("tr") as HTMLElement);
+    expect(row.getByRole("cell", { name: `${latest.from} → ${latest.to}` })).toBeInTheDocument();
+    expect(row.getByRole("cell", { name: formatDateTime(latest.at) })).toBeInTheDocument();
+
+    const unassigned = rowOf(progress, "By region", "Unassigned");
+    const expected = p.byRegion.find((r) => r.region === "Unassigned");
+    expect(unassigned.getAllByRole("cell")[1]).toHaveTextContent(String(expected?.openDeals));
+    expect(headersOf(progress, "By owner")).toEqual(["Owner", "Region", "Open", "Stage changes", "Won", "Lost"]);
+    expect(rowOf(progress, "By owner", p.byOwner[0].ownerEmail).getByRole("cell", { name: p.byOwner[0].region ?? "Unassigned" })).toBeInTheDocument();
+  });
+
+  it("shows quiet deals: the share quiet, never-emailed first, by owner and by region", async () => {
+    renderPage();
+    const quiet = within(await screen.findByRole("region", { name: "Quiet deals" }));
+    const q = demo.quietDeals;
+    expect(tile(quiet, "Open opportunities")).toHaveTextContent(String(q.openDeals));
+    expect(tile(quiet, "Quiet")).toHaveTextContent(String(q.quiet));
+    expect(tile(quiet, "Share quiet")).toHaveTextContent(formatShare(q.quiet, q.openDeals));
+
+    expect(headersOf(quiet, "Quiet opportunities")).toEqual([
+      "Opportunity",
+      "Owner",
+      "Region",
+      "Stage",
+      "Last email",
+      "Last activity",
+      "Last call",
+    ]);
+    const [first] = q.deals;
+    expect(first.lastEmailAt).toBeNull();
+    const link = quiet.getByRole("link", { name: first.name });
+    expect(link).toHaveAttribute("href", `/sales/deals/${first.opportunityId}`);
+    expect(within(link.closest("tr") as HTMLElement).getByRole("cell", { name: "Never" })).toBeInTheDocument();
+    const emailed = q.deals.find((d) => d.lastEmailAt !== null);
+    expect(emailed).toBeDefined();
+    const emailedRow = within(quiet.getByRole("link", { name: emailed?.name }).closest("tr") as HTMLElement);
+    expect(emailedRow.getByRole("cell", { name: formatDateTime(emailed?.lastEmailAt) })).toBeInTheDocument();
+
+    expect(headersOf(quiet, "By owner")).toEqual(["Owner", "Region", "Open", "Quiet"]);
+    const [region] = q.byRegion;
+    expect(rowOf(quiet, "By region", region.region).getAllByRole("cell").map((c) => c.textContent)).toEqual([
+      region.region,
+      String(region.openDeals),
+      String(region.quiet),
+    ]);
+  });
+
+  it("shows decisions with Region by user, analysis outcomes and Salesforce completeness on Quality", async () => {
+    renderPage("/sales/echo-stats?tab=quality");
+    const decisions = within(await screen.findByRole("region", { name: "AM decisions on Echo's suggestions" }));
+    const d = demo.decisions;
+    expect(tile(decisions, "Approved as proposed")).toHaveTextContent(String(d.approved));
+    expect(tile(decisions, "Approved as proposed rate")).toHaveTextContent(formatRate(d.approvedAsIsRate));
+    expect(tile(decisions, "Pending suggestions (all deals)")).toHaveTextContent(String(d.pending));
+    // Never called accuracy, and it says why.
+    expect(decisions.getByText(/not how accurate they were: measuring accuracy needs the labelled gold set/)).toBeInTheDocument();
+    expect(decisions.getByRole("table", { name: "Reject reasons" })).toHaveTextContent("No reason given");
+    for (const status of ["SINGLE", "MERGED", "FALLBACK"]) {
+      expect(decisions.getByRole("table", { name: "By merge status" })).toHaveTextContent(status);
+    }
+    expect(headersOf(decisions, "By user").slice(0, 2)).toEqual(["User", "Region"]);
+    const [byUser] = d.byUser;
+    expect(rowOf(decisions, "By user", byUser.email).getByRole("cell", { name: byUser.region ?? "Unassigned" })).toBeInTheDocument();
+
+    const analysis = section("Analysis outcomes");
+    expect(analysis.getByText(`What became of the ${formatCount(demo.recording.calls)} sales calls recorded in this range.`)).toBeInTheDocument();
+    expect(tile(analysis, "With transcript")).toHaveTextContent(formatCount(demo.recording.withTranscript));
+    expect(tile(analysis, "Analysed")).toHaveTextContent(formatCount(demo.recording.analysed));
+    expect(tile(analysis, "Analysis failed")).toHaveTextContent(formatCount(demo.recording.failed));
+    expect(tile(analysis, "Empty transcript")).toHaveTextContent(formatCount(demo.recording.emptyTranscript));
+
+    const salesforce = section("Salesforce completeness");
+    expect(tile(salesforce, "Fill rate")).toHaveTextContent(formatRate(demo.salesforce.fillRate));
+    const gap = demo.salesforce.dealsWithMostGaps[0];
+    expect(salesforce.getByRole("link", { name: gap.name })).toHaveAttribute("href", `/sales/deals/${gap.opportunityId}`);
+  });
+
+  it("asks for 30 days first, and the range toggle asks again for the range picked, on either tab", async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByRole("region", { name: "Usage" });
@@ -177,29 +332,33 @@ describe("EchoStatsPage", { timeout: 20000 }, () => {
     await user.click(range.getByRole("button", { name: "90 days" }));
 
     await waitFor(() => expect(adminStats).toHaveBeenLastCalledWith(90));
-    expect(await screen.findByRole("figure", { name: "Daily active users, 90 days" })).toBeInTheDocument();
+    expect(await screen.findByRole("figure", { name: "Daily and weekly active users, 90 days" })).toBeInTheDocument();
     expect(screen.getByTestId("where")).toHaveTextContent("/sales/echo-stats?days=90");
 
+    await user.click(screen.getByRole("tab", { name: "Quality" }));
     await user.click(range.getByRole("button", { name: "7 days" }));
     await waitFor(() => expect(adminStats).toHaveBeenLastCalledWith(7));
+    const params = new URLSearchParams(screen.getByTestId("where").textContent?.split("?")[1]);
+    expect(Object.fromEntries(params)).toEqual({ tab: "quality", days: "7" });
   });
 
-  it("opens on the range in the address, and falls back to 30 days for one the endpoint would refuse", async () => {
-    const first = renderPage("/sales/echo-stats?days=7");
-    await screen.findByRole("region", { name: "Usage" });
-    expect(adminStats).toHaveBeenLastCalledWith(7);
-    first.unmount();
-
+  it("falls back to 30 days for a range the endpoint would refuse", async () => {
     renderPage("/sales/echo-stats?days=14");
     await screen.findByRole("region", { name: "Usage" });
     expect(adminStats).toHaveBeenLastCalledWith(30);
   });
 
   it("shows a dash, not 0%, for a rate with nothing to divide by", async () => {
-    renderPage();
+    answer((days) => {
+      const stats = mockEchoAdminStats(days);
+      stats.decisions.byField = [
+        { fieldKey: "paperProcess", label: "Paper process", approved: 0, edited: 0, rejected: 0, pending: 6, approvedAsIsRate: null },
+      ];
+      return stats;
+    });
+    renderPage("/sales/echo-stats?tab=quality");
     const decisions = within(await screen.findByRole("region", { name: "AM decisions on Echo's suggestions" }));
-    // Paper Process has only pending suggestions: nothing decided, so no rate.
-    const paper = within(decisions.getByRole("cell", { name: "Paper Process" }).closest("tr") as HTMLElement);
+    const paper = rowOf(decisions, "By field", "Paper process");
     expect(paper.getAllByRole("cell").at(-1)).toHaveTextContent(/^—$/);
   });
 
@@ -207,58 +366,78 @@ describe("EchoStatsPage", { timeout: 20000 }, () => {
     renderPage();
     const usage = within(await screen.findByRole("region", { name: "Usage" }));
     expect(
-      usage.getByText(
-        "Usage is counted only since tracking started on 20 Nov 2026, so this range shows nothing before then.",
-      ),
+      usage.getByText("Usage is counted only since tracking started on 2 Nov 2026, so this range shows nothing before then."),
     ).toBeInTheDocument();
   });
 
   it("says nothing about tracking when it started before the range", async () => {
-    answer((days) => {
-      const stats = mockEchoAdminStats(days);
-      stats.usage.trackedSince = "2026-09-01T00:00:00Z";
-      return stats;
-    });
-    renderPage();
+    renderPage("/sales/echo-stats?days=7");
     const usage = within(await screen.findByRole("region", { name: "Usage" }));
     expect(usage.queryByText(/counted only since tracking started/)).not.toBeInTheDocument();
   });
 
-  it("shows an empty state for every empty list, and dashes for every rate", async () => {
+  it("shows an empty state for every empty list and chart on Adoption, and dashes for its rates", async () => {
     answer(emptyEchoAdminStats);
     renderPage();
     const usage = within(await screen.findByRole("region", { name: "Usage" }));
-    expect(
-      usage.getByText("Usage is counted only since tracking started, and nothing has been recorded yet."),
-    ).toBeInTheDocument();
-    // The chart says why it is empty rather than drawing flat bars; so does the users table.
+    expect(usage.getByText("Usage is counted only since tracking started, and nothing has been recorded yet.")).toBeInTheDocument();
+    // The trend says why it is empty rather than drawing flat lines; so do the two tables.
     expect(usage.queryByRole("figure")).not.toBeInTheDocument();
-    expect(usage.getAllByText("No one used Echo in this range.")).toHaveLength(2);
-    expect(usage.getByText("No actions in this range.")).toBeInTheDocument();
+    expect(usage.getAllByText("No one used Echo in this range.")).toHaveLength(3);
 
     const calls = section("Calls recorded");
     expect(calls.queryByRole("figure")).not.toBeInTheDocument();
-    expect(calls.getAllByText("No calls recorded in this range.")).toHaveLength(3);
+    expect(calls.getAllByText("No calls recorded in this range.")).toHaveLength(4);
 
-    const decisions = section("AM decisions on Echo's suggestions");
+    const progress = section("Deal progress");
+    expect(progress.queryByRole("figure")).not.toBeInTheDocument();
+    expect(progress.getByText("No open opportunities on the list.")).toBeInTheDocument();
+    expect(progress.getByText("No opportunity changed stage in the last 30 days.")).toBeInTheDocument();
+    expect(progress.getAllByText("No open opportunities, and no stage changes in this range.")).toHaveLength(2);
+
+    const quiet = section("Quiet deals");
+    expect(tile(quiet, "Share quiet")).toHaveTextContent("—");
+    expect(quiet.getByText("Every open opportunity has a customer email in the last 30 days.")).toBeInTheDocument();
+    expect(quiet.getAllByText("No open opportunities on the list.")).toHaveLength(2);
+
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty state for every empty list on Quality, and dashes for its rates", async () => {
+    answer(emptyEchoAdminStats);
+    renderPage("/sales/echo-stats?tab=quality");
+    const decisions = within(await screen.findByRole("region", { name: "AM decisions on Echo's suggestions" }));
     expect(tile(decisions, "Approved as proposed rate")).toHaveTextContent("—");
     expect(decisions.getByText("No suggestions decided in this range, and none pending.")).toBeInTheDocument();
     expect(decisions.getByText("No suggestions rejected in this range.")).toBeInTheDocument();
     expect(decisions.getAllByText("No suggestions decided in this range.")).toHaveLength(3);
 
+    expect(tile(section("Analysis outcomes"), "With transcript")).toHaveTextContent("0");
+
     const salesforce = section("Salesforce completeness");
     expect(tile(salesforce, "Fill rate")).toHaveTextContent("—");
     expect(salesforce.getByText("No open opportunities on the list.")).toBeInTheDocument();
     expect(salesforce.getByText("No open opportunities are missing a field.")).toBeInTheDocument();
-
-    expect(section("Claude usage").getByText("Echo made no requests to Claude in this range.")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("says the quiet list is cut short when it holds fewer than the quiet count", async () => {
+    answer((days) => {
+      const stats = mockEchoAdminStats(days);
+      stats.quietDeals.quiet = stats.quietDeals.deals.length + 5;
+      return stats;
+    });
+    renderPage();
+    const quiet = within(await screen.findByRole("region", { name: "Quiet deals" }));
+    const shown = demo.quietDeals.deals.length;
+    expect(quiet.getByText(`Showing the first ${shown} of ${shown + 5}.`)).toBeInTheDocument();
   });
 
   it("tells a caller who is not a Sales admin that the page is for admins, and asks nothing", async () => {
     access.isAdmin = false;
     renderPage();
     expect(screen.getByText("Echo stats are for Sales admins only.")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Range" })).not.toBeInTheDocument();
     expect(adminStats).not.toHaveBeenCalled();
   });

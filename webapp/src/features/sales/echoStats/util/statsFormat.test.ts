@@ -17,14 +17,17 @@
 import { describe, expect, it } from "vitest";
 import type { StatsRange, UsageStats } from "../types";
 import {
-  actionLabel,
+  directionLabel,
   formatCount,
   formatDay,
   formatRange,
   formatRate,
+  formatShare,
   mergeStatusLabel,
+  regionLabel,
   statsRejectReasonLabel,
   usageTrackingNote,
+  weekStartOf,
 } from "./statsFormat";
 
 const range: StatsRange = { from: "2026-10-27T00:00:00Z", to: "2026-11-26T10:00:00Z", days: 30 };
@@ -32,8 +35,10 @@ const usage = (trackedSince: string | null): UsageStats => ({
   trackedSince,
   activeUsers: 0,
   daily: [],
+  weekly: [],
   users: [],
   byAction: [],
+  byRegion: [],
 });
 
 describe("formatCount", () => {
@@ -57,6 +62,23 @@ describe("formatRate", () => {
   it("shows a dash when there is no rate", () => {
     expect(formatRate(null)).toBe("—");
     expect(formatRate(undefined)).toBe("—");
+  });
+});
+
+describe("formatShare", () => {
+  it("is a rate of a whole, and a dash when there is no whole", () => {
+    expect(formatShare(11, 40)).toBe("27.5%");
+    expect(formatShare(0, 0)).toBe("—");
+  });
+});
+
+describe("weekStartOf", () => {
+  it("finds the Monday of the ISO week, in UTC", () => {
+    expect(weekStartOf("2026-11-23")).toBe("2026-11-23");
+    expect(weekStartOf("2026-11-26")).toBe("2026-11-23");
+    // Sunday belongs to the week that started six days before.
+    expect(weekStartOf("2026-11-29")).toBe("2026-11-23");
+    expect(weekStartOf("2026-11-01")).toBe("2026-10-26");
   });
 });
 
@@ -98,10 +120,17 @@ describe("usageTrackingNote", () => {
 });
 
 describe("labels", () => {
-  it("names the logged actions, and shows one it doesn't know as sent", () => {
-    expect(actionLabel("deal.view")).toBe("Opened an opportunity");
-    expect(actionLabel("meeting.reanalyse")).toBe("Re-analysed a call");
-    expect(actionLabel("deal.something_new")).toBe("deal.something_new");
+  it("calls a missing region Unassigned, as the by-region lists do", () => {
+    expect(regionLabel("APAC")).toBe("APAC");
+    expect(regionLabel(null)).toBe("Unassigned");
+  });
+
+  it("names each way a stage can change, and shows one it doesn't know as sent", () => {
+    expect(directionLabel("FORWARD")).toBe("Forward");
+    expect(directionLabel("BACK")).toBe("Back");
+    expect(directionLabel("WON")).toBe("Won");
+    expect(directionLabel("LOST")).toBe("Lost");
+    expect(directionLabel("SIDEWAYS")).toBe("SIDEWAYS");
   });
 
   it("names the reject reasons, including UNSPECIFIED, which the dialog never offers", () => {

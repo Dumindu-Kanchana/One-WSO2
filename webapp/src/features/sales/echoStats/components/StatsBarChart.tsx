@@ -14,8 +14,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Bars over time for Echo stats: one series (daily active users) or two side by side
-// (calls against analysed). Drawn with recharts and the shared chart palette, so the hues
+// Bars for Echo stats: one series (open deals by stage) or two side by side (calls against
+// analysed, by week). Drawn with recharts and the shared chart palette, so the hues
 // are the app's validated pair in both colour schemes, and the chrome is alpha over the
 // surface rather than fixed greys.
 
@@ -30,6 +30,7 @@ import {
 } from "@components/charts/chartPalette";
 import { useLiveScheme } from "@components/charts/useLiveScheme";
 import { formatCount } from "../util/statsFormat";
+import StatsTooltip from "./StatsTooltip";
 
 const CHART_HEIGHT = 220;
 /** First series blue, second orange: the palette's pair, assigned by series, never by value. */
@@ -40,56 +41,10 @@ export interface ChartSeries<T> {
   name: string;
 }
 
-interface TooltipEntry {
-  name?: string | number;
-  value?: number | string | readonly (number | string)[];
-  color?: string;
-}
-
-function StatsTooltip({
-  active,
-  label,
-  payload = [],
-  formatLabel,
-}: {
-  active?: boolean;
-  label?: string | number;
-  payload?: readonly TooltipEntry[];
-  formatLabel: (value: string) => string;
-}) {
-  if (!active || payload.length === 0) return null;
-  return (
-    <Box
-      role="tooltip"
-      sx={{
-        bgcolor: "background.paper",
-        color: "text.primary",
-        border: 1,
-        borderColor: "divider",
-        borderRadius: 1,
-        boxShadow: 2,
-        px: 1.25,
-        py: 0.75,
-        fontSize: 12,
-      }}
-    >
-      <Box sx={{ fontWeight: 700, mb: 0.25 }}>{formatLabel(String(label ?? ""))}</Box>
-      {payload.map((entry) => (
-        <Box key={String(entry.name)} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <Box aria-hidden component="span" sx={{ width: 8, height: 8, borderRadius: "2px", bgcolor: entry.color }} />
-          <span>{entry.name}</span>
-          <Box component="span" sx={{ ml: "auto", pl: 1.5, fontVariantNumeric: "tabular-nums" }}>
-            {formatCount(Number(entry.value ?? 0))}
-          </Box>
-        </Box>
-      ))}
-    </Box>
-  );
-}
-
 /**
  * @param label - Names the chart for assistive tech; the figures are in the tables and tiles around it
  * @param empty - Said instead of drawing flat bars when every value is zero
+ * @param everyTick - Label every bar, for a few named categories rather than a run of dates
  */
 export default function StatsBarChart<T extends object>({
   data,
@@ -98,6 +53,7 @@ export default function StatsBarChart<T extends object>({
   formatX,
   label,
   empty,
+  everyTick = false,
 }: {
   data: readonly T[];
   xKey: keyof T & string;
@@ -105,6 +61,7 @@ export default function StatsBarChart<T extends object>({
   formatX: (value: string) => string;
   label: string;
   empty: string;
+  everyTick?: boolean;
 }) {
   const mode = useLiveScheme();
   const chrome = chartChrome(mode);
@@ -131,6 +88,7 @@ export default function StatsBarChart<T extends object>({
             stroke={chrome.line}
             tickLine={false}
             minTickGap={16}
+            interval={everyTick ? 0 : "preserveEnd"}
           />
           <YAxis
             allowDecimals={false}
