@@ -60,6 +60,8 @@ export default function MeetingFilters({
   search,
   onSearchChange,
   disabled,
+  showRegion = true,
+  searchPlaceholder = "Title, account, call type or owner",
 }: {
   scope: MeetingScope;
   onScopeChange: (scope: MeetingScope) => void;
@@ -73,6 +75,10 @@ export default function MeetingFilters({
   search: string | null;
   onSearchChange: (search: string | null) => void;
   disabled?: boolean;
+  /** False when the page filters by region elsewhere (the Echo scope's own filters). */
+  showRegion?: boolean;
+  /** What the search matches, which differs by the backend serving the list. */
+  searchPlaceholder?: string;
 }) {
   // Draft lives here; only submitting lifts it to the page.
   const [draft, setDraft] = useState(search ?? "");
@@ -128,39 +134,41 @@ export default function MeetingFilters({
           focus, so without it the tooltip explaining WHY it is disabled never appears.
           While disabled the span is focusable, and describeChild makes the tooltip its
           accessible description, so keyboard and screen-reader users get it too. */}
-      <Tooltip
-        title={regionDisabled ? "Region isn't available for Echo meetings yet" : ""}
-        describeChild
-        arrow
-      >
-        <Box component="span" sx={{ display: "inline-flex" }} tabIndex={regionDisabled ? 0 : undefined}>
-          <FormControl
-            size="small"
-            sx={{ minWidth: 180 }}
-            disabled={disabled || regionsLoading || regionDisabled}
-          >
-            <InputLabel id="sales-region-label">Region</InputLabel>
-            <Select
-              labelId="sales-region-label"
-              label="Region"
-              value={region ?? ALL_REGIONS}
-              onChange={(event) => {
-                const value = event.target.value as string;
-                onRegionChange(value === ALL_REGIONS ? null : value);
-              }}
+      {showRegion && (
+        <Tooltip
+          title={regionDisabled ? "Region isn't available for Echo meetings yet" : ""}
+          describeChild
+          arrow
+        >
+          <Box component="span" sx={{ display: "inline-flex" }} tabIndex={regionDisabled ? 0 : undefined}>
+            <FormControl
+              size="small"
+              sx={{ minWidth: 180 }}
+              disabled={disabled || regionsLoading || regionDisabled}
             >
-              {/* "All" is a sentinel rather than an empty string: an empty value
-                  would render the Select as unset and float its label oddly. */}
-              <MenuItem value={ALL_REGIONS}>All regions</MenuItem>
-              {regions.map((name) => (
-                <MenuItem key={name} value={name}>
-                  {name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-      </Tooltip>
+              <InputLabel id="sales-region-label">Region</InputLabel>
+              <Select
+                labelId="sales-region-label"
+                label="Region"
+                value={region ?? ALL_REGIONS}
+                onChange={(event) => {
+                  const value = event.target.value as string;
+                  onRegionChange(value === ALL_REGIONS ? null : value);
+                }}
+              >
+                {/* "All" is a sentinel rather than an empty string: an empty value
+                    would render the Select as unset and float its label oddly. */}
+                <MenuItem value={ALL_REGIONS}>All regions</MenuItem>
+                {regions.map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Tooltip>
+      )}
 
       <Box component="form" role="search" onSubmit={submit} sx={{ flex: 1, minWidth: 240 }}>
         <TextField
@@ -168,7 +176,7 @@ export default function MeetingFilters({
           size="small"
           type="search"
           label="Search"
-          placeholder="Title, account, call type or owner"
+          placeholder={searchPlaceholder}
           value={draft}
           disabled={disabled}
           onChange={(event) => setDraft(event.target.value)}
