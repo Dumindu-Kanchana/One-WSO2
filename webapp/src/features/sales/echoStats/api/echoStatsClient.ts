@@ -15,7 +15,8 @@
 // under the License.
 
 // GET /admin/stats behind one interface, as meddpiccClient does for the MEDDPICC routes:
-// echo-backend over HTTP here, and a test double in ../testing that the tests swap in.
+// the ONE_WSO2_ECHO_BACKEND_URL backend over HTTP here, and a test double in ../testing that
+// the tests swap in.
 
 import { authedGet } from "@api/http";
 import { echoServiceUrls } from "@config/apiConfig";

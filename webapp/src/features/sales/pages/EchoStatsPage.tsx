@@ -44,11 +44,9 @@ function daysFrom(params: URLSearchParams): StatsDays {
  * Sales → Echo → Stats: how Echo is used and what account managers do with its suggestions.
  * Sales admins only.
  *
- * Three answers to "may I see this", from the outside in. SalesShell asks meet-app whether
- * the caller is in Sales at all, as every Sales page does. A caller who is, but is not a
- * Sales admin there, is told so here and nothing is requested. And echo-backend decides for
- * itself, from its own admin groups: its 403 is met with the same explanation rather than an
- * error, since the two lists of admins are kept separately and can disagree.
+ * A caller who is not a Sales admin is told the page is for admins, and nothing is requested.
+ * The Echo backend also decides for itself: its 403 is met with the same explanation rather
+ * than an error.
  *
  * The range lives in the URL (?days=), so a link to the 90-day view opens on it.
  */

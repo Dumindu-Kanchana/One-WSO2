@@ -36,7 +36,7 @@ const PURPOSE_COLUMNS: readonly StatsColumn<ModelPurposeStats>[] = [
   { key: "cacheReadTokens", label: "Cache read tokens", numeric: true, render: (p) => formatCount(p.cacheReadTokens) },
 ];
 
-/** Every call echo-backend made to Claude in range, and the tokens they took. */
+/** Every call Echo made to Claude in range, and the tokens they took. */
 export default function ModelSection({ model }: { model: ModelStats }) {
   return (
     <StatsSection title="Claude usage" subtitle="Every request Echo made to Claude in this range.">

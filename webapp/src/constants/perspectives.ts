@@ -673,10 +673,7 @@ const SALES_OPPORTUNITIES_ROW: PerspectiveSection = {
   icon: HandshakeIcon,
   path: "/sales/deals",
 };
-/**
- * Echo stats, for Sales admins only. Still one of SALES_ITEM_IDS, so the Sales gate decides
- * it, and useSalesRailGate shows it only to a meet-app admin.
- */
+/** Identifies the admin-only Echo stats rail row. */
 export const SALES_ECHO_STATS_ITEM_ID = "sales-echo-stats";
 
 // Echo: the calls it recorded, with their transcripts and notes, and, for admins, its stats.

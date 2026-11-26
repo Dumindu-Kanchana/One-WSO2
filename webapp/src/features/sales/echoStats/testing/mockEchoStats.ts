@@ -15,7 +15,7 @@
 // under the License.
 
 // A GET /admin/stats answer shaped exactly as the contract gives it, for the tests and for
-// building the page before echo-backend serves it. Every list holds at least one row, so a
+// building the page before the Echo backend serves it. Every list holds at least one row, so a
 // render of it reaches every section; `emptyEchoAdminStats` is the opposite, a deployment
 // with nothing in it yet.
 

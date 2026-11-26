@@ -1140,9 +1140,9 @@ export default function App() {
               returned to with Back. ?letter= opens it filtered to one MEDDPICC Letter. */}
           <Route path="sales/deals/:opportunityId" element={<DealPage />} />
           {/* Echo stats: usage, calls, AM decisions, Salesforce completeness and Claude usage.
-              Sales admins only. The rail shows it to meet-app admins alone; anyone else who
-              opens the address is told it is for admins, and echo-backend refuses them (403)
-              on its own account. */}
+              Sales admins only. The rail shows it to Sales admins alone; anyone else who
+              opens the address is told it is for admins, and the ONE_WSO2_ECHO_BACKEND_URL
+              backend refuses them (403) on its own account. */}
           <Route path="sales/echo-stats" element={<EchoStatsPage />} />
           {/* Sales → Library, Smart Search over Pitstop's content. Loaded lazily, so nothing of it is
               downloaded until the page is opened. */}

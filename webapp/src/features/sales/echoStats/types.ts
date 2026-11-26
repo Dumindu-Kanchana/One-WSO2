@@ -14,8 +14,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// GET {echoBackendUrl}/admin/stats?days= — the Echo admin stats contract, as echo-backend
-// answers it. Sales admins only; anyone else gets 403.
+// GET {echoBackendUrl}/admin/stats?days= — the Echo admin stats contract, as the Echo
+// backend answers it. Sales admins only; anyone else gets 403.
 //
 // Timestamps are RFC 3339 UTC; `date` and `weekStart` are calendar dates (yyyy-MM-dd, UTC).
 // Counts are integers. Rates are 0..1, and null when their denominator is 0. Every list
@@ -36,7 +36,7 @@ export interface StatsRange {
 
 // ---- usage: who uses Echo --------------------------------------------------
 
-/** The actions echo-backend logs, one per protected route. */
+/** The actions the Echo backend logs, one per protected route. */
 export type UsageAction =
   | "deals.list"
   | "deal.view"

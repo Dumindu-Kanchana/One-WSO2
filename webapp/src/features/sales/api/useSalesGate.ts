@@ -88,8 +88,8 @@ export function useSalesRailGate(enabled: boolean): SalesRailGate {
   const isResolving = active && (isPending || isLoading);
   const failed = active && isError && !isForbidden(error);
   const open = !isResolving && !(active && isError);
-  // Echo stats is for admins: shown only once meet-app has said this caller is one. With no
-  // backend configured there is no one to ask, so it stays hidden rather than open.
+  // Show Echo stats only after the Sales access check confirms ADMIN. Hide it when the Sales
+  // backend (ONE_WSO2_REVOPS_BACKEND_URL) is not configured.
   const isAdmin = (data?.privileges ?? []).includes(SALES_PRIVILEGE.ADMIN);
   return {
     canSee: (itemId) => open && (itemId !== SALES_ECHO_STATS_ITEM_ID || (active && isAdmin)),

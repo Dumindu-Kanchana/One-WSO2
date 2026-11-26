@@ -49,7 +49,7 @@ const ACTION_COLUMNS: readonly StatsColumn<UsageByAction>[] = [
   { key: "users", label: "Users", numeric: true, render: (a) => formatCount(a.users) },
 ];
 
-/** Who uses Echo: from echo-backend's usage log, so only since that log began. */
+/** Who uses Echo: from Echo's usage log, so only since that log began. */
 export default function UsageSection({ usage, range }: { usage: UsageStats; range: StatsRange }) {
   const note = usageTrackingNote(usage, range);
   const events = usage.daily.reduce((sum, day) => sum + day.events, 0);

@@ -18,7 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { HttpError } from "@api/http";
 
-// echo-backend is replaced by a double of GET /admin/stats behind the same client
+// The Echo backend is replaced by a double of GET /admin/stats behind the same client
 // interface, so the real hook, cache and page run against the contract's shape. The shell
 // has its own suite; here it only frames the page. Who is an admin is the Sales gate's
 // answer, set per test.
@@ -263,9 +263,9 @@ describe("EchoStatsPage", { timeout: 20000 }, () => {
     expect(adminStats).not.toHaveBeenCalled();
   });
 
-  // meet-app's admins and echo-backend's are kept apart and can disagree: echo-backend's 403
-  // gets the same explanation, not an error.
-  it("meets echo-backend's 403 with the admins-only explanation, not an error", async () => {
+  // The admins known to ONE_WSO2_REVOPS_BACKEND_URL and to ONE_WSO2_ECHO_BACKEND_URL are kept
+  // apart and can disagree: the Echo backend's 403 gets the same explanation, not an error.
+  it("meets the Echo backend's 403 with the admins-only explanation, not an error", async () => {
     adminStats.mockRejectedValue(new HttpError("https://echo/admin/stats?days=30", 403, ""));
     renderPage();
     expect(await screen.findByText(/Echo stats are for Sales admins only, and Echo doesn't list you as one/)).toBeInTheDocument();

@@ -125,8 +125,8 @@ describe("useSalesRailGate", () => {
     expect(gate().canSee("sales-meetings")).toBe(true);
   });
 
-  // Echo stats is for admins only: the row is there for a meet-app ADMIN (762) and for no one else.
-  it("shows the Stats row to a meet-app admin only", () => {
+  // Echo stats is for admins only: the row is there for a Sales ADMIN (762) and for no one else.
+  it("shows the Stats row to a Sales admin only", () => {
     expect(gate().canSee("sales-echo-stats")).toBe(false);
     expect(gate().canSee("sales-meetings")).toBe(true);
     state.privileges = [987, 762];

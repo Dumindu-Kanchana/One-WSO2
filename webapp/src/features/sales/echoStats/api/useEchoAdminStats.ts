@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Echo stats, from echo-backend. Nothing is fetched while ONE_WSO2_ECHO_BACKEND_URL is
+// Echo stats, from the Echo backend. Nothing is fetched while ONE_WSO2_ECHO_BACKEND_URL is
 // unset, nor for a caller the page already knows is not a Sales admin: the backend would
 // only answer 403.
 //
