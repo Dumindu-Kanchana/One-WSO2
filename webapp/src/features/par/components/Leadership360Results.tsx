@@ -31,13 +31,15 @@ import type { FormDefinition, Leadership360Summary, Leadership360View } from "..
 import { allQuestions, stepSections } from "../util/leadership360Form";
 import { formatShortDate } from "../util/parDate";
 import { formatIndex } from "../util/review360Form";
+import { MIN_360_RESPONSES } from "../api/review360Types";
 import { SummaryMetric } from "./Par360SummaryView";
 
 // One leader's results in one survey. What they contain depends on the view
 // they're read from — the backend decides: the leader (SELF) gets averages and
-// comments, with names on named comments; their manager (REPORTS) and PAR
-// admins (ALL) also get named responses in full; admins also get the
-// relationship breakdown. Laid out like a PAR 360° summary.
+// comments, with names on named comments, from 3 responses; their leads
+// (REPORTS) and PAR admins (ALL) get them from the first, with named responses
+// in full, and the averages from 3; admins also get the relationship breakdown.
+// Laid out like a PAR 360° summary.
 export function Leadership360Results({
   surveyId,
   view,
@@ -74,7 +76,9 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
   if (!summary.available) {
     return (
       <Alert severity="info">
-        {summary.reason} {summary.responseCount} {summary.responseCount === 1 ? "response" : "responses"} so far.
+        {summary.reason}
+        {summary.responseCount > 0 &&
+          ` ${summary.responseCount} ${summary.responseCount === 1 ? "response" : "responses"} so far.`}
       </Alert>
     );
   }
@@ -91,50 +95,63 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
     </Typography>
   );
 
+  // Like PAR 360°'s index, the averages show only from 3 responses: one anonymous response's scores would be
+  // readable from them.
+  const averagesShown = summary.responseCount >= MIN_360_RESPONSES;
+
   return (
     <Stack spacing={2.5}>
       <Box sx={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        <SummaryMetric label="Overall" value={formatIndex(summary.overallAverage)} hint={`out of ${max}`} />
+        {averagesShown && (
+          <SummaryMetric label="Overall" value={formatIndex(summary.overallAverage)} hint={`out of ${max}`} />
+        )}
         <SummaryMetric label="Responses" value={String(summary.responseCount)} />
       </Box>
 
-      {stepSections(definition)
-        .filter((s) => s.questions.some((q) => q.type === "RATING"))
-        .map((section) => (
-          <Box key={section.id}>
-            {heading(section.title)}
-            <Stack spacing={1.25}>
-              {section.questions
-                .filter((q) => q.type === "RATING")
-                .map((q) => {
-                  const average = averages.get(q.id);
-                  return (
-                    <Box key={q.id}>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {q.text}
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
-                          {formatIndex(average?.average)}
-                          {average && (
-                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
-                              {`${average.ratingCount} rating${average.ratingCount === 1 ? "" : "s"}`}
-                            </Typography>
-                          )}
-                        </Typography>
+      {!averagesShown && (
+        <Typography variant="body2" color="text.secondary">
+          The averages show after {MIN_360_RESPONSES} or more responses.
+        </Typography>
+      )}
+
+      {averagesShown &&
+        stepSections(definition)
+          .filter((s) => s.questions.some((q) => q.type === "RATING"))
+          .map((section) => (
+            <Box key={section.id}>
+              {heading(section.title)}
+              <Stack spacing={1.25}>
+                {section.questions
+                  .filter((q) => q.type === "RATING")
+                  .map((q) => {
+                    const average = averages.get(q.id);
+                    return (
+                      <Box key={q.id}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                            {q.text}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                            {formatIndex(average?.average)}
+                            {average && (
+                              <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.75 }}>
+                                {`${average.ratingCount} rating${average.ratingCount === 1 ? "" : "s"}`}
+                              </Typography>
+                            )}
+                          </Typography>
+                        </Box>
+                        <LinearProgress
+                          variant="determinate"
+                          value={average ? (average.average / max) * 100 : 0}
+                          aria-label={q.text}
+                          sx={{ height: 6, borderRadius: 3, mt: 0.5 }}
+                        />
                       </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={average ? (average.average / max) * 100 : 0}
-                        aria-label={q.text}
-                        sx={{ height: 6, borderRadius: 3, mt: 0.5 }}
-                      />
-                    </Box>
-                  );
-                })}
-            </Stack>
-          </Box>
-        ))}
+                    );
+                  })}
+              </Stack>
+            </Box>
+          ))}
 
       <Box>
         {heading("Comments")}

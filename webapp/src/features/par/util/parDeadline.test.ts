@@ -15,7 +15,7 @@
 // under the License.
 
 import { describe, expect, it } from "vitest";
-import { isDeadlinePassed } from "./parDeadline";
+import { deadlinePassedEverywhereAt, isDeadlinePassed } from "./parDeadline";
 
 describe("isDeadlinePassed", () => {
   it("is false for a bare date still in the future", () => {
@@ -33,5 +33,11 @@ describe("isDeadlinePassed", () => {
   it("fails closed for an empty or malformed value", () => {
     expect(isDeadlinePassed("")).toBe(true);
     expect(isDeadlinePassed("not-a-date")).toBe(true);
+  });
+});
+
+describe("deadlinePassedEverywhereAt", () => {
+  it("is the start of the next day at UTC-12, the second after the deadline ends there", () => {
+    expect(deadlinePassedEverywhereAt("2026-12-05").toISOString()).toBe("2026-12-06T12:00:00.000Z");
   });
 });

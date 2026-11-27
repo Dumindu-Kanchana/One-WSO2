@@ -31,10 +31,11 @@ import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from ".
 import { Leadership360Results } from "./Leadership360Results";
 
 // One leader's Leadership 360° results in one PAR cycle's survey (live while
-// it's open), shown in place like a PAR 360° summary once there are enough
-// responses: your own (view SELF), a report's in the lead's review (view
-// REPORTS, which adds named responses), or anyone's for People Ops (view ALL,
-// which also adds named responses). Renders `fallback` when there's
+// it's open), shown in place like a PAR 360° summary: your own (view SELF) once
+// there are enough responses, a report's in their leads' review (view REPORTS:
+// their PAR lead, additional leads and reporting chain; adds named responses)
+// or anyone's for PAR admins (view ALL, which also adds named responses) from
+// the first. Renders `fallback` when there's
 // nothing to show: the person isn't in the leadership team, or the cycle has
 // no survey. `compact` (the leader's own, in Active cycle) is one line with View
 // results, which opens them in a dialog, and only once they can be seen.
@@ -106,10 +107,12 @@ export default function Leadership360ResultsCard({
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
         {live
-          ? "Updates as feedback comes in, once 3 or more people have submitted."
+          ? view === "SELF"
+            ? "Updates as feedback comes in, once 3 or more people have submitted."
+            : "Updates as feedback comes in."
           : "Results from a survey that has closed."}
         {view === "REPORTS" &&
-          " As their manager you also see named responses in full; anonymous ones are shown without a name."}
+          " As their lead you also see named responses in full; anonymous ones are shown without a name."}
         {view === "ALL" &&
           " As People Ops you also see named responses in full; anonymous ones are shown without a name."}
       </Typography>
@@ -119,7 +122,11 @@ export default function Leadership360ResultsCard({
         </Box>
       ) : (
         <Typography variant="body2" color="text.secondary">
-          {responses} so far{live ? "; results show from 3." : "; fewer than 3, so no results."}
+          {view !== "SELF"
+            ? live
+              ? "No responses yet."
+              : "No one responded."
+            : `${responses} so far${live ? "; results show from 3." : "; fewer than 3, so no results."}`}
         </Typography>
       )}
     </Card>

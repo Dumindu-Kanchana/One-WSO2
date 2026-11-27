@@ -157,6 +157,7 @@ export interface Leadership360Summary {
   responseCount: number;
   available: boolean;
   reason?: string;
+  // The averages, from 3 responses.
   overallAverage?: number;
   questionAverages: FormQuestionAverage[];
   // From anonymous feedback.
@@ -165,7 +166,7 @@ export interface Leadership360Summary {
   namedComments: Leadership360NamedComment[];
   // PAR admins only.
   relationshipCounts?: Record<string, number>;
-  // PAR admins and the leader's manager only.
+  // PAR admins and the leader's leads only.
   namedResponses?: Leadership360NamedResponse[];
 }
 

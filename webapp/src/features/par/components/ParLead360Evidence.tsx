@@ -36,9 +36,11 @@ import Par360SummaryView from "./Par360SummaryView";
 
 // Once the 360° deadline has ended everywhere, no more feedback can come in, so fewer than 3 is final.
 const tooFewAtDeadline = `Fewer than ${MIN_360_RESPONSES} people submitted by the 360° deadline, so there's no 360° feedback this cycle.`;
+const noIndexAtDeadline = `Fewer than ${MIN_360_RESPONSES} people submitted by the 360° deadline, so there's no 360° index this cycle.`;
 
 // The lead's 360° evidence for one employee in a PAR 2.0 cycle: the summary
 // with the team average for context, then every response with its reviewer.
+// The responses show from the first; the summary only from 3.
 export default function ParLead360Evidence({
   parCycleId,
   employeeEmail,
@@ -70,16 +72,16 @@ export default function ParLead360Evidence({
         {framed && <Typography sx={{ fontWeight: 600, mb: 1.5 }}>PAR 360° results</Typography>}
         {data.responseCount < MIN_360_RESPONSES && hasEndedEverywhere(threeSixtyDeadline) ? (
           <Typography variant="body2" color="text.secondary">
-            {tooFewAtDeadline}
+            {data.responseCount === 0 ? tooFewAtDeadline : noIndexAtDeadline}
           </Typography>
         ) : data.responseCount === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No one has submitted yet.
           </Typography>
         ) : data.responseCount < MIN_360_RESPONSES ? (
-          // Nothing of the feedback until enough responses: not the responses, the index or the averages.
+          // No index or averages until enough responses; the responses themselves show below.
           <Typography variant="body2" color="text.secondary">
-            The 360° feedback shows after {MIN_360_RESPONSES} or more submissions.
+            The 360° index shows after {MIN_360_RESPONSES} or more submissions.
           </Typography>
         ) : (
           <>
@@ -94,7 +96,7 @@ export default function ParLead360Evidence({
           </>
         )}
       </Box>
-      {data.responseCount >= MIN_360_RESPONSES && data.responses.length > 0 && (
+      {data.responses.length > 0 && (
         <Box>
           <Typography sx={{ fontWeight: 600, mb: 1 }}>Responses</Typography>
           {data.responses.map((r) => (

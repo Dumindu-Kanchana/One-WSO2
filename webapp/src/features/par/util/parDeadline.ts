@@ -42,6 +42,12 @@ export function deadlineEndsEverywhereAt(deadline: string): Date {
   return new Date(`${deadline}T23:59:59-12:00`);
 }
 
+/** When a `YYYY-MM-DD` deadline has passed everywhere: the second after it ends at UTC-12. What waits for it opens
+ * then, as the backend judges it. */
+export function deadlinePassedEverywhereAt(deadline: string): Date {
+  return new Date(deadlineEndsEverywhereAt(deadline).getTime() + 1000);
+}
+
 /** Whether a `YYYY-MM-DD` deadline has ended in every timezone, so nothing more can come in by it. */
 export function hasEndedEverywhere(deadline: string): boolean {
   return new Date() > deadlineEndsEverywhereAt(deadline);

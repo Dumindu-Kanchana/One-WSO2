@@ -43,6 +43,19 @@ export function employeeDeadlineFor(
   return own?.deadline ?? cycle.parEmployeeDeadline;
 }
 
+/** The deadline after which a lead (or a PAR admin) can share a PAR of a PAR 2.0 cycle: the 360° deadline, or the
+ * employee's own self-review deadline when their department's is later. Sharing opens once it has passed
+ * everywhere (deadlineEndsEverywhereAt), as the backend's checkShareOpen has it, so all 360° feedback is in. */
+export function shareOpensAfter(
+  cycle: Pick<ParCycle, "parEmployeeDeadline" | "parThreeSixtyRatingDeadline" | "parCycleConfigurations">,
+  department: string | undefined,
+): { date: string; after: "360" | "self-review" } {
+  const selfReview = employeeDeadlineFor(cycle, department);
+  return selfReview > cycle.parThreeSixtyRatingDeadline
+    ? { date: selfReview, after: "self-review" }
+    : { date: cycle.parThreeSixtyRatingDeadline, after: "360" };
+}
+
 /** Whether a lead shares the rating that needs evidence without it for a PAR in this department. */
 export function needsNoEvidence(configurations: ParCycleConfigurations | undefined, department: string | undefined) {
   return isDepartmentIn(configurations?.evidenceExemptDepartments, department);

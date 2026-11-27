@@ -20,9 +20,9 @@ import { describeError } from "@api/errors";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import { useSendBulkReminder } from "../api/useParMutations";
 
-type ReminderKind = "employee" | "lead" | "special-rating";
+type ReminderKind = "employee";
 
-// Only offers the three kinds useSendBulkReminder accepts — no "360 Reminder"
+// Only offers the one kind useSendBulkReminder accepts — no "360 Reminder"
 // option, since that one is lead-only.
 export default function ParBulkReminderDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [kind, setKind] = useState<ReminderKind | "">("");
@@ -59,8 +59,6 @@ export default function ParBulkReminderDialog({ open, onClose }: { open: boolean
           onChange={(e) => setKind(e.target.value as ReminderKind)}
         >
           <ComplexSelect.MenuItem value="employee">Employee Reminder</ComplexSelect.MenuItem>
-          <ComplexSelect.MenuItem value="lead">Lead Reminder</ComplexSelect.MenuItem>
-          <ComplexSelect.MenuItem value="special-rating">Top 5%/20% Rating Reminder</ComplexSelect.MenuItem>
         </ComplexSelect>
         {sendReminder.isError && (
           <Alert severity="error" sx={{ mt: 2 }}>

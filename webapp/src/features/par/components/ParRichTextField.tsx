@@ -44,6 +44,12 @@ import { Delta, linkifyDelta } from "../util/parLinkify";
 // the sanitized copy of what was typed handed back: the sanitizer writes some
 // characters differently (an apostrophe), and Quill would replace its whole
 // contents on every keystroke, each time a fresh step to undo.
+// Quill 2 writes every space as "&nbsp;", which would count six times against
+// an answer's length limit. A lone one goes back to a space; a run keeps the
+// rest, so it still shows.
+const withPlainSpaces = (html: string): string =>
+  html.replace(/(?:&nbsp;)+/g, (run) => " " + "&nbsp;".repeat(run.length / "&nbsp;".length - 1));
+
 const TOOLBAR = [["undo", "redo"], ["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], [{ indent: "-1" }, { indent: "+1" }], ["link"], ["clean"]];
 const FORMATS = ["bold", "italic", "underline", "list", "indent", "link"];
 
@@ -92,11 +98,14 @@ export default function ParRichTextField({
   minHeight = "30vh",
   suggestion,
   onAcceptSuggestion,
+  ariaLabel,
   ref,
 }: {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** The field's accessible name, where nothing on screen labels it. */
+  ariaLabel?: string;
   disabled?: boolean;
   /** Where it starts before growing with its content: shorter for a short text. */
   minHeight?: string;
@@ -142,12 +151,28 @@ export default function ParRichTextField({
     };
   }, []);
 
+  // Named as a multi-line text box, on each render since Quill can rebuild its editor.
+  useLayoutEffect(() => {
+    const root = quillRef.current?.getEditor().root;
+    if (!root || !ariaLabel) return;
+    root.setAttribute("role", "textbox");
+    root.setAttribute("aria-multiline", "true");
+    root.setAttribute("aria-label", ariaLabel);
+  });
+
+  // Set while the caller replaces the contents, the one change not typed that's still an edit.
+  const replacing = useRef(false);
   useImperativeHandle(ref, () => ({
     replaceContents: (html) => {
       const quill = quillRef.current?.getEditor();
       if (!quill) return;
       historyOf(quill).cutoff();
-      quill.setContents(quill.clipboard.convert({ html }), "api");
+      replacing.current = true;
+      try {
+        quill.setContents(quill.clipboard.convert({ html }), "api");
+      } finally {
+        replacing.current = false;
+      }
       quill.setSelection(quill.getLength(), 0, "api");
     },
   }));
@@ -335,8 +360,14 @@ export default function ParRichTextField({
           ref={quillRef}
           theme="snow"
           value={value === sent?.html ? sent.own : value}
-          onChange={(html) => {
-            const sanitized = sanitizeParHtml(addLinkProtocol(html));
+          onChange={(html, _delta, source) => {
+            // Quill writes out a value it's given (the saved text loading) in its own way, which isn't an edit:
+            // passing it on would save it. It's kept as that value's own form instead.
+            if (source !== "user" && !replacing.current) {
+              setSent({ html: value, own: html });
+              return;
+            }
+            const sanitized = sanitizeParHtml(addLinkProtocol(withPlainSpaces(html)));
             setSent({ html: sanitized, own: html });
             onChange(sanitized);
           }}

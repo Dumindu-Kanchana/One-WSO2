@@ -141,7 +141,7 @@ export function useRestoreRejectedReview(parCycleId: number | undefined) {
 
 export function useSendBulkReminder() {
   const getAccessToken = useAccessToken();
-  return useMutation<void, Error, "employee" | "lead" | "special-rating">({
+  return useMutation<void, Error, "employee">({
     mutationFn: async (kind) => {
       const accessToken = await getAccessToken();
       await authedPatch<void>(parServiceUrls.parBulkReminder(kind), accessToken, {}, digiopsHeaders());

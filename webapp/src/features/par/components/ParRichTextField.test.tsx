@@ -16,7 +16,7 @@
 
 import { StrictMode, createRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Quill } from "react-quill-new";
 import ParRichTextField, { type ParRichTextFieldHandle } from "./ParRichTextField";
 
@@ -68,6 +68,13 @@ afterEach(() => {
 });
 
 describe("ParRichTextField", () => {
+  it("names its editor as a text box when given a name", () => {
+    render(<ParRichTextField value="" onChange={() => {}} ariaLabel="Impact this cycle" />);
+    const editor = screen.getByRole("textbox", { name: "Impact this cycle" });
+    expect(editor).toHaveAttribute("contenteditable", "true");
+    expect(editor).toHaveAttribute("aria-multiline", "true");
+  });
+
   it("doesn't undo the saved text loading", () => {
     const { container } = render(<Held initial="<p>Saved text</p>" />);
     const quill = quillIn(container);
@@ -158,6 +165,21 @@ describe("ParRichTextField", () => {
     expect(onChange).toHaveBeenCalled();
     fireEvent.click(undoButton(container));
     expect(quill.getText().trim()).toBe("My own words.");
+  });
+
+  it("sends nothing when the saved text loads, though Quill writes it out its own way", () => {
+    const onChange = vi.fn();
+    render(<Held initial="<p>Saved before the field took formatting</p>" onChange={onChange} />);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("sends spaces as spaces, keeping each one of a run", () => {
+    const onChange = vi.fn();
+    const { container } = render(<Held initial="" onChange={onChange} />);
+    act(() => {
+      quillIn(container).insertText(0, "Two words,  then a gap", "user");
+    });
+    expect(onChange).toHaveBeenLastCalledWith("<p>Two words, &nbsp;then a gap</p>");
   });
 
   it("takes the suggestion on Tab in the empty field, and types a tab otherwise", () => {

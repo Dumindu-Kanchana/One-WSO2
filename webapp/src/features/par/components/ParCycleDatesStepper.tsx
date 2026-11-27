@@ -14,9 +14,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { Avatar, Box, Typography } from "@wso2/oxygen-ui";
+import { Avatar, Box, Skeleton, Typography } from "@wso2/oxygen-ui";
 import { CheckIcon } from "@wso2/oxygen-ui-icons-react";
+import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { formatShortDate } from "../util/parDate";
+import { isDeadlinePassed } from "../util/parDeadline";
+import { useParShowsPar2 } from "../api/useReview360";
 import type { ParCycle } from "../api/types";
 
 // Source's icons (MUI's CheckCircle/Circle) are solid filled shapes;
@@ -47,25 +50,73 @@ export default function ParCycleDatesStepper({
 }: {
   cycle: Pick<
     ParCycle,
-    "parEvaluationStartDate" | "parEmployeeDeadline" | "parLeadDeadline" | "parSpecialRatingDeadline" | "parEvaluationEndDate"
+    | "parCycleId"
+    | "parEvaluationStartDate"
+    | "parEmployeeDeadline"
+    | "parLeadDeadline"
+    | "parLeadHardDeadline"
+    | "parSpecialRatingDeadline"
+    | "parEvaluationEndDate"
   >;
+  /** Which of the five steps without the hard lead deadline is reached (calculateCycleActiveStep). */
   activeStep?: number;
 }) {
-  const steps = [
-    { date: cycle.parEvaluationStartDate, label: "Start Date" },
-    { date: cycle.parEmployeeDeadline, label: "Employee PAR Deadline" },
-    { date: cycle.parLeadDeadline, label: "Lead's PAR Deadline" },
-    { date: cycle.parSpecialRatingDeadline, label: "Top 5%/20% Rating Submission" },
-    { date: cycle.parEvaluationEndDate, label: "End Date" },
-  ];
+  // A PAR 2.0 cycle shows its hard lead deadline right after the lead deadline, and no Top 5%/20% step: its
+  // Top 5%/20% deadline is the lead deadline.
+  const par2 = useParShowsPar2(cycle.parCycleId);
+  const { showsPar2 } = par2;
+  const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
+  const steps = showsPar2
+    ? [
+        { date: cycle.parEvaluationStartDate, label: "Start Date" },
+        { date: cycle.parEmployeeDeadline, label: "Employee PAR Deadline" },
+        { date: cycle.parLeadDeadline, label: "Lead's PAR Deadline" },
+        ...(hardDeadline ? [{ date: hardDeadline, label: "Hard Lead Deadline" }] : []),
+        { date: cycle.parEvaluationEndDate, label: "End Date" },
+      ]
+    : [
+        { date: cycle.parEvaluationStartDate, label: "Start Date" },
+        { date: cycle.parEmployeeDeadline, label: "Employee PAR Deadline" },
+        { date: cycle.parLeadDeadline, label: "Lead's PAR Deadline" },
+        { date: cycle.parSpecialRatingDeadline, label: "Top 5%/20% Rating Submission" },
+        { date: cycle.parEvaluationEndDate, label: "End Date" },
+      ];
+  // activeStep counts the five PAR 1.0 steps: 0 start, 1 employee, 2 lead, 3 Top 5%/20%, 4 end. In a PAR 2.0 cycle
+  // 2 and 3 are both the lead deadline (its Top 5%/20% deadline), then the hard lead deadline is reached once it has
+  // passed, and 4 is the last step.
+  const reached = !showsPar2
+    ? activeStep
+    : activeStep < 2
+      ? activeStep
+      : activeStep >= 4
+        ? steps.length - 1
+        : hardDeadline && isDeadlinePassed(hardDeadline)
+          ? 3
+          : 2;
+
+  // The steps differ in a PAR 2.0 cycle, so none show until that's known.
+  if (par2.isLoading) return <Skeleton variant="rectangular" height={88} sx={{ borderRadius: 1 }} />;
+  if (par2.error) {
+    return (
+      <ErrorNotice error={par2.error} onRetry={par2.retry} retrying={par2.retrying}>
+        Couldn't load the cycle's dates.
+      </ErrorNotice>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex" }}>
       {steps.map((step, index) => {
-        const isDone = index <= activeStep;
+        const isDone = index <= reached;
         return (
           <Box key={step.label} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", px: 1 }}>
-            <Typography variant="caption" color="text.secondary" align="center" sx={{ mb: 1 }}>
+            {/* Two lines tall, text at the bottom, so a label that wraps doesn't push its dot out of line. */}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              align="center"
+              sx={{ mb: 1, minHeight: "3.32em", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+            >
               {step.label}
             </Typography>
             <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
@@ -75,7 +126,7 @@ export default function ParCycleDatesStepper({
                 sx={{
                   flex: 1,
                   height: 2,
-                  bgcolor: index === steps.length - 1 ? "transparent" : index < activeStep ? "primary.main" : "divider",
+                  bgcolor: index === steps.length - 1 ? "transparent" : index < reached ? "primary.main" : "divider",
                 }}
               />
             </Box>

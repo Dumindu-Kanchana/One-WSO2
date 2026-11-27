@@ -217,6 +217,21 @@ export function ParRequiresPar2CycleRoute({ children }: { children: ReactNode })
   return <>{children}</>;
 }
 
+/** Guards the PAR 1.0 tabs (Employee Feedback, Request/Provide 360°, F2F), reached by URL or an old bookmark: in a
+ * cycle with the PAR 2.0 forms, where par2 is on, they open the PAR 2.0 page instead, since the PAR 1.0 page would
+ * write PAR 1.0 fields the cycle doesn't use. Until that's known, nothing shows; when it can't be looked up,
+ * ParGroupPage says so in place of every tab. */
+export function ParOpensPar2PageRoute({ to, children }: { to: string; children: ReactNode }) {
+  const profile = useMeProfile();
+  const activeCycles = useActiveParCycle(profile.data?.userInfo.workEmail);
+  const par2 = isPreviewEnabled("par2");
+  const { showsPar2, isLoading, error } = useParShowsPar2(par2 ? activeCycles.data?.[0]?.parCycleId : undefined);
+  if (!par2) return <>{children}</>;
+  if (profile.isLoading || activeCycles.isLoading || isLoading || error) return null;
+  if (showsPar2) return <Navigate to={to} replace />;
+  return <>{children}</>;
+}
+
 /** Guards every tab but History from being reached by URL once there's no
  * OPEN cycle — Employee Feedback, Request/Provide 360°, and F2F all act on
  * an in-progress cycle, so none of them has anything to show without one.

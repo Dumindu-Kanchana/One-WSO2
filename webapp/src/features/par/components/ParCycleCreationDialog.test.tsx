@@ -44,8 +44,21 @@ vi.mock("../api/useParMutations", () => ({
 }));
 // A plain field, so a test can type a date.
 vi.mock("./ParDateField", () => ({
-  default: ({ ariaLabel, value, onChange }: { ariaLabel: string; value: string; onChange: (v: string) => void }) => (
-    <input aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)} />
+  default: ({
+    ariaLabel,
+    value,
+    onChange,
+    helperText,
+  }: {
+    ariaLabel: string;
+    value: string;
+    onChange: (v: string) => void;
+    helperText?: string;
+  }) => (
+    <>
+      <input aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)} />
+      {helperText && <span>{helperText}</span>}
+    </>
   ),
 }));
 
@@ -65,15 +78,20 @@ function fillNameAndDates() {
   fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "2027 H1" } });
   const dates: [string, string][] = [
     ["PAR cycle start date", "2027-01-01"],
-    ["PAR cycle end date", "2027-06-30"],
+    ["PAR cycle end date", "2027-08-31"],
     ["PAR evaluation closing date", "2027-07-31"],
     ["Deadline for employee PAR", "2027-07-05"],
     ["Deadline for 360° feedback", "2027-07-10"],
     ["Deadline for lead's feedback", "2027-07-15"],
-    ["Top 5%/20% rating submission", "2027-07-20"],
     ["PAR F2F deadline", "2027-07-25"],
   ];
   for (const [label, value] of dates) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  // Asked only with par2 off: a PAR 2.0 cycle's Top 5%/20% deadline is its lead deadline.
+  const top5 = screen.queryByLabelText("Top 5%/20% rating submission");
+  if (top5) fireEvent.change(top5, { target: { value: "2027-07-20" } });
+  // Asked only with par2 on.
+  const hardDeadline = screen.queryByLabelText("Hard lead deadline");
+  if (hardDeadline) fireEvent.change(hardDeadline, { target: { value: "2027-07-18" } });
 }
 
 describe("ParCycleCreationDialog", () => {
@@ -156,6 +174,19 @@ describe("ParCycleCreationDialog", () => {
     expect(refetch).toHaveBeenCalled();
   });
 
+  it("asks for a hard lead deadline after the lead deadline, with par2 on", () => {
+    setPar2(true);
+    render(<ParCycleCreationDialog open onClose={vi.fn()} />);
+    fillNameAndDates();
+    fireEvent.change(screen.getByLabelText("Hard lead deadline"), { target: { value: "2027-07-15" } });
+    expect(screen.getByRole("button", { name: "Start Cycle" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Hard lead deadline"), { target: { value: "2027-07-18" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start Cycle" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Start PAR Cycle" })).getByRole("button", { name: "Confirm" }));
+    expect(mutate.mock.calls[0][0].parLeadHardDeadline).toBe("2027-07-18");
+  });
+
   it("keeps the questions and both rating lists, with par2 off", () => {
     setPar2(false);
     render(<ParCycleCreationDialog open onClose={vi.fn()} />);
@@ -165,17 +196,76 @@ describe("ParCycleCreationDialog", () => {
     expect(screen.getByRole("combobox", { name: "PAR ratings" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "360° feedback ratings" })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Leadership group" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Hard lead deadline")).not.toBeInTheDocument();
 
     fillNameAndDates();
     fireEvent.click(screen.getByRole("button", { name: "Start Cycle" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Start PAR Cycle" })).getByRole("button", { name: "Confirm" }));
     const [payload] = mutate.mock.calls[0];
     expect(payload.par2Forms).toBeUndefined();
+    expect(payload).not.toHaveProperty("parLeadHardDeadline");
     expect(payload.parCycleConfigurations).toEqual({
       employeeParQuestion: "What went well?",
       threeSixtyReviewQuestion: "What could be better?",
       parRatings: ["Successful", "Needs Improvements", "Step Up"],
       threeSixtyReviewRatings: ["Satisfactory", "Unsatisfactory"],
     });
+  });
+});
+
+describe("ParCycleCreationDialog: a PAR 2.0 cycle's date order", () => {
+  const start = () => screen.getByRole("button", { name: "Start Cycle" });
+
+  it("asks for each date after the one before it, with par2 on", () => {
+    setPar2(true);
+    render(<ParCycleCreationDialog open onClose={vi.fn()} />);
+    fillNameAndDates();
+    expect(start()).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText("Deadline for 360° feedback"), { target: { value: "2027-07-05" } });
+    expect(screen.getByText("Must be later than the employee PAR deadline")).toBeInTheDocument();
+    expect(start()).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Deadline for 360° feedback"), { target: { value: "2027-07-15" } });
+    expect(screen.getByText("Must be later than the 360° feedback deadline")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Deadline for 360° feedback"), { target: { value: "2027-07-10" } });
+
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-18" } });
+    expect(screen.getByText("Must be later than the hard lead deadline")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-31" } });
+    expect(screen.getByText("Must be later than the PAR F2F deadline")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-25" } });
+
+    fireEvent.change(screen.getByLabelText("PAR cycle end date"), { target: { value: "2027-07-31" } });
+    expect(screen.getByText("Must be later than the PAR evaluation closing date")).toBeInTheDocument();
+    expect(start()).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("PAR cycle end date"), { target: { value: "2027-08-31" } });
+    expect(screen.queryByText(/Must be later than/)).not.toBeInTheDocument();
+    expect(start()).toBeEnabled();
+  });
+
+  it("keeps a PAR 1.0 cycle to today's checks, with par2 off", () => {
+    setPar2(false);
+    render(<ParCycleCreationDialog open onClose={vi.fn()} />);
+    fillNameAndDates();
+    fireEvent.change(screen.getByLabelText("Deadline for 360° feedback"), { target: { value: "2027-07-01" } });
+    expect(screen.queryByText(/Must be later than/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ParCycleCreationDialog: the Top 5%/20% deadline", () => {
+  it("isn't asked for a PAR 2.0 cycle, and is sent as the lead deadline, with par2 on", () => {
+    setPar2(true);
+    render(<ParCycleCreationDialog open onClose={vi.fn()} />);
+    expect(screen.queryByLabelText("Top 5%/20% rating submission")).not.toBeInTheDocument();
+    fillNameAndDates();
+    fireEvent.click(screen.getByRole("button", { name: "Start Cycle" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Start PAR Cycle" })).getByRole("button", { name: "Confirm" }));
+    expect(mutate.mock.calls[0][0].parSpecialRatingDeadline).toBe("2027-07-15");
+  });
+
+  it("is asked for a PAR 1.0 cycle, with par2 off", () => {
+    setPar2(false);
+    render(<ParCycleCreationDialog open onClose={vi.fn()} />);
+    expect(screen.getByLabelText("Top 5%/20% rating submission")).toBeInTheDocument();
   });
 });

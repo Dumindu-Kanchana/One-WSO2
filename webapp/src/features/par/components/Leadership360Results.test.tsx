@@ -1,0 +1,73 @@
+// Copyright (c) 2026 WSO2 LLC. (https://www.wso2.com).
+//
+// WSO2 LLC. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import type { FormDefinition, Leadership360Summary } from "../api/leadership360Types";
+
+const query = <T,>(data: T) => ({ data, isLoading: false, isError: false, refetch: vi.fn() });
+
+let summary: Leadership360Summary;
+const definition = {
+  kind: "LEADERSHIP_360",
+  version: 1,
+  title: "Leadership 360° feedback",
+  scales: { agreement: { min: 1, max: 5, minLabel: "Strongly disagree", maxLabel: "Strongly agree" } },
+  sections: [
+    {
+      id: "traits",
+      title: "Personal traits",
+      questions: [{ id: "integrity", type: "RATING", text: "Shows integrity", scale: "agreement", required: true }],
+    },
+  ],
+} as unknown as FormDefinition;
+
+vi.mock("../api/useLeadership360", () => ({
+  useLeadership360SurveyWithTemplate: () => query({ template: { definition } }),
+  useLeadership360Summary: () => query(summary),
+}));
+
+const { Leadership360Results } = await import("./Leadership360Results");
+
+const results = (responseCount: number): Leadership360Summary => ({
+  leaderEmail: "ada@example.com",
+  responseCount,
+  available: true,
+  ...(responseCount >= 3 ? { overallAverage: 4 } : {}),
+  questionAverages: responseCount >= 3 ? [{ questionId: "integrity", average: 4, ratingCount: responseCount }] : [],
+  comments: ["Share more context"],
+  namedComments: [],
+  namedResponses: [],
+});
+
+describe("Leadership360Results", () => {
+  it("below 3, shows a leader's lead the comments but not the averages", () => {
+    summary = results(1);
+    render(<Leadership360Results surveyId={5} view="REPORTS" leaderEmail="ada@example.com" />);
+    expect(screen.getByText("The averages show after 3 or more responses.")).toBeInTheDocument();
+    expect(screen.queryByText("Overall")).not.toBeInTheDocument();
+    expect(screen.queryByText("Shows integrity")).not.toBeInTheDocument();
+    expect(screen.getByText("Share more context")).toBeInTheDocument();
+  });
+
+  it("from 3, shows the averages", () => {
+    summary = results(3);
+    render(<Leadership360Results surveyId={5} view="REPORTS" leaderEmail="ada@example.com" />);
+    expect(screen.getByText("Overall")).toBeInTheDocument();
+    expect(screen.getByText("Shows integrity")).toBeInTheDocument();
+    expect(screen.queryByText(/averages show after/)).not.toBeInTheDocument();
+  });
+});

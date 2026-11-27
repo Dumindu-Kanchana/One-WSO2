@@ -19,6 +19,7 @@ import autoTable from "jspdf-autotable";
 import type { Par360Review, ParLegacyHistory, ParLegacyQuestionAnswer, ParRating } from "../api/types";
 import type { FormDefinition, Leadership360Summary } from "../api/leadership360Types";
 import type { SelfReviewAnswers } from "../api/selfReviewTypes";
+import { answerViewHtml, isQuestionAnswered } from "./selfReviewForm";
 import { decodeParComment, isEmptyHtml, sanitizeParHtml } from "./parComment";
 import { formatShortDate } from "./parDate";
 import { pdfRatingText } from "./parLabels";
@@ -151,11 +152,15 @@ export function downloadPar2Pdf({
   section("Self-review");
   for (const s of selfReview.definition.sections) {
     for (const q of s.questions) {
-      const text = selfReview.answers[q.id] ?? "";
+      // Rich text, or plain text from before the editor (one paragraph per line).
+      const answered = isQuestionAnswered(q, selfReview.answers);
       // A section of one question is named by its title, with its hint under it as on screen; with more,
       // each answer by its question.
       const label = s.questions.length > 1 ? q.text : s.hint ? `${s.title}\n${s.hint}` : s.title;
-      rows.push([label, { content: text || "-", styles: TEXT_CELL }]);
+      rows.push([
+        label,
+        { content: answered ? htmlToPdfText(answerViewHtml(selfReview.answers[q.id])) : "-", styles: TEXT_CELL },
+      ]);
     }
   }
 

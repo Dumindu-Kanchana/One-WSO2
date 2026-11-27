@@ -30,7 +30,7 @@ import {
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { HistoryIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
+import { ArrowLeftIcon, HistoryIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { isPreviewEnabled } from "@config/previewFeatures";
@@ -217,7 +217,10 @@ export default function ParOrgTeamRoster({
 
   return (
     <Stack spacing={2}>
-      <Box>
+      <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+        <IconButton aria-label="Back to all teams" color="primary" onClick={onBack} sx={{ mr: 0.5 }}>
+          <ArrowLeftIcon size={18} />
+        </IconButton>
         <Link component="button" underline="hover" onClick={onBack} sx={{ mr: 0.5 }}>
           All Teams
         </Link>

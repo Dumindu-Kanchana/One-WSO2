@@ -76,11 +76,19 @@ describe("Leadership360ResultsCard", () => {
     expect(screen.queryByText(/Results of survey/)).not.toBeInTheDocument();
   });
 
-  it("below 3, gives the leader's manager the count too, not the results", () => {
+  it("below 3, shows the leader's manager the results as they come in", () => {
     const bea = { ...ada, workEmail: "bea@example.com", employeeName: "Bea" };
-    results = [{ leader: bea, responseCount: 2, available: false }];
+    results = [{ leader: bea, responseCount: 1, available: true }];
     render(<Leadership360ResultsCard view="REPORTS" leaderEmail="bea@example.com" parCycleId={9} />);
-    expect(screen.getByText("2 responses so far; results show from 3.")).toBeInTheDocument();
+    expect(screen.getByText(/^Updates as feedback comes in\. As their lead/)).toBeInTheDocument();
+    expect(screen.getByText("Results of survey 5 (REPORTS)")).toBeInTheDocument();
+  });
+
+  it("tells the leader's manager when no one has responded yet", () => {
+    const bea = { ...ada, workEmail: "bea@example.com", employeeName: "Bea" };
+    results = [{ leader: bea, responseCount: 0, available: false }];
+    render(<Leadership360ResultsCard view="REPORTS" leaderEmail="bea@example.com" parCycleId={9} />);
+    expect(screen.getByText("No responses yet.")).toBeInTheDocument();
     expect(screen.queryByText(/Results of survey/)).not.toBeInTheDocument();
   });
 

@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -62,12 +62,12 @@ import { useParEmployeeReviews } from "../api/useLeadHistory";
 import { useGoogleDrivePicker } from "../hooks/useGoogleDrivePicker";
 import { decodeParComment, encodeParComment, isEmptyHtml, paragraphsToHtml } from "../util/parComment";
 import { isPreviewEnabled } from "@config/previewFeatures";
-import { deadlineEndsEverywhereAt, hasEndedEverywhere, isDeadlinePassed } from "../util/parDeadline";
+import { deadlinePassedEverywhereAt, hasEndedEverywhere, isDeadlinePassed } from "../util/parDeadline";
 import { formatShortDate, formatShortDateTime } from "../util/parDate";
 import { downloadParPdf } from "../util/parPdf";
 import { isOpenableUrl, parseSavedUrls, type DriveFile } from "../util/parDriveFile";
 import { isEvidenceMissing, missedDeadlineRatingFor, ratingOptions, ratingRulesFor } from "../util/parLeadership";
-import { employeeDeadlineFor, needsNoEvidence } from "../util/parDepartments";
+import { employeeDeadlineFor, needsNoEvidence, shareOpensAfter } from "../util/parDepartments";
 import ParRichTextField, { type ParRichTextFieldHandle } from "./ParRichTextField";
 import { ParCommentView } from "./ParContent";
 import { ParAutoAssignedChip } from "./ParChips";
@@ -82,6 +82,7 @@ import { useParShowsPar2, useReviewResponses } from "../api/useReview360";
 import { useLead360SummarySuggestion, useSaveLead360Summary } from "../api/useLead360Summary";
 import { MIN_360_RESPONSES } from "../api/review360Types";
 import ParLead360Evidence, { ParLead360Guidance } from "./ParLead360Evidence";
+import { useRedrawAt } from "../hooks/useRedrawAt";
 import ParLead360Suggestion from "./ParLead360Suggestion";
 
 type SpecialRatingUi = "NONE" | "TOP5P" | "TOP20P";
@@ -152,11 +153,11 @@ export default function ParLeadReviewPanel({
   const autoSaveTokenRef = useRef(0);
 
   const parRatingData = rating.data;
-  // When the employee's self-review has closed everywhere (their department's
-  // own deadline, or the cycle's): they can no longer share it.
-  const selfReviewClosesAt = deadlineEndsEverywhereAt(employeeDeadlineFor(cycle, parRatingData?.parDepartment));
+  // When the employee's self-review deadline has passed everywhere (their department's
+  // own deadline, or the cycle's): from then they can no longer share it.
+  const selfReviewClosesAt = deadlinePassedEverywhereAt(employeeDeadlineFor(cycle, parRatingData?.parDepartment));
   const selfReviewClosesAtMs = selfReviewClosesAt.getTime();
-  const selfReviewClosed = new Date() > selfReviewClosesAt;
+  const selfReviewClosed = new Date() >= selfReviewClosesAt;
   // A PAR the employee didn't share by then gets the cycle's missed-deadline
   // rating (the leadership team's own for them), and the lead has nothing to
   // submit: the backend refuses the lead's saves and shares. People Ops can
@@ -226,10 +227,13 @@ export default function ParLeadReviewPanel({
   const deadlineDate = isAdminView ? cycle.parCycleEndDate : cycle.parLeadDeadline;
   const deadlinePassed = isDeadlinePassed(deadlineDate);
   const shared = parRatingData?.parLeadStatus === "SHARED";
-  // A lead can still save and share after the lead deadline, until the cycle closes; it's shown as late.
-  // People Ops' edits stop at the cycle's end date.
-  const editingClosed = isAdminView ? deadlinePassed : cycle.parCycleStatus === "CLOSED";
-  const leadLate = !isAdminView && !shared && deadlinePassed;
+  // A lead can still save and share after the lead deadline, shown as late, until the hard lead deadline in a
+  // PAR 2.0 cycle (until the cycle closes in a PAR 1.0 one). After it, only PAR admins can. PAR admins' edits stop
+  // at the cycle's end date.
+  const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
+  const hardDeadlinePassed = !isAdminView && hardDeadline !== undefined && isDeadlinePassed(hardDeadline);
+  const editingClosed = isAdminView ? deadlinePassed : cycle.parCycleStatus === "CLOSED" || hardDeadlinePassed;
+  const leadLate = !isAdminView && !shared && deadlinePassed && !hardDeadlinePassed;
   const specialRatingClosed =
     !isAdminView && Boolean(cycle.parSpecialRatingDeadline) && isDeadlinePassed(cycle.parSpecialRatingDeadline!);
   const readOnly = isAdminView ? !adminForceEdit : shared || editingClosed;
@@ -288,6 +292,11 @@ export default function ParLeadReviewPanel({
     opts?: { silent?: boolean; onSuccess?: () => void; commentOnly?: boolean },
   ) => {
     if (!parRatingData) return;
+    // Past the hard lead deadline nothing is sent, even from a confirmation opened before it: the panel locks.
+    if (!isAdminView && hardDeadline !== undefined && isDeadlinePassed(hardDeadline)) {
+      setConfirming(false);
+      return;
+    }
     saveSummaryIfChanged().then(
       () => sendRatingUpdate(status, opts),
       (err) => {
@@ -307,7 +316,9 @@ export default function ParLeadReviewPanel({
         parRatingId: parRatingData.parRatingId,
         payload: {
           parLeadStatus: status,
-          parLeadComment: encodeParComment(leadComment),
+          // A comment never written is left out: the backend refuses an empty one. (A comment the lead
+          // clears still holds the editor's empty paragraph, so it's sent and saved empty.)
+          ...(leadComment ? { parLeadComment: encodeParComment(leadComment) } : {}),
           // The autosave fires purely off comment typing and must not also
           // commit whatever the rating dropdowns currently hold — sending
           // parSpecialRating with it would clobber a saved Top 5%/20%
@@ -329,7 +340,7 @@ export default function ParLeadReviewPanel({
               }),
           // Only an admin caller may set this field — the backend rejects a
           // non-empty value from anyone else.
-          ...(isAdminView ? { parAdminComment: encodeParComment(adminComment) } : {}),
+          ...(isAdminView && adminComment ? { parAdminComment: encodeParComment(adminComment) } : {}),
         },
       },
       {
@@ -380,17 +391,22 @@ export default function ParLeadReviewPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead360Summary, readOnly, saveSummary.isPending, parRatingData]);
 
-  // If the self-review closes while the panel is open (even between a render and this effect), the panel
+  // If the self-review closes while the panel is open (even between a render and the timer), the panel
   // redraws, so it shows what the lead can do now without a reload.
-  const [, redraw] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    if (selfReviewClosed) return;
-    const wait = Math.max(selfReviewClosesAtMs - Date.now() + 1, 0);
-    // A browser timer can't wait longer than about 24 days, and no one keeps the panel open that long.
-    if (wait > 2 ** 31 - 1) return;
-    const timer = window.setTimeout(redraw, wait);
-    return () => window.clearTimeout(timer);
-  }, [selfReviewClosesAtMs, selfReviewClosed]);
+  useRedrawAt(selfReviewClosesAtMs, !selfReviewClosed);
+
+  // In a PAR 2.0 cycle a PAR is shared once all its 360° feedback is in, by PAR admins too (the backend's
+  // checkShareOpen): once the 360° deadline (or the employee's later self-review deadline) has passed everywhere,
+  // as the missed-deadline job judges deadlines. The panel redraws then, as for the self-review closing.
+  const shareOpens = shareOpensAfter(cycle, parRatingData?.parDepartment);
+  const shareOpensAtMs = deadlinePassedEverywhereAt(shareOpens.date).getTime();
+  const shareWaits = showsPar2 && Date.now() < shareOpensAtMs;
+  useRedrawAt(shareOpensAtMs, shareWaits);
+
+  // The lead's review closes after the hard lead deadline, by their own day as isDeadlinePassed judges it: the panel
+  // redraws then too.
+  const hardDeadlineEndsAtMs = hardDeadline ? new Date(`${hardDeadline}T23:59:59.999`).getTime() : NaN;
+  useRedrawAt(hardDeadlineEndsAtMs, !isAdminView && !hardDeadlinePassed);
 
   if (rating.isLoading) {
     return <Skeleton variant="rectangular" height={360} sx={{ borderRadius: 1.5 }} />;
@@ -429,12 +445,15 @@ export default function ParLeadReviewPanel({
     </Alert>
   ) : parRatingData.parLeadStatus === "DRAFT" ? (
     <Alert severity="warning">
-      You have saved your PAR as a draft.{" "}
+      You have saved your PAR as a draft.
+      {/* Once late, the late note below says until when. */}
       {isAdminView
-        ? `Please share before the cycle ends: ${formatShortDate(deadlineDate)}.`
-        : `Please share on or before the deadline: ${formatShortDate(deadlineDate)}.`}
+        ? ` Please share before the cycle ends: ${formatShortDate(deadlineDate)}.`
+        : leadLate
+          ? ""
+          : ` Please share on or before the deadline: ${formatShortDate(deadlineDate)}.`}
     </Alert>
-  ) : (
+  ) : leadLate ? null : (
     <Alert severity="info">
       {isAdminView
         ? `Please share the lead's feedback before the cycle ends: ${formatShortDate(deadlineDate)}.`
@@ -459,6 +478,7 @@ export default function ParLeadReviewPanel({
     !ratingUpdate.isPending &&
     !saveSummary.isPending &&
     employeeReady &&
+    !shareWaits &&
     Boolean(shownRating) &&
     !isEmptyHtml(leadComment) &&
     !isEvidenceMissing({
@@ -501,7 +521,16 @@ export default function ParLeadReviewPanel({
             )}
             {leadLate && (
               <Alert severity="error" sx={{ mt: 1.5 }}>
-                The lead review deadline passed on {formatShortDate(deadlineDate)}. You can still share, but it's late.
+                The lead review deadline passed on {formatShortDate(deadlineDate)}.{" "}
+                {hardDeadline
+                  ? `You can still share until ${formatShortDate(hardDeadline)}, but it's late.`
+                  : "You can still share, but it's late."}
+              </Alert>
+            )}
+            {hardDeadlinePassed && !shared && hardDeadline && (
+              <Alert severity="error" sx={{ mt: 1.5 }}>
+                The hard lead deadline passed on {formatShortDate(hardDeadline)}. Only PAR admins can rate and share
+                this PAR now.
               </Alert>
             )}
           </Box>
@@ -690,7 +719,7 @@ export default function ParLeadReviewPanel({
                     )}
                   </Typography>
                   {readOnly ? (
-                    parRatingData.parRating ? (
+                    parRatingData.parRating && parRatingData.parRating !== "NOT_ASSIGNED" ? (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <Chip size="small" label={parRatingData.parRating} />
                         {parRatingData.parRatingUpdatedBy === "SYSTEM" && <ParAutoAssignedChip />}
@@ -779,7 +808,10 @@ export default function ParLeadReviewPanel({
                     )}
                     {!readOnly && specialRatingClosed && (
                       <Typography variant="caption" color="text.secondary">
-                        The Top 5%/20% deadline passed on {formatShortDate(cycle.parSpecialRatingDeadline!)}
+                        {/* A PAR 2.0 cycle's Top 5%/20% deadline is its lead deadline. */}
+                        {showsPar2
+                          ? `Top 5%/20% can't be given after the lead deadline, ${formatShortDate(cycle.parSpecialRatingDeadline!)}.`
+                          : `The Top 5%/20% deadline passed on ${formatShortDate(cycle.parSpecialRatingDeadline!)}`}
                       </Typography>
                     )}
                   </Box>
@@ -890,6 +922,14 @@ export default function ParLeadReviewPanel({
                         : `, or from ${formatShortDateTime(selfReviewClosesAt)} if they don't.`}
                     </Alert>
                   )}
+                  {employeeReady && shareWaits && (
+                    <Alert severity="info" sx={{ py: 0.25 }}>
+                      {shareOpens.after === "360"
+                        ? `You can share from ${formatShortDateTime(new Date(shareOpensAtMs))}, when the 360° deadline has passed everywhere and all 360° feedback is in.`
+                        : `You can share from ${formatShortDateTime(new Date(shareOpensAtMs))}, when ${parRatingData.parEmployeeName?.split(" ")[0] ?? "the employee"}'s self-review deadline has passed everywhere.`}
+                      {" "}You can save a draft until then.
+                    </Alert>
+                  )}
                   <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, pt: 1, borderTop: 1, borderColor: "divider" }}>
                     <Button variant="outlined" disabled={!canSaveDraft} onClick={() => submit("DRAFT")}>
                       Save draft
@@ -977,8 +1017,9 @@ export default function ParLeadReviewPanel({
         </Grid>
       )}
 
-      {/* Stays open while sharing, so nothing can be edited behind it and then lost once it's shared. */}
-      <Dialog open={confirming} onClose={() => !sharing && setConfirming(false)} maxWidth="md" fullWidth>
+      {/* Stays open while sharing, so nothing can be edited behind it and then lost once it's shared. Closes when
+          the review locks, as at the hard lead deadline. */}
+      <Dialog open={confirming && !readOnly} onClose={() => !sharing && setConfirming(false)} maxWidth="md" fullWidth>
         <DialogTitle>Share Lead's Feedback?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">

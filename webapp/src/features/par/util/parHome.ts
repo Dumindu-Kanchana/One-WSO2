@@ -87,7 +87,8 @@ function facts({ cycle, rating, reviewers, received, leadership }: HomeInput) {
   const { asked, responded } = feedbackProgress(reviewers);
   const deadline360Passed = isDeadlinePassed(cycle.parThreeSixtyRatingDeadline);
   // Sharing the PAR stops requests for a member's PAR 360° feedback; a leader's Leadership 360° still
-  // counts until the 360° deadline.
+  // counts until the 360° deadline. In a PAR 2.0 cycle a lead can't share before then, so only the
+  // missed-deadline job does, when a self-review wasn't shared by its deadline (or a PAR shared before that rule).
   const closedEarly = !leadership && leadShared && !deadline360Passed;
   return {
     selfShared,
@@ -152,8 +153,12 @@ export function stepHeader(input: HomeInput, key: HomeStepKey): StepHeader {
       if (state === "incomplete") {
         return {
           title: `${name} incomplete`,
-          // The backend keeps no date for when the lead shared.
-          line: f.closedEarly ? "Your lead shared your PAR before the 360° deadline." : passed("360°", deadline),
+          // The backend keeps no date for when the PAR was shared.
+          line: !f.closedEarly
+            ? passed("360°", deadline)
+            : input.rating.parRatingSharedBy === "SYSTEM"
+              ? "Your PAR was rated and shared when your self-review deadline passed."
+              : "Your lead shared your PAR before the 360° deadline.",
         };
       }
       if (state === "done") {

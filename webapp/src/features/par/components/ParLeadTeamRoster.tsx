@@ -15,6 +15,7 @@
 // under the License.
 
 import { useMemo, useState } from "react";
+import { useRedrawAt } from "../hooks/useRedrawAt";
 import {
   Avatar,
   Box,
@@ -26,7 +27,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Grid,
   IconButton,
   InputAdornment,
@@ -37,7 +37,7 @@ import {
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
+import { ArrowLeftIcon, CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import { describeError } from "@api/errors";
@@ -52,8 +52,10 @@ import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from ".
 import { formatIndex } from "../util/review360Form";
 import { calculateCycleActiveStep } from "../util/parCycleActiveStep";
 import { resolveGridSelectedIds } from "../util/parGridSelection";
-import { isDeadlinePassed } from "../util/parDeadline";
-import ParCycleDatesStepper from "./ParCycleDatesStepper";
+import { deadlinePassedEverywhereAt, isDeadlinePassed } from "../util/parDeadline";
+import { formatShortDate, formatShortDateTime } from "../util/parDate";
+import { shareOpensAfter } from "../util/parDepartments";
+import ParCycleDatesDialog from "./ParCycleDatesDialog";
 import ParStatusChip from "./ParStatusChip";
 import ParCompletionKpiTile from "./ParCompletionKpiTile";
 import ParSyncEmployeeDialog from "./ParSyncEmployeeDialog";
@@ -126,6 +128,14 @@ export default function ParLeadTeamRoster({
   // A PAR 2.0 cycle adds each member's 360° index and the team's headline counts.
   const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
   const indexes = useReviewIndexes(cycle.parCycleId, leadEmail, showsPar2);
+  // In a PAR 2.0 cycle the team's PARs are shared once all their 360° feedback is in: once the 360° deadline (or the
+  // team's later self-review deadline) has passed everywhere (the backend's checkShareOpen).
+  const shareOpens = shareOpensAfter(cycle, team.parDepartment);
+  const shareOpensAt = deadlinePassedEverywhereAt(shareOpens.date);
+  const shareOpensAtMs = shareOpensAt.getTime();
+  const shareWaits = showsPar2 && new Date() < shareOpensAt;
+  // The roster redraws when Share opens, as the review panel does.
+  useRedrawAt(shareOpensAtMs, shareWaits);
   const indexByEmail = useMemo(
     () => new Map((indexes.data?.members ?? []).map((m) => [m.employeeEmail.toLowerCase(), m.index])),
     [indexes.data],
@@ -192,6 +202,12 @@ export default function ParLeadTeamRoster({
 
   // Validated before the confirm dialog opens, not only at confirm-time.
   const handleOpenShareConfirm = () => {
+    // After the hard lead deadline of a PAR 2.0 cycle, only PAR admins can share.
+    const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
+    if (hardDeadline !== undefined && isDeadlinePassed(hardDeadline)) {
+      showError(`The hard lead deadline passed on ${formatShortDate(hardDeadline)}. Only PAR admins can share now.`);
+      return;
+    }
     if (!selectedMembers.every((m) => m.parLeadStatus === "DRAFT")) {
       showError("Unable to share selected reviews. Please select only draft reviews.");
       return;
@@ -430,9 +446,12 @@ export default function ParLeadTeamRoster({
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
           {showBack && (
             <>
+              <IconButton aria-label="Back to all teams" color="primary" onClick={onBack} sx={{ mr: 0.5 }}>
+                <ArrowLeftIcon size={18} />
+              </IconButton>
               <Link component="button" underline="hover" onClick={onBack} sx={{ mr: 0.5 }}>
                 All Teams
               </Link>
@@ -500,9 +519,23 @@ export default function ParLeadTeamRoster({
             <Button variant="contained" disabled={selectedIds.length === 0} onClick={handleCopyEmails} startIcon={<CopyIcon size={16} />}>
               Copy Emails
             </Button>
-            <Button variant="contained" disabled={selectedIds.length === 0 || sharing} onClick={handleOpenShareConfirm}>
-              Share
-            </Button>
+            <Tooltip
+              title={
+                shareWaits
+                  ? `Reviews can be shared from ${formatShortDateTime(shareOpensAt)}, when ${shareOpens.after === "360" ? "the 360° deadline" : "this team's self-review deadline"} has passed everywhere.`
+                  : ""
+              }
+            >
+              <span>
+                <Button
+                  variant="contained"
+                  disabled={selectedIds.length === 0 || sharing || shareWaits}
+                  onClick={handleOpenShareConfirm}
+                >
+                  Share
+                </Button>
+              </span>
+            </Tooltip>
             <TextField
               size="small"
               placeholder="Search Members"
@@ -536,21 +569,12 @@ export default function ParLeadTeamRoster({
         />
       </Card>
 
-      {/* TeamSummary.tsx opens this in its own CustomModal at width="80vw"
-          — much wider than a fixed maxWidth breakpoint, since five stepper
-          steps need the room. */}
-      <Dialog
+      <ParCycleDatesDialog
+        cycle={cycle}
         open={cycleDatesOpen}
         onClose={() => setCycleDatesOpen(false)}
-        maxWidth={false}
-        slotProps={{ paper: { sx: { width: "80vw" } } }}
-      >
-        <DialogTitle>Cycle Dates</DialogTitle>
-        <Divider />
-        <DialogContent sx={{ pt: 4, pb: 4 }}>
-          <ParCycleDatesStepper cycle={cycle} activeStep={calculateCycleActiveStep(cycle)} />
-        </DialogContent>
-      </Dialog>
+        activeStep={calculateCycleActiveStep(cycle)}
+      />
 
       {/* ConfirmationDialog's own threeSixtyReminder copy — same dialog as
           MultiTeamSummary.tsx's, reused here since both send the same

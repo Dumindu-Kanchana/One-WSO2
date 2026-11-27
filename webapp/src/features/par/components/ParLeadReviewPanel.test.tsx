@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ParCycle, ParRating } from "../api/types";
 import { encodeParComment } from "../util/parComment";
+import { formatShortDateTime } from "../util/parDate";
 import type { ParRichTextFieldHandle } from "./ParRichTextField";
 
 let rating: ParRating;
@@ -119,6 +120,9 @@ const cycle = {
   parCycleConfigurations: { parRatings: ["Successful"] },
 } as unknown as ParCycle;
 const FIELD = "Summarise the 360° feedback";
+// Deadlines that have passed, in a cycle's order: a PAR 2.0 PAR is shared only after both.
+const PASSED_SELF_REVIEW = "2020-01-01";
+const PASSED_360 = "2020-01-02";
 // The summary field while a suggestion shows in it, with no placeholder.
 const EMPTY_FIELD = "summary field with a suggestion";
 const SUGGESTED = { summary: "Colleagues see real ownership.\nThey'd like earlier updates.", responseCount: 3 };
@@ -145,6 +149,9 @@ beforeEach(() => {
   responsesFail = false;
   retryResponses.mockReset();
   cycle.parThreeSixtyRatingDeadline = "2999-12-01";
+  cycle.parLeadDeadline = "2999-12-31";
+  delete cycle.parLeadHardDeadline;
+  cycle.parEmployeeDeadline = "2999-12-01";
   suggestion = { data: SUGGESTED };
   suggestionAskedFor = false;
   save.mockReset();
@@ -181,6 +188,14 @@ describe("ParLeadReviewPanel: Top 5%/20%", () => {
     pick("N/A");
     expect(screen.queryByText(STATEMENT)).not.toBeInTheDocument();
     expect(specialRatingSelect()).toHaveTextContent("N/A");
+  });
+
+  it("closes with the lead deadline in a PAR 2.0 cycle, saying so", () => {
+    rating = { parRatingId: 7, parCycleId: 2, parEmployeeEmail: "alex@example.com", parEmployeeStatus: "SHARED",
+      parLeadStatus: "DRAFT", parIsLeadershipEmployee: false, parRating: "Successful" } as ParRating;
+    const closed = { ...cycle, parSpecialRatingDeadline: "2020-01-01" } as unknown as ParCycle;
+    render(<ParLeadReviewPanel cycle={closed} employeeEmail="alex@example.com" />);
+    expect(screen.getByText("Top 5%/20% can't be given after the lead deadline, 1 Jan '20.")).toBeInTheDocument();
   });
 
   it("isn't offered to the leadership team", () => {
@@ -301,12 +316,16 @@ describe("ParLeadReviewPanel: 360° summary", () => {
   });
 
   it("says on sharing that a suggestion not inserted isn't shared", () => {
+    cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
     show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Great cycle.</p>") });
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
     expect(screen.getByText(/The suggestion in grey is only included if you insert it/)).toBeInTheDocument();
   });
 
   it("keeps the share confirmation open while sharing, so nothing can be edited behind it", () => {
+    cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
     const view = show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Great cycle.</p>") });
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
     ratingUpdatePending = true;
@@ -316,6 +335,8 @@ describe("ParLeadReviewPanel: 360° summary", () => {
   });
 
   it("saves the latest summary before sharing, and the confirmation can't be dismissed meanwhile", async () => {
+    cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
     suggestion = {};
     let finishSave = () => {};
     save.mockImplementation(() => new Promise<void>((resolve) => (finishSave = resolve)));
@@ -371,7 +392,11 @@ describe("ParLeadReviewPanel: sharing before the employee has", () => {
   });
   // A cycle that can't give the missed-deadline rating (Needs Improvements isn't one of its ratings): the
   // backend leaves such a PAR to its lead, who can share it once the self-review has closed.
-  const closedCycle = { ...cycle, parEmployeeDeadline: "2020-01-01" } as unknown as ParCycle;
+  const closedCycle = {
+    ...cycle,
+    parEmployeeDeadline: "2020-01-01",
+    parThreeSixtyRatingDeadline: "2020-01-02",
+  } as unknown as ParCycle;
   const ready = {
     parRatingId: 7,
     parCycleId: 2,
@@ -393,13 +418,19 @@ describe("ParLeadReviewPanel: sharing before the employee has", () => {
   it("turns Share on when the self-review closes while the panel is open, in a cycle with no missed-deadline rating", () => {
     setPar2(true);
     rating = ready;
-    // The self-review closes everywhere at 23:59:59 at UTC-12 on its deadline: 2026-12-02 11:59:59 UTC.
+    // The self-review deadline has passed everywhere from the end of that day at UTC-12: 2026-12-02 12:00 UTC.
     vi.useFakeTimers({ now: new Date("2026-12-02T11:59:00Z") });
     try {
-      const closing = { ...cycle, parEmployeeDeadline: "2026-12-01" } as unknown as ParCycle;
+      const closing = {
+        ...cycle,
+        parEmployeeDeadline: "2026-12-01",
+        parThreeSixtyRatingDeadline: "2026-11-30",
+      } as unknown as ParCycle;
       render(<ParLeadReviewPanel cycle={closing} employeeEmail="alex@example.com" />);
       expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
-      act(() => vi.advanceTimersByTime(60_000));
+      act(() => vi.advanceTimersByTime(59_000));
+      expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(2_000));
       expect(screen.getByRole("button", { name: "Share" })).toBeEnabled();
     } finally {
       vi.useRealTimers();
@@ -413,7 +444,11 @@ describe("ParLeadReviewPanel: sharing before the employee has", () => {
     // Rendered while it's open; by the time the timer is set, it has closed.
     const now = vi.spyOn(Date, "now").mockReturnValue(new Date("2026-12-02T12:00:30Z").getTime());
     try {
-      const closing = { ...cycle, parEmployeeDeadline: "2026-12-01" } as unknown as ParCycle;
+      const closing = {
+        ...cycle,
+        parEmployeeDeadline: "2026-12-01",
+        parThreeSixtyRatingDeadline: "2026-11-30",
+      } as unknown as ParCycle;
       render(<ParLeadReviewPanel cycle={closing} employeeEmail="alex@example.com" />);
       expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
       vi.setSystemTime(new Date("2026-12-02T12:00:30Z"));
@@ -511,6 +546,8 @@ describe("ParLeadReviewPanel: a PAR not shared by its deadline", () => {
     expect(
       screen.getByText(/You can share once Alex shares their self-review\. If they don't by .+, their rating will be Needs Improvements\./),
     ).toBeInTheDocument();
+    // The moment the deadline has passed everywhere: the start of the next day at UTC-12.
+    expect(screen.getByText(new RegExp(`by ${formatShortDateTime(new Date("2999-12-02T12:00:00Z"))},`))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
   });
 });
@@ -518,6 +555,7 @@ describe("ParLeadReviewPanel: a PAR not shared by its deadline", () => {
 describe("ParLeadReviewPanel: a department's own rules", () => {
   const rulesCycle = {
     ...cycle,
+    parThreeSixtyRatingDeadline: PASSED_360,
     parCycleConfigurations: {
       parRatings: ["Successful", "Needs Improvements", "Step Up"],
       employeeRatings: ["Successful", "Needs Improvements"],
@@ -552,7 +590,16 @@ describe("ParLeadReviewPanel: a department's own rules", () => {
 
   it("shares Needs Improvements without them in a department that needs no evidence", () => {
     rating = { ...needsImprovement, parDepartment: "Field Ops" };
-    render(<ParLeadReviewPanel cycle={rulesCycle} employeeEmail="alex@example.com" />);
+    // Its own self-review deadline passed too, so it can be shared.
+    const shareable = {
+      ...rulesCycle,
+      parEmployeeDeadline: PASSED_SELF_REVIEW,
+      parCycleConfigurations: {
+        ...rulesCycle.parCycleConfigurations,
+        departmentEmployeeDeadlines: [{ department: "FIELD OPS", deadline: PASSED_SELF_REVIEW }],
+      },
+    } as unknown as ParCycle;
+    render(<ParLeadReviewPanel cycle={shareable} employeeEmail="alex@example.com" />);
     expect(screen.queryByRole("checkbox", { name: EVIDENCE })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Attach from Google Drive/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Share" })).toBeEnabled();
@@ -618,5 +665,220 @@ describe("ParLeadReviewPanel: evidence links", () => {
     await act(async () => {});
     expect(savedPayload()).toMatchObject({ parRating: "Needs Improvements" });
     expect(savedPayload()).not.toHaveProperty("parPerformanceNoticeAck");
+  });
+});
+
+describe("ParLeadReviewPanel: hard lead deadline", () => {
+  it("tells a late lead until when they can still share", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2999-12-30";
+    show({ parRating: "Successful" });
+    expect(
+      screen.getByText("The lead review deadline passed on 1 Jan '00. You can still share until 30 Dec '99, but it's late."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/before the deadline/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+  });
+
+  it("closes the review after it: only PAR admins can rate and share", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2000-01-04";
+    show({ parRating: "Successful" });
+    expect(
+      screen.getByText("The hard lead deadline passed on 4 Jan '00. Only PAR admins can rate and share this PAR now."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/You can still share/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save draft" })).not.toBeInTheDocument();
+  });
+
+  it("closes the review when the hard lead deadline passes while it's open", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2026-12-15";
+    // The last minute of that day, in the browser's time zone.
+    vi.useFakeTimers({ now: new Date(2026, 11, 15, 23, 59) });
+    try {
+      show({ parRating: "Successful" });
+      expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(61_000));
+      expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+      expect(screen.getByText(/^The hard lead deadline passed on 15 Dec '26\./)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("closes an open Share confirmation when the hard lead deadline passes", () => {
+    cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2026-12-15";
+    vi.useFakeTimers({ now: new Date(2026, 11, 15, 23, 59) });
+    try {
+      show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Steady work.</p>") });
+      fireEvent.click(screen.getByRole("button", { name: "Share" }));
+      expect(screen.getByText("Share Lead's Feedback?")).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(61_000));
+      // Past its fade-out.
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(screen.queryByText("Share Lead's Feedback?")).not.toBeInTheDocument();
+      expect(ratingMutate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sends nothing, not even a changed 360° summary, when Share is confirmed after the hard lead deadline", async () => {
+    cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2026-12-15";
+    suggestion = {};
+    vi.useFakeTimers({ now: new Date(2026, 11, 15, 23, 59) });
+    try {
+      show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Steady work.</p>") });
+      fireEvent.change(screen.getByLabelText(FIELD), { target: { value: "<p>Clear ownership.</p>" } });
+      fireEvent.click(screen.getByRole("button", { name: "Share" }));
+      // The deadline passes before the panel's timer has redrawn it.
+      vi.setSystemTime(new Date(2026, 11, 16, 0, 0, 30));
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Share" }));
+      await act(async () => {});
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(save).not.toHaveBeenCalled();
+      expect(ratingMutate).not.toHaveBeenCalled();
+      expect(screen.queryByText("Share Lead's Feedback?")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says N/A for a PAR the lead never rated, not the stored value", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2000-01-04";
+    show({ parRating: "NOT_ASSIGNED", parLeadStatus: "PENDING" });
+    expect(screen.getByText("N/A")).toBeInTheDocument();
+    expect(screen.queryByText("NOT_ASSIGNED")).not.toBeInTheDocument();
+    expect(screen.getByText("Lead's feedback is pending")).toBeInTheDocument();
+  });
+});
+
+describe("ParLeadReviewPanel: sharing once all 360° feedback is in", () => {
+  const ready = {
+    parRatingId: 7,
+    parCycleId: 2,
+    parEmployeeEmail: "alex@example.com",
+    parEmployeeName: "Alex Morgan",
+    parEmployeeStatus: "SHARED",
+    parLeadStatus: "DRAFT",
+    parIsLeadershipEmployee: false,
+    parRating: "Successful",
+    parLeadComment: encodeParComment("<p>Great cycle.</p>"),
+  } as ParRating;
+  const withDates = (employee: string, threeSixty: string, departmentDeadline?: string) =>
+    ({
+      ...cycle,
+      parEmployeeDeadline: employee,
+      parThreeSixtyRatingDeadline: threeSixty,
+      parCycleConfigurations: {
+        parRatings: ["Successful"],
+        departmentEmployeeDeadlines: departmentDeadline ? [{ department: "FIELD OPS", deadline: departmentDeadline }] : [],
+      },
+    }) as unknown as ParCycle;
+
+  it("waits for the 360° deadline, saying when, with a draft still saving", () => {
+    rating = ready;
+    render(<ParLeadReviewPanel cycle={withDates("2020-01-01", "2999-12-01")} employeeEmail="alex@example.com" />);
+    expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+    expect(
+      screen.getByText(
+        /You can share from .+, when the 360° deadline has passed everywhere and all 360° feedback is in\. You can save a draft until then\./,
+      ),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Enter your comment here"), { target: { value: "<p>Even better.</p>" } });
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeEnabled();
+  });
+
+  it("waits in Admin View too", async () => {
+    rating = ready;
+    render(<ParLeadReviewPanel cycle={withDates("2020-01-01", "2999-12-01")} employeeEmail="alex@example.com" isAdminView />);
+    fireEvent.click(screen.getByRole("button", { name: "edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(await screen.findByRole("button", { name: "Save and Share" })).toBeDisabled();
+  });
+
+  it("waits for the employee's department's later self-review deadline", () => {
+    rating = { ...ready, parDepartment: "Field Ops" };
+    render(<ParLeadReviewPanel cycle={withDates("2020-01-01", "2020-01-02", "2999-12-01")} employeeEmail="alex@example.com" />);
+    expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+    expect(screen.getByText(/You can share from .+, when Alex's self-review deadline has passed everywhere\./)).toBeInTheDocument();
+  });
+
+  it("turns Share on once the 360° deadline has passed everywhere, while the panel is open", () => {
+    rating = ready;
+    // The 360° deadline ends everywhere at 23:59:59 at UTC-12 on its day, so it has passed from 2026-12-06 12:00 UTC.
+    vi.useFakeTimers({ now: new Date("2026-12-06T11:59:00Z") });
+    try {
+      render(<ParLeadReviewPanel cycle={withDates("2026-12-01", "2026-12-05")} employeeEmail="alex@example.com" />);
+      expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(59_000));
+      expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(2_000));
+      expect(screen.getByRole("button", { name: "Share" })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("opens once the 360° deadline has passed", () => {
+    rating = ready;
+    render(<ParLeadReviewPanel cycle={withDates("2020-01-01", "2020-01-02")} employeeEmail="alex@example.com" />);
+    expect(screen.getByRole("button", { name: "Share" })).toBeEnabled();
+    expect(screen.queryByText(/You can share from/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ParLeadReviewPanel: saving without a comment", () => {
+  const savedPayload = () => ratingMutate.mock.calls.at(-1)![0].payload;
+  const pickRating = (label: string) => {
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Rating" }));
+    fireEvent.click(screen.getByRole("option", { name: label }));
+  };
+
+  it("saves a draft with only a rating, leaving the comment out", async () => {
+    show();
+    pickRating("Successful");
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toMatchObject({ parLeadStatus: "DRAFT", parRating: "Successful" });
+    expect(savedPayload()).not.toHaveProperty("parLeadComment");
+  });
+
+  it("still sends a comment the lead has cleared, so it's saved empty", async () => {
+    show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Great cycle.</p>") });
+    fireEvent.change(screen.getByLabelText("Enter your comment here"), { target: { value: "<p><br></p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toMatchObject({ parLeadComment: encodeParComment("<p><br></p>") });
+  });
+
+  it("leaves out an admin comment nobody wrote in Admin View", async () => {
+    rating = {
+      parRatingId: 7,
+      parCycleId: 2,
+      parEmployeeEmail: "alex@example.com",
+      parEmployeeStatus: "SHARED",
+      parLeadStatus: "DRAFT",
+      parIsLeadershipEmployee: false,
+    } as ParRating;
+    render(<ParLeadReviewPanel cycle={cycle} employeeEmail="alex@example.com" isAdminView />);
+    fireEvent.click(screen.getByRole("button", { name: "edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await screen.findByRole("combobox", { name: "Rating" });
+    pickRating("Successful");
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toMatchObject({ parRating: "Successful" });
+    expect(savedPayload()).not.toHaveProperty("parLeadComment");
+    expect(savedPayload()).not.toHaveProperty("parAdminComment");
   });
 });
