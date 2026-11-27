@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Typography } from "@wso2/oxygen-ui";
 import { CheckIcon, RefreshCwIcon, SendIcon, XIcon } from "@wso2/oxygen-ui-icons-react";
 import { useNotifications } from "@context/notifications/NotificationsContext";
@@ -58,6 +58,17 @@ export function useInvoiceWork(rows: readonly Invoice[], { tripOpen, resetKey }:
     setDialog(null);
     setSelected(new Set());
   }
+  // A confirmation finishing after a move to another queue must not clear the new queue's ticks or dialog.
+  const queueNow = useRef(resetKey);
+  useEffect(() => {
+    queueNow.current = resetKey;
+  }, [resetKey]);
+  const inQueue = (fn: () => void) => {
+    const at = resetKey;
+    return () => {
+      if (queueNow.current === at) fn();
+    };
+  };
 
   const stepActs = (stage: InvoiceStage): boolean =>
     (stage === "po" && steps.po) || (stage === "finance" && steps.finance) || ((stage === "push" || stage === "failed") && steps.push);
@@ -156,17 +167,21 @@ export function useInvoiceWork(rows: readonly Invoice[], { tripOpen, resetKey }:
     </>
   ) : null;
 
-  const done = () => {
+  const done = inQueue(() => {
     setSelected(new Set());
     setDialog(null);
+  });
+  const close = inQueue(() => setDialog(null));
+  const finish = () => {
     pushKey.renew();
+    done();
   };
   const act = (action: "approve" | "reject" | "push" | "resync", list: string[], reason?: string) =>
     batch.mutateAsync({ action, ids: list, reason, idempotencyKey: action === "push" ? pushKey.keyFor([...list].sort().join(",")) : undefined });
 
   let dialogs: ReactNode = null;
   if (dialog?.kind === "reject") {
-    dialogs = <RejectDialog count={dialog.ids.length} onClose={() => setDialog(null)} run={async (reason) => report(await act("reject", dialog.ids, reason), "rejected", "invoice")} onDone={done} />;
+    dialogs = <RejectDialog count={dialog.ids.length} onClose={close} run={async (reason) => report(await act("reject", dialog.ids, reason), "rejected", "invoice")} onDone={finish} />;
   } else if (dialog?.kind === "approve") {
     dialogs = (
       <ConfirmDialog
@@ -175,8 +190,8 @@ export function useInvoiceWork(rows: readonly Invoice[], { tripOpen, resetKey }:
         busyLabel="Approving…"
         text={`Approve ${plural(dialog.ids.length, "invoice")}? ${dialog.stage === "po" ? "They go to finance for approval next." : "They can then be pushed to NetSuite."}`}
         run={async () => report(await act("approve", dialog.ids), "approved", "invoice")}
-        onDone={done}
-        onClose={() => setDialog(null)}
+        onDone={finish}
+        onClose={close}
       />
     );
   } else if (dialog?.kind === "push") {
@@ -187,8 +202,8 @@ export function useInvoiceWork(rows: readonly Invoice[], { tripOpen, resetKey }:
         busyLabel="Pushing…"
         text={`Push ${plural(dialog.ids.length, "invoice")} to NetSuite as purchase orders? Each one is looked up in NetSuite first, so nothing is pushed twice.`}
         run={async () => report(await act("push", dialog.ids), "pushed", "invoice")}
-        onDone={done}
-        onClose={() => setDialog(null)}
+        onDone={finish}
+        onClose={close}
       />
     );
   } else if (dialog?.kind === "resync") {
@@ -199,8 +214,8 @@ export function useInvoiceWork(rows: readonly Invoice[], { tripOpen, resetKey }:
         busyLabel="Re-syncing…"
         text={`Look up ${plural(dialog.ids.length, "record")} in NetSuite and update their NetSuite status here. Nothing is pushed again.`}
         run={async () => report(await act("resync", dialog.ids), "re-synced", "invoice")}
-        onDone={done}
-        onClose={() => setDialog(null)}
+        onDone={finish}
+        onClose={close}
       />
     );
   }

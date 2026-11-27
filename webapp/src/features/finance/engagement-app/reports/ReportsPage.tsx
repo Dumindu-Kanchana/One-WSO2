@@ -204,7 +204,7 @@ function TravelReport({ kind }: { kind: "invoices" | "per-diem-payments" }): JSX
           columns={invoiceCols}
           rows={list.pageOf(sortedInvoices)}
           sorting={list.sorting}
-          pagination={list.pager(sortedInvoices.length)}
+          pagination={list.pager(sortedInvoices.length, invoices.isPlaceholderData)}
           rowKey={(i) => i.id}
           {...tableState(invoices)}
           empty={<Empty title="No Invoices in This Range" body="Change the dates and search again." />}
@@ -215,7 +215,7 @@ function TravelReport({ kind }: { kind: "invoices" | "per-diem-payments" }): JSX
           columns={paymentCols}
           rows={list.pageOf(sortedPayments)}
           sorting={list.sorting}
-          pagination={list.pager(sortedPayments.length)}
+          pagination={list.pager(sortedPayments.length, payments.isPlaceholderData)}
           rowKey={(x) => x.id}
           {...tableState(payments)}
           empty={<Empty title="No Per Diem Payments in This Range" body="Change the dates and search again." />}
@@ -353,7 +353,7 @@ function ConsultantReport(): JSX.Element {
           columns={columns}
           rows={list.pageOf(sortedRows)}
           sorting={list.sorting}
-          pagination={list.pager(rows.length)}
+          pagination={list.pager(rows.length, report.isPlaceholderData)}
           rowKey={(r) => `${r.email}|${r.engagementCode}|${r.allocationTypeName}|${r.dailyHourly}|${r.engagementTypeName}`}
           {...tableState(report)}
           empty={<Empty title="No Allocations in This Period" body="Change the dates or filters and search again." />}

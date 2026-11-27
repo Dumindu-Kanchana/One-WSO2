@@ -82,7 +82,7 @@ export default function SearchPage(): JSX.Element {
         </ListCard>
       ) : search.isError ? (
         <Failed what="the search results" error={search.error} onRetry={() => void search.refetch()} retrying={search.isFetching} />
-      ) : search.isPending ? (
+      ) : search.isPending || (search.isPlaceholderData && !groups.length && !failed.length) ? (
         <DelayedSkeleton minHeight={160}>
           <Stack spacing={2}>
             {[0, 1].map((i) => (
