@@ -24,12 +24,11 @@ export interface CallFilters {
   scope: MeetingScope;
   /** Search text: title, account or opportunity name in the Echo scope. */
   q: string | null;
-  /**
-   * Regions. In the Echo scope, any of these Sales Regions; in the All scope the list is
-   * filtered by one region of its own, the first.
-   */
-  regions: string[];
+  /** The host's team: the All scope's one filter of its own, from the Sales backend's HR teams. */
+  hostTeam: string | null;
   // The rest filter the Echo scope only.
+  /** Salesforce Sales Regions; any of them. */
+  regions: string[];
   /** Opportunity owner (AM) emails; any of them. */
   owners: string[];
   /** Call types; any of them. */
@@ -46,6 +45,7 @@ export interface CallFilters {
 export const NO_FILTERS: CallFilters = {
   scope: "echo",
   q: null,
+  hostTeam: null,
   regions: [],
   owners: [],
   types: [],
@@ -65,6 +65,7 @@ export function filtersFromSearch(params: URLSearchParams): CallFilters {
   return {
     scope: params.get("scope") === "all" ? "all" : "echo",
     q: text(params.get("q")),
+    hostTeam: text(params.get("team")),
     regions: list(params.getAll("region")),
     owners: list(params.getAll("owner")),
     types: list(params.getAll("type")),
@@ -79,6 +80,7 @@ export function filtersToSearch(filters: CallFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.scope === "all") params.set("scope", "all");
   if (filters.q) params.set("q", filters.q);
+  if (filters.hostTeam) params.set("team", filters.hostTeam);
   filters.owners.forEach((owner) => params.append("owner", owner));
   filters.regions.forEach((region) => params.append("region", region));
   filters.types.forEach((type) => params.append("type", type));

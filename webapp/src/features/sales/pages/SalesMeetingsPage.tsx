@@ -51,7 +51,7 @@ const DEFAULT_PAGE_SIZE = 10;
  * TWO SOURCES. The Echo scope lists from the Echo backend (ONE_WSO2_ECHO_BACKEND_URL),
  * which keeps each call's Salesforce context and so can filter every call by owner,
  * region, account or opportunity, call type and date. The All scope lists from the Sales
- * backend as it always has, with its own region and search, and fetches the live context
+ * backend as it always has, with its host team filter and search, and fetches the live context
  * of the page it shows. Without the Echo backend (not configured, or failing) the Echo
  * scope falls back to the Sales backend's Echo list and says so.
  *
@@ -86,7 +86,8 @@ export default function SalesMeetingsPage() {
     setSearchParams(filtersToSearch({ ...filters, ...patch }), { replace: true });
   };
 
-  const regionsQuery = useSalesRegions();
+  // The Sales backend's HR team list (`GET /regions`), for the All scope's host team filter.
+  const hostTeamsQuery = useSalesRegions();
 
   // ---- The Echo scope, from the Echo backend ----------------------------------------
   const echoWanted = filters.scope === "echo" && echoConfigured;
@@ -113,9 +114,9 @@ export default function SalesMeetingsPage() {
   // inside useMeetings, so any refetch picks up meetings that have ended since.
   const meetingsQuery = useMeetings({
     search: filters.q,
-    // Its own region list, one at a time. Echo meetings carry none there, so the filter
-    // is disabled for the Echo scope.
-    region: filters.scope === "all" ? (filters.regions[0] ?? null) : null,
+    // The host's team, which the Sales backend calls its region. Echo meetings carry none
+    // there, so the filter is disabled for the Echo scope.
+    region: filters.scope === "all" ? filters.hostTeam : null,
     echoOnly: filters.scope === "echo",
     page,
     pageSize,
@@ -146,9 +147,8 @@ export default function SalesMeetingsPage() {
   }, [calls]);
 
   const changeScope = (scope: MeetingScope) => {
-    // The two scopes' filters mean different things (the Echo regions are Salesforce's
-    // Sales Regions; the All scope's are the Sales backend's own), so only the search
-    // text carries over.
+    // The two scopes filter by different things (Salesforce's Sales Regions and the rest in
+    // the Echo scope; the host's team in the All scope), so only the search text carries over.
     update({ ...NO_FILTERS, scope, q: filters.q });
   };
   const changePageSize = (next: number) => {
@@ -159,7 +159,7 @@ export default function SalesMeetingsPage() {
   // One 403 anywhere means the caller is in no authorised group — the backend
   // refuses every endpoint in that case — so the page says so once instead of
   // repeating it per panel.
-  const forbidden = isForbidden(meetingsQuery.error) || isForbidden(regionsQuery.error);
+  const forbidden = isForbidden(meetingsQuery.error) || isForbidden(hostTeamsQuery.error);
   const listError = fromEcho ? echoQuery.error : meetingsQuery.error;
   const loading = fromEcho
     ? echoQuery.isLoading || echoQuery.isFetching
@@ -177,13 +177,13 @@ export default function SalesMeetingsPage() {
         <MeetingFilters
           scope={filters.scope}
           onScopeChange={changeScope}
-          region={filters.regions[0] ?? null}
-          onRegionChange={(region) => update({ regions: region ? [region] : [] })}
-          regions={regionsQuery.data?.regions ?? []}
-          regionsLoading={regionsQuery.isLoading}
-          regionDisabled={filters.scope === "echo"}
-          // The Echo scope's regions are in its own filters, below.
-          showRegion={!fromEcho}
+          hostTeam={filters.hostTeam}
+          onHostTeamChange={(hostTeam) => update({ hostTeam })}
+          hostTeams={hostTeamsQuery.data?.regions ?? []}
+          hostTeamsLoading={hostTeamsQuery.isLoading}
+          hostTeamDisabled={filters.scope === "echo"}
+          // The Echo scope has its own filters, below, Region among them.
+          showHostTeam={!fromEcho}
           search={filters.q}
           onSearchChange={(q) => update({ q })}
           searchPlaceholder={fromEcho ? "Title, account or opportunity" : undefined}

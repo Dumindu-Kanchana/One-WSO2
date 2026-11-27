@@ -161,6 +161,21 @@ describe("SalesMeetingsPage — the Echo scope", () => {
     expect(echo.calls.mock.calls[0][0]).toMatchObject({ accounts: ["001Hb00000Nordl001", "001Hb00000Merid001"] });
   });
 
+  it("offers every Sales Region, a region with no calls yet included, with its count", SLOW, async () => {
+    const options = await mockEchoCallsClient().filters("");
+    echo.filters.mockResolvedValue({ ...options, regions: [...options.regions, { region: "AFRICA", calls: 0 }] });
+    renderAt();
+    await screen.findByRole("link", { name: "Harbourline – API platform" });
+    // The Echo scope filters by Sales Region, not by the host's team.
+    expect(screen.queryByRole("combobox", { name: "Host team" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("combobox", { name: "Region" }));
+    const africa = await screen.findByRole("option", { name: /AFRICA/ });
+    expect(africa).toHaveTextContent(/AFRICA\s*0$/);
+    await userEvent.click(africa);
+    expect(where().getAll("region")).toEqual(["AFRICA"]);
+    await waitFor(() => expect(screen.getByText("No meetings found")).toBeInTheDocument());
+  });
+
   it("writes a picked owner to the URL and goes back to the first page", SLOW, async () => {
     renderAt();
     await screen.findByRole("link", { name: "Harbourline – API platform" });
@@ -258,6 +273,18 @@ describe("SalesMeetingsPage — the All scope", () => {
     expect(within(bodyRows()[0]).getByRole("link", { name: "Harbourline" })).toHaveAttribute(
       "href",
       "/sales/deals/006Hb00000Harbr001",
+    );
+  });
+
+  it("filters by the host's team, named for what it is, and keeps it in the URL", SLOW, async () => {
+    renderAt("/sales/meetings?scope=all");
+    expect(screen.queryByRole("combobox", { name: "Region" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("combobox", { name: "Host team" }));
+    expect(screen.getByRole("option", { name: "All host teams" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("option", { name: "Sales - EU" }));
+    expect(where().toString()).toBe("scope=all&team=Sales+-+EU");
+    await waitFor(() =>
+      expect(salesList).toHaveBeenLastCalledWith(expect.objectContaining({ region: "Sales - EU", echoOnly: false })),
     );
   });
 

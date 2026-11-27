@@ -27,10 +27,10 @@ import { DealFlagMarker } from "./DealFlags";
 import { useNow } from "../../util/useNow";
 
 /**
- * Three columns, MEDDPICC first after the name: it is what the list is for. The stage,
- * amount, close date and any flags ride under the opportunity's name; Salesforce's score
- * rides beside the circles (nothing there when Salesforce has none), and the count to
- * review under them. The journey takes the width that is left, saying only the activity
+ * Three columns, MEDDPICC first after the name: it is what the list is for. The account
+ * leads the first column, the opportunity's name under it; the stage, amount, close date
+ * and any flags ride under those. Salesforce's score rides beside the circles (nothing
+ * there when Salesforce has none), and the count to review under them. The journey takes the width that is left, saying only the activity
  * and when it last moved under its track, since the stage and close date are already
  * beside the name.
  */
@@ -115,23 +115,32 @@ export default function DealsTable({
                     sx={{ cursor: "pointer" }}
                   >
                     <ListingTable.Cell sx={{ maxWidth: 300 }}>
+                      {/* The account leads, bold: it is what people know a deal by. The
+                          opportunity's own name, beneath it, stays the link into the deal. */}
                       <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        variant="body2"
+                        sx={{
+                          display: "block",
+                          fontWeight: 600,
+                          color: "text.primary",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={deal.accountName}
                       >
                         {deal.accountName}
                       </Typography>
                       <Link
                         component="button"
                         type="button"
-                        variant="body2"
+                        variant="caption"
                         underline="hover"
                         onClick={(event) => {
                           event.stopPropagation();
                           onOpenDeal(deal.opportunityId);
                         }}
-                        sx={{ textAlign: "left", color: "text.primary", fontWeight: 600 }}
+                        sx={{ display: "block", textAlign: "left", color: "text.secondary" }}
                       >
                         {deal.name}
                       </Link>

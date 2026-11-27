@@ -389,7 +389,7 @@ export default function MeetingsTable({
         {!loading && meetings.length === 0 && (
           <ListingTable.EmptyState
             title="No meetings found"
-            description="Try a different filter, region, or search term."
+            description="Try a different filter, host team, or search term."
           />
         )}
 

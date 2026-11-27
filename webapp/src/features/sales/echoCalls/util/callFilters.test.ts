@@ -20,12 +20,13 @@ import { NO_FILTERS, filtersFromSearch, filtersToSearch, hasEchoFilters } from "
 
 describe("callFilters", () => {
   it("reads every filter from the URL and writes it back the same", () => {
-    const search = "scope=all&q=nordlys&owner=lars%40wso2.com&owner=maya%40wso2.com&region=EU&type=renewal"
+    const search = "scope=all&q=nordlys&team=Sales+-+EU&owner=lars%40wso2.com&owner=maya%40wso2.com&region=EU&type=renewal"
       + "&account=001Hb00000Nordl001&from=2026-11-01&to=2026-11-30";
     const filters = filtersFromSearch(new URLSearchParams(search));
     expect(filters).toEqual({
       scope: "all",
       q: "nordlys",
+      hostTeam: "Sales - EU",
       owners: ["lars@wso2.com", "maya@wso2.com"],
       regions: ["EU"],
       types: ["renewal"],
@@ -47,6 +48,7 @@ describe("callFilters", () => {
 
   it("tells the Echo filters from the search text", () => {
     expect(hasEchoFilters({ ...NO_FILTERS, q: "x" })).toBe(false);
+    expect(hasEchoFilters({ ...NO_FILTERS, hostTeam: "Sales - EU" })).toBe(false);
     expect(hasEchoFilters({ ...NO_FILTERS, to: "2026-11-30" })).toBe(true);
   });
 });
