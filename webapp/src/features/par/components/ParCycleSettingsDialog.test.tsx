@@ -36,8 +36,21 @@ vi.mock("@context/notifications/NotificationsContext", () => ({
 }));
 // A plain field, so a test can type a date.
 vi.mock("./ParDateField", () => ({
-  default: ({ ariaLabel, value, onChange }: { ariaLabel: string; value: string; onChange: (v: string) => void }) => (
-    <input aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)} />
+  default: ({
+    ariaLabel,
+    value,
+    onChange,
+    helperText,
+  }: {
+    ariaLabel: string;
+    value: string;
+    onChange: (v: string) => void;
+    helperText?: string;
+  }) => (
+    <>
+      <input aria-label={ariaLabel} value={value} onChange={(e) => onChange(e.target.value)} />
+      {helperText && <span>{helperText}</span>}
+    </>
   ),
 }));
 
@@ -47,7 +60,7 @@ const cycle = {
   parCycleId: 7,
   parCycleName: "2027 H1",
   parCycleStartDate: "2027-01-01",
-  parCycleEndDate: "2027-06-30",
+  parCycleEndDate: "2027-08-31",
   parEvaluationStartDate: "2027-06-01",
   parEvaluationEndDate: "2027-07-31",
   parEmployeeDeadline: "2027-07-05",
@@ -157,5 +170,63 @@ describe("ParCycleSettingsDialog", () => {
       evidenceExemptDepartments: ["FIELD OPS", "PARTNER OPS"],
       departmentEmployeeDeadlines: [],
     });
+  });
+});
+
+describe("ParCycleSettingsDialog: a PAR 2.0 cycle's date order", () => {
+  // Saved before the order: the 360° deadline before the self-review deadline.
+  const oldCycle = { ...cycle, parEmployeeDeadline: "2027-07-12", parThreeSixtyRatingDeadline: "2027-07-10" } as ParCycle;
+  const save = () => screen.getByRole("button", { name: "Save" });
+
+  it("doesn't hold up a save that changes no date", () => {
+    forms = { ...resolved, showsPar2: true };
+    setPar2(true);
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={oldCycle} />);
+    expect(screen.queryByText(/Must be later than/)).not.toBeInTheDocument();
+  });
+
+  it("puts every date in order once one changes", () => {
+    forms = { ...resolved, showsPar2: true };
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={oldCycle} />);
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-28" } });
+    expect(screen.getByText("Must be later than the employee PAR deadline")).toBeInTheDocument();
+    expect(save()).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Deadline for 360° feedback"), { target: { value: "2027-07-13" } });
+    expect(screen.queryByText(/Must be later than/)).not.toBeInTheDocument();
+    expect(save()).toBeEnabled();
+  });
+
+  it("names the date each one must follow", () => {
+    forms = { ...resolved, showsPar2: true };
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={cycle} />);
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-18" } });
+    expect(screen.getByText("Must be later than the hard lead deadline")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-31" } });
+    expect(screen.getByText("Must be later than the PAR F2F deadline")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-25" } });
+    fireEvent.change(screen.getByLabelText("PAR cycle end date"), { target: { value: "2027-07-31" } });
+    expect(screen.getByText("Must be later than the PAR evaluation closing date")).toBeInTheDocument();
+  });
+
+  it("keeps a PAR 1.0 cycle to today's checks", () => {
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={oldCycle} />);
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-28" } });
+    expect(screen.queryByText(/Must be later than/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ParCycleSettingsDialog: the Top 5%/20% deadline", () => {
+  it("isn't shown for a PAR 2.0 cycle, and is sent as the lead deadline", () => {
+    forms = { ...resolved, showsPar2: true };
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={cycle} />);
+    expect(screen.queryByLabelText("Top 5%/20% rating submission")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Deadline for lead's feedback"), { target: { value: "2027-07-14" } });
+    expect(moveF2FDeadlineAndSave().parSpecialRatingDeadline).toBe("2027-07-14");
+  });
+
+  it("stays for a PAR 1.0 cycle", () => {
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={cycle} />);
+    expect(screen.getByLabelText("Top 5%/20% rating submission")).toBeInTheDocument();
   });
 });

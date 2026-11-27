@@ -60,24 +60,35 @@ export default function ParCycleDatesStepper({
   /** Which of the five steps without the hard lead deadline is reached (calculateCycleActiveStep). */
   activeStep?: number;
 }) {
-  // A PAR 2.0 cycle also shows its hard lead deadline, right after the lead deadline.
+  // A PAR 2.0 cycle shows its hard lead deadline right after the lead deadline, and no Top 5%/20% step: its
+  // Top 5%/20% deadline is the lead deadline.
   const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
   const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
-  const steps = [
-    { date: cycle.parEvaluationStartDate, label: "Start Date" },
-    { date: cycle.parEmployeeDeadline, label: "Employee PAR Deadline" },
-    { date: cycle.parLeadDeadline, label: "Lead's PAR Deadline" },
-    ...(hardDeadline ? [{ date: hardDeadline, label: "Hard Lead Deadline" }] : []),
-    { date: cycle.parSpecialRatingDeadline, label: "Top 5%/20% Rating Submission" },
-    { date: cycle.parEvaluationEndDate, label: "End Date" },
-  ];
-  // The steps after the lead deadline move one along; the hard lead deadline's is reached once it has passed.
-  const reached =
-    hardDeadline === undefined || activeStep < 2
+  const steps = showsPar2
+    ? [
+        { date: cycle.parEvaluationStartDate, label: "Start Date" },
+        { date: cycle.parEmployeeDeadline, label: "Employee PAR Deadline" },
+        { date: cycle.parLeadDeadline, label: "Lead's PAR Deadline" },
+        ...(hardDeadline ? [{ date: hardDeadline, label: "Hard Lead Deadline" }] : []),
+        { date: cycle.parEvaluationEndDate, label: "End Date" },
+      ]
+    : [
+        { date: cycle.parEvaluationStartDate, label: "Start Date" },
+        { date: cycle.parEmployeeDeadline, label: "Employee PAR Deadline" },
+        { date: cycle.parLeadDeadline, label: "Lead's PAR Deadline" },
+        { date: cycle.parSpecialRatingDeadline, label: "Top 5%/20% Rating Submission" },
+        { date: cycle.parEvaluationEndDate, label: "End Date" },
+      ];
+  // activeStep counts the five PAR 1.0 steps: 0 start, 1 employee, 2 lead, 3 Top 5%/20%, 4 end. In a PAR 2.0 cycle
+  // 2 and 3 are both the lead deadline (its Top 5%/20% deadline), then the hard lead deadline is reached once it has
+  // passed, and 4 is the last step.
+  const reached = !showsPar2
+    ? activeStep
+    : activeStep < 2
       ? activeStep
-      : activeStep > 2
-        ? activeStep + 1
-        : isDeadlinePassed(hardDeadline)
+      : activeStep >= 4
+        ? steps.length - 1
+        : hardDeadline && isDeadlinePassed(hardDeadline)
           ? 3
           : 2;
 

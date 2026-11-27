@@ -35,8 +35,11 @@ const cycle = {
 
 const labels = () => screen.getAllByText(/Date$|Deadline$|Submission$/).map((e) => e.textContent);
 
+// The steps shown as reached (a check in a filled circle).
+const reachedCount = (container: HTMLElement) => container.querySelectorAll(".MuiAvatar-root").length;
+
 describe("ParCycleDatesStepper", () => {
-  it("shows a PAR 2.0 cycle's hard lead deadline right after the lead deadline", () => {
+  it("shows a PAR 2.0 cycle's hard lead deadline right after the lead deadline, and no Top 5%/20% step", () => {
     showsPar2 = true;
     render(<ParCycleDatesStepper cycle={cycle} />);
     expect(labels()).toEqual([
@@ -44,16 +47,41 @@ describe("ParCycleDatesStepper", () => {
       "Employee PAR Deadline",
       "Lead's PAR Deadline",
       "Hard Lead Deadline",
-      "Top 5%/20% Rating Submission",
       "End Date",
     ]);
     expect(screen.getByText("15 Dec '26")).toBeInTheDocument();
   });
 
-  it("leaves it out of a PAR 1.0 cycle", () => {
+  it("leaves the hard lead deadline out of a PAR 1.0 cycle, which keeps its Top 5%/20% step", () => {
     showsPar2 = false;
     render(<ParCycleDatesStepper cycle={cycle} />);
     expect(screen.queryByText("Hard Lead Deadline")).not.toBeInTheDocument();
-    expect(labels()).toHaveLength(5);
+    expect(labels()).toEqual([
+      "Start Date",
+      "Employee PAR Deadline",
+      "Lead's PAR Deadline",
+      "Top 5%/20% Rating Submission",
+      "End Date",
+    ]);
+  });
+
+  it("reaches a PAR 2.0 cycle's steps from the five PAR 1.0 ones", () => {
+    showsPar2 = true;
+    // 3 (the Top 5%/20% deadline, its lead deadline) reaches the lead deadline; the hard lead deadline is still ahead.
+    const { container, unmount } = render(<ParCycleDatesStepper cycle={cycle} activeStep={3} />);
+    expect(reachedCount(container)).toBe(3);
+    unmount();
+    const hardPassed = { ...cycle, parLeadHardDeadline: "2020-01-01" } as ParCycle;
+    const second = render(<ParCycleDatesStepper cycle={hardPassed} activeStep={3} />);
+    expect(reachedCount(second.container)).toBe(4);
+    second.unmount();
+    const ended = render(<ParCycleDatesStepper cycle={cycle} activeStep={4} />);
+    expect(reachedCount(ended.container)).toBe(5);
+  });
+
+  it("reaches a PAR 1.0 cycle's steps as given", () => {
+    showsPar2 = false;
+    const { container } = render(<ParCycleDatesStepper cycle={cycle} activeStep={3} />);
+    expect(reachedCount(container)).toBe(4);
   });
 });

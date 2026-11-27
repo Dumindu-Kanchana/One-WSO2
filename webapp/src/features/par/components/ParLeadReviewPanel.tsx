@@ -791,7 +791,10 @@ export default function ParLeadReviewPanel({
                     )}
                     {!readOnly && specialRatingClosed && (
                       <Typography variant="caption" color="text.secondary">
-                        The Top 5%/20% deadline passed on {formatShortDate(cycle.parSpecialRatingDeadline!)}
+                        {/* A PAR 2.0 cycle's Top 5%/20% deadline is its lead deadline. */}
+                        {showsPar2
+                          ? `Top 5%/20% can't be given after the lead deadline, ${formatShortDate(cycle.parSpecialRatingDeadline!)}.`
+                          : `The Top 5%/20% deadline passed on ${formatShortDate(cycle.parSpecialRatingDeadline!)}`}
                       </Typography>
                     )}
                   </Box>

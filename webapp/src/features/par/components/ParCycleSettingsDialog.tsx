@@ -28,6 +28,7 @@ import { useParShowsPar2 } from "../api/useReview360";
 import type { DepartmentDeadline, ParCycle } from "../api/types";
 import { dayAfter } from "../util/parDate";
 import { departmentDeadlinesProblem } from "../util/parDepartments";
+import { dateOrderProblems } from "../util/parDateOrder";
 
 function fieldsFromCycle(cycle: ParCycle) {
   return {
@@ -87,6 +88,14 @@ export default function ParCycleSettingsDialog({
       })
     : null;
 
+  // A PAR 2.0 cycle's dates follow one order, checked once a date changes, as the backend does: a cycle saved
+  // before the order can still change its other settings, and the first date edit puts them all in order.
+  const datesChanged = JSON.stringify(form) !== JSON.stringify(fieldsFromCycle(cycle));
+  const order =
+    par2.showsPar2 && datesChanged
+      ? dateOrderProblems({ ...form, parLeadHardDeadline: showsHardDeadline ? form.parLeadHardDeadline : "" })
+      : {};
+
   const isValid =
     form.parCycleStartDate &&
     form.parCycleEndDate &&
@@ -99,13 +108,14 @@ export default function ParCycleSettingsDialog({
     form.parThreeSixtyRatingDeadline > evalStart &&
     form.parLeadDeadline &&
     form.parLeadDeadline > form.parEmployeeDeadline &&
-    form.parSpecialRatingDeadline &&
-    form.parSpecialRatingDeadline > evalStart &&
+    // A PAR 2.0 cycle's Top 5%/20% deadline is its lead deadline, so it isn't shown.
+    (par2.showsPar2 || (form.parSpecialRatingDeadline && form.parSpecialRatingDeadline > evalStart)) &&
     form.parF2FDeadline &&
     form.parF2FDeadline > evalStart &&
     (!showsHardDeadline ||
       (form.parLeadHardDeadline > form.parLeadDeadline && form.parLeadHardDeadline <= form.parEvaluationEndDate)) &&
     (!showsQuestions || (employeeQuestion.trim() && reviewQuestion.trim())) &&
+    Object.keys(order).length === 0 &&
     deadlinesProblem === null;
 
   const hasChanged =
@@ -134,6 +144,8 @@ export default function ParCycleSettingsDialog({
           {
             ...dates,
             ...(showsHardDeadline ? { parLeadHardDeadline } : {}),
+            // Sent as the lead deadline for a PAR 2.0 cycle, which the backend keeps it in step with anyway.
+            ...(par2.showsPar2 ? { parSpecialRatingDeadline: form.parLeadDeadline } : {}),
             // Partial update — rating scales aren't edited by this dialog, so
             // only the two question fields and the departments go out.
             ...(showsQuestions || showsDepartments
@@ -187,11 +199,14 @@ export default function ParCycleSettingsDialog({
                 ariaLabel="PAR cycle end date"
                 value={form.parCycleEndDate}
                 min={form.parCycleStartDate || undefined}
-                error={Boolean(form.parCycleEndDate) && form.parCycleEndDate <= form.parCycleStartDate}
+                error={
+                  (Boolean(form.parCycleEndDate) && form.parCycleEndDate <= form.parCycleStartDate) ||
+                  Boolean(order.parCycleEndDate)
+                }
                 helperText={
                   form.parCycleEndDate && form.parCycleEndDate <= form.parCycleStartDate
                     ? "Must be later than the cycle start date"
-                    : undefined
+                    : order.parCycleEndDate
                 }
                 onChange={set("parCycleEndDate")}
               />
@@ -213,11 +228,11 @@ export default function ParCycleSettingsDialog({
                 ariaLabel="PAR evaluation closing date"
                 value={form.parEvaluationEndDate}
                 min={evalStart}
-                error={Boolean(form.parEvaluationEndDate) && form.parEvaluationEndDate <= evalStart}
+                error={(Boolean(form.parEvaluationEndDate) && form.parEvaluationEndDate <= evalStart) || Boolean(order.parEvaluationEndDate)}
                 helperText={
                   form.parEvaluationEndDate && form.parEvaluationEndDate <= evalStart
                     ? "Must be later than the PAR creation date"
-                    : undefined
+                    : order.parEvaluationEndDate
                 }
                 onChange={set("parEvaluationEndDate")}
               />
@@ -247,11 +262,11 @@ export default function ParCycleSettingsDialog({
                 value={form.parThreeSixtyRatingDeadline}
                 min={evalStart}
                 max={form.parEvaluationEndDate || undefined}
-                error={Boolean(form.parThreeSixtyRatingDeadline) && form.parThreeSixtyRatingDeadline <= evalStart}
+                error={(Boolean(form.parThreeSixtyRatingDeadline) && form.parThreeSixtyRatingDeadline <= evalStart) || Boolean(order.parThreeSixtyRatingDeadline)}
                 helperText={
                   form.parThreeSixtyRatingDeadline && form.parThreeSixtyRatingDeadline <= evalStart
                     ? "Must be later than the PAR creation date"
-                    : undefined
+                    : order.parThreeSixtyRatingDeadline
                 }
                 onChange={set("parThreeSixtyRatingDeadline")}
               />
@@ -264,11 +279,14 @@ export default function ParCycleSettingsDialog({
                 value={form.parLeadDeadline}
                 min={form.parEmployeeDeadline || cycle.parEvaluationStartDate}
                 max={form.parEvaluationEndDate || undefined}
-                error={Boolean(form.parLeadDeadline) && form.parLeadDeadline <= form.parEmployeeDeadline}
+                error={
+                  (Boolean(form.parLeadDeadline) && form.parLeadDeadline <= form.parEmployeeDeadline) ||
+                  Boolean(order.parLeadDeadline)
+                }
                 helperText={
                   form.parLeadDeadline && form.parLeadDeadline <= form.parEmployeeDeadline
                     ? "Must be later than the employee PAR deadline"
-                    : undefined
+                    : order.parLeadDeadline
                 }
                 onChange={set("parLeadDeadline")}
               />
@@ -282,33 +300,38 @@ export default function ParCycleSettingsDialog({
                   value={form.parLeadHardDeadline}
                   min={form.parLeadDeadline ? dayAfter(form.parLeadDeadline) : evalStart}
                   max={form.parEvaluationEndDate || undefined}
-                  error={Boolean(form.parLeadHardDeadline) && form.parLeadHardDeadline <= form.parLeadDeadline}
+                  error={
+                    (Boolean(form.parLeadHardDeadline) && form.parLeadHardDeadline <= form.parLeadDeadline) ||
+                    Boolean(order.parLeadHardDeadline)
+                  }
                   helperText={
                     form.parLeadHardDeadline && form.parLeadHardDeadline <= form.parLeadDeadline
                       ? "Must be later than the lead's feedback deadline"
-                      : undefined
+                      : order.parLeadHardDeadline
                   }
                   onChange={set("parLeadHardDeadline")}
                 />
               </Grid>
             )}
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <ParDateField
-                label="Top 5%/20% rating submission"
-                fullWidth
-                ariaLabel="Top 5%/20% rating submission"
-                value={form.parSpecialRatingDeadline}
-                min={evalStart}
-                max={form.parEvaluationEndDate || undefined}
-                error={Boolean(form.parSpecialRatingDeadline) && form.parSpecialRatingDeadline <= evalStart}
-                helperText={
-                  form.parSpecialRatingDeadline && form.parSpecialRatingDeadline <= evalStart
-                    ? "Must be later than the PAR creation date"
-                    : undefined
-                }
-                onChange={set("parSpecialRatingDeadline")}
-              />
-            </Grid>
+            {!par2.showsPar2 && (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <ParDateField
+                  label="Top 5%/20% rating submission"
+                  fullWidth
+                  ariaLabel="Top 5%/20% rating submission"
+                  value={form.parSpecialRatingDeadline}
+                  min={evalStart}
+                  max={form.parEvaluationEndDate || undefined}
+                  error={Boolean(form.parSpecialRatingDeadline) && form.parSpecialRatingDeadline <= evalStart}
+                  helperText={
+                    form.parSpecialRatingDeadline && form.parSpecialRatingDeadline <= evalStart
+                      ? "Must be later than the PAR creation date"
+                      : undefined
+                  }
+                  onChange={set("parSpecialRatingDeadline")}
+                />
+              </Grid>
+            )}
             <Grid size={{ xs: 12, sm: 6 }}>
               <ParDateField
                 label="PAR F2F deadline"
@@ -317,11 +340,11 @@ export default function ParCycleSettingsDialog({
                 value={form.parF2FDeadline}
                 min={evalStart}
                 max={form.parEvaluationEndDate || undefined}
-                error={Boolean(form.parF2FDeadline) && form.parF2FDeadline <= evalStart}
+                error={(Boolean(form.parF2FDeadline) && form.parF2FDeadline <= evalStart) || Boolean(order.parF2FDeadline)}
                 helperText={
                   form.parF2FDeadline && form.parF2FDeadline <= evalStart
                     ? "Must be later than the PAR creation date"
-                    : undefined
+                    : order.parF2FDeadline
                 }
                 onChange={set("parF2FDeadline")}
               />

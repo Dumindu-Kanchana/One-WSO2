@@ -185,6 +185,14 @@ describe("ParLeadReviewPanel: Top 5%/20%", () => {
     expect(specialRatingSelect()).toHaveTextContent("N/A");
   });
 
+  it("closes with the lead deadline in a PAR 2.0 cycle, saying so", () => {
+    rating = { parRatingId: 7, parCycleId: 2, parEmployeeEmail: "alex@example.com", parEmployeeStatus: "SHARED",
+      parLeadStatus: "DRAFT", parIsLeadershipEmployee: false, parRating: "Successful" } as ParRating;
+    const closed = { ...cycle, parSpecialRatingDeadline: "2020-01-01" } as unknown as ParCycle;
+    render(<ParLeadReviewPanel cycle={closed} employeeEmail="alex@example.com" />);
+    expect(screen.getByText("Top 5%/20% can't be given after the lead deadline, 1 Jan '20.")).toBeInTheDocument();
+  });
+
   it("isn't offered to the leadership team", () => {
     show({ parRating: "Successful", parIsLeadershipEmployee: true, parSpecialRatingEligibility: false });
     expect(screen.queryByText("Top 5%/20%")).not.toBeInTheDocument();
