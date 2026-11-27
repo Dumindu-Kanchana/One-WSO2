@@ -165,6 +165,16 @@ describe("stepHeader", () => {
       title: "360° feedback incomplete",
       line: "Your lead shared your PAR before the 360° deadline.",
     });
+    // Only the missed-deadline job shares before the 360° deadline now: a self-review not shared by its deadline.
+    expect(
+      stepHeader(
+        input({ rating: rating({ parLeadStatus: "SHARED", parRatingSharedBy: "SYSTEM" }), reviewers: asked(3, 1) }),
+        "360",
+      ),
+    ).toEqual({
+      title: "360° feedback incomplete",
+      line: "Your PAR was rated and shared when your self-review deadline passed.",
+    });
   });
 
   it("360° for the leadership team is Leadership 360° feedback", () => {

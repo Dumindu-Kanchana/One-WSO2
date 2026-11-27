@@ -52,8 +52,9 @@ import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from ".
 import { formatIndex } from "../util/review360Form";
 import { calculateCycleActiveStep } from "../util/parCycleActiveStep";
 import { resolveGridSelectedIds } from "../util/parGridSelection";
-import { isDeadlinePassed } from "../util/parDeadline";
-import { formatShortDate } from "../util/parDate";
+import { deadlinePassedEverywhereAt, isDeadlinePassed } from "../util/parDeadline";
+import { formatShortDate, formatShortDateTime } from "../util/parDate";
+import { shareOpensAfter } from "../util/parDepartments";
 import ParCycleDatesStepper from "./ParCycleDatesStepper";
 import ParStatusChip from "./ParStatusChip";
 import ParCompletionKpiTile from "./ParCompletionKpiTile";
@@ -127,6 +128,11 @@ export default function ParLeadTeamRoster({
   // A PAR 2.0 cycle adds each member's 360° index and the team's headline counts.
   const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
   const indexes = useReviewIndexes(cycle.parCycleId, leadEmail, showsPar2);
+  // In a PAR 2.0 cycle the team's PARs are shared once all their 360° feedback is in: once the 360° deadline (or the
+  // team's later self-review deadline) has passed everywhere (the backend's checkShareOpen).
+  const shareOpens = shareOpensAfter(cycle, team.parDepartment);
+  const shareOpensAt = deadlinePassedEverywhereAt(shareOpens.date);
+  const shareWaits = showsPar2 && new Date() < shareOpensAt;
   const indexByEmail = useMemo(
     () => new Map((indexes.data?.members ?? []).map((m) => [m.employeeEmail.toLowerCase(), m.index])),
     [indexes.data],
@@ -507,9 +513,23 @@ export default function ParLeadTeamRoster({
             <Button variant="contained" disabled={selectedIds.length === 0} onClick={handleCopyEmails} startIcon={<CopyIcon size={16} />}>
               Copy Emails
             </Button>
-            <Button variant="contained" disabled={selectedIds.length === 0 || sharing} onClick={handleOpenShareConfirm}>
-              Share
-            </Button>
+            <Tooltip
+              title={
+                shareWaits
+                  ? `Reviews can be shared from ${formatShortDateTime(shareOpensAt)}, when ${shareOpens.after === "360" ? "the 360° deadline" : "this team's self-review deadline"} has passed everywhere.`
+                  : ""
+              }
+            >
+              <span>
+                <Button
+                  variant="contained"
+                  disabled={selectedIds.length === 0 || sharing || shareWaits}
+                  onClick={handleOpenShareConfirm}
+                >
+                  Share
+                </Button>
+              </span>
+            </Tooltip>
             <TextField
               size="small"
               placeholder="Search Members"

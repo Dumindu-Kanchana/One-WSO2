@@ -62,12 +62,12 @@ import { useParEmployeeReviews } from "../api/useLeadHistory";
 import { useGoogleDrivePicker } from "../hooks/useGoogleDrivePicker";
 import { decodeParComment, encodeParComment, isEmptyHtml, paragraphsToHtml } from "../util/parComment";
 import { isPreviewEnabled } from "@config/previewFeatures";
-import { deadlineEndsEverywhereAt, hasEndedEverywhere, isDeadlinePassed } from "../util/parDeadline";
+import { deadlineEndsEverywhereAt, deadlinePassedEverywhereAt, hasEndedEverywhere, isDeadlinePassed } from "../util/parDeadline";
 import { formatShortDate, formatShortDateTime } from "../util/parDate";
 import { downloadParPdf } from "../util/parPdf";
 import { isOpenableUrl, parseSavedUrls, type DriveFile } from "../util/parDriveFile";
 import { isEvidenceMissing, missedDeadlineRatingFor, ratingOptions, ratingRulesFor } from "../util/parLeadership";
-import { employeeDeadlineFor, needsNoEvidence } from "../util/parDepartments";
+import { employeeDeadlineFor, needsNoEvidence, shareOpensAfter } from "../util/parDepartments";
 import ParRichTextField, { type ParRichTextFieldHandle } from "./ParRichTextField";
 import { ParCommentView } from "./ParContent";
 import { ParAutoAssignedChip } from "./ParChips";
@@ -395,6 +395,20 @@ export default function ParLeadReviewPanel({
     return () => window.clearTimeout(timer);
   }, [selfReviewClosesAtMs, selfReviewClosed]);
 
+  // In a PAR 2.0 cycle a PAR is shared once all its 360° feedback is in, by PAR admins too (the backend's
+  // checkShareOpen): once the 360° deadline (or the employee's later self-review deadline) has passed everywhere,
+  // as the missed-deadline job judges deadlines. The panel redraws then, as for the self-review closing.
+  const shareOpens = shareOpensAfter(cycle, parRatingData?.parDepartment);
+  const shareOpensAtMs = deadlinePassedEverywhereAt(shareOpens.date).getTime();
+  const shareWaits = showsPar2 && Date.now() < shareOpensAtMs;
+  useEffect(() => {
+    if (!shareWaits) return;
+    const wait = Math.max(shareOpensAtMs - Date.now() + 1, 0);
+    if (wait > 2 ** 31 - 1) return;
+    const timer = window.setTimeout(redraw, wait);
+    return () => window.clearTimeout(timer);
+  }, [shareOpensAtMs, shareWaits]);
+
   if (rating.isLoading) {
     return <Skeleton variant="rectangular" height={360} sx={{ borderRadius: 1.5 }} />;
   }
@@ -462,6 +476,7 @@ export default function ParLeadReviewPanel({
     !ratingUpdate.isPending &&
     !saveSummary.isPending &&
     employeeReady &&
+    !shareWaits &&
     Boolean(shownRating) &&
     !isEmptyHtml(leadComment) &&
     !isEvidenceMissing({
@@ -903,6 +918,14 @@ export default function ParLeadReviewPanel({
                       {missedDeadlineRating
                         ? `. If they don't by ${formatShortDateTime(selfReviewClosesAt)}, their rating will be ${missedDeadlineRating}.`
                         : `, or from ${formatShortDateTime(selfReviewClosesAt)} if they don't.`}
+                    </Alert>
+                  )}
+                  {employeeReady && shareWaits && (
+                    <Alert severity="info" sx={{ py: 0.25 }}>
+                      {shareOpens.after === "360"
+                        ? `You can share from ${formatShortDateTime(new Date(shareOpensAtMs))}, when the 360° deadline has passed everywhere and all 360° feedback is in.`
+                        : `You can share from ${formatShortDateTime(new Date(shareOpensAtMs))}, when ${parRatingData.parEmployeeName?.split(" ")[0] ?? "the employee"}'s self-review deadline has passed everywhere.`}
+                      {" "}You can save a draft until then.
                     </Alert>
                   )}
                   <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, pt: 1, borderTop: 1, borderColor: "divider" }}>
