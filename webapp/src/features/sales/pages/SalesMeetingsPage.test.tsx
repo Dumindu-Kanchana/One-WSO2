@@ -29,8 +29,10 @@ const state = vi.hoisted(() => ({
   echoClient: null as unknown as EchoCallsClient,
   contextClient: null as unknown as CallContextClient,
   salesMeetings: [] as Meeting[],
+  identity: { status: "ready", sub: "user-under-test" } as { status: string; sub?: string; message?: string },
 }));
 const salesList = vi.fn((params: MeetingsQueryParams) => params);
+const retryIdentity = vi.fn();
 
 vi.mock("@config/apiConfig", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@config/apiConfig")>()),
@@ -70,8 +72,11 @@ vi.mock("../components/SalesShell", () => ({
 vi.mock("../components/AttachmentsDialog", () => ({ default: () => null }));
 vi.mock("@asgardeo/react", () => ({ useAsgardeo: () => ({ isSignedIn: true }) }));
 vi.mock("@hooks/useAsgardeoSub", () => ({
-  useAsgardeoSub: () => ({ state: { status: "ready", sub: "user-under-test" }, retry: () => {} }),
-  foldIdentityError: (query: unknown) => query,
+  useAsgardeoSub: () => ({ state: state.identity, retry: retryIdentity }),
+  foldIdentityError: (query: object, identity: { status: string; message?: string }, retry: () => void) =>
+    identity.status === "error"
+      ? { ...query, isError: true, isPending: false, isLoading: false, isFetching: false, error: new Error(identity.message), refetch: async () => retry() }
+      : query,
 }));
 vi.mock("@hooks/useAccessToken", () => ({ useAccessToken: () => async () => "token" }));
 
@@ -114,6 +119,8 @@ beforeEach(() => {
   context = vi.fn(mockCallContextClient().context);
   state.contextClient = { context } as unknown as CallContextClient;
   salesList.mockClear();
+  retryIdentity.mockClear();
+  state.identity = { status: "ready", sub: "user-under-test" };
 });
 
 // Page tests drive MUI selects and an autocomplete; give a busy runner room.
@@ -244,6 +251,83 @@ describe("SalesMeetingsPage — the Echo scope", () => {
   });
 });
 
+describe("SalesMeetingsPage — the Echo scope, when things go wrong", () => {
+  it("stays on the Sales backend's list while paging after the Echo list failed, until Retry", SLOW, async () => {
+    state.salesMeetings = MEETINGS;
+    echo.calls.mockRejectedValue(new Error("down"));
+    renderAt();
+    await screen.findByText(/isn't available right now/, {}, { timeout: 5000 });
+    const failedCalls = echo.calls.mock.calls.length;
+
+    await userEvent.click(screen.getByRole("button", { name: /next page/i }));
+    await waitFor(() => expect(salesList).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, enabled: true })));
+    expect(screen.getByText(/isn't available right now/)).toBeInTheDocument();
+    // The new page is not asked of the Echo backend: the fallback holds for these filters.
+    expect(echo.calls.mock.calls.length).toBe(failedCalls);
+
+    echo.calls.mockImplementation(mockEchoCallsClient().calls);
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("group", { name: "Filter calls" })).toBeInTheDocument();
+    expect(screen.queryByText(/isn't available right now/)).not.toBeInTheDocument();
+  });
+
+  it("reports a failure to tell who is signed in, falls back, and retries it", SLOW, async () => {
+    state.identity = { status: "error", message: "Could not read your sign-in." };
+    renderAt();
+    expect(await screen.findByText(/isn't available right now/)).toBeInTheDocument();
+    expect(echo.calls).not.toHaveBeenCalled();
+    expect(salesList).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true }));
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retryIdentity).toHaveBeenCalled();
+  });
+
+  it("says when the filter options can't be loaded, and loads them on Retry", SLOW, async () => {
+    const options = mockEchoCallsClient().filters;
+    echo.filters.mockRejectedValue(new Error("down"));
+    renderAt("/sales/meetings?owner=lars@wso2.com");
+    expect(await screen.findByText("Couldn't load the filter options.", {}, { timeout: 5000 })).toBeInTheDocument();
+    // What was picked stays picked, and applied.
+    expect(screen.getByRole("combobox", { name: "Opportunity Owner (AM)" })).toHaveTextContent("lars@wso2.com");
+    expect(echo.calls).toHaveBeenLastCalledWith(expect.objectContaining({ owners: ["lars@wso2.com"] }));
+
+    echo.filters.mockImplementation(options);
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByText("Couldn't load the filter options.")).not.toBeInTheDocument());
+    expect(screen.getByRole("combobox", { name: "Opportunity Owner (AM)" })).toHaveTextContent("Lars Holm");
+  });
+
+  it("goes back to the first page for earlier filters too, not to the page left there", SLOW, async () => {
+    renderAt();
+    await screen.findByRole("link", { name: "Harbourline – API platform" });
+    await userEvent.click(screen.getByRole("button", { name: /next page/i }));
+    await waitFor(() => expect(echo.calls).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Region" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^EU/ }));
+    await userEvent.keyboard("{Escape}");
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(where().toString()).toBe("");
+    // The unfiltered first page again (from the cache), not the second page left before.
+    expect(await screen.findByText("1–10 of 14")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Harbourline – API platform" })).toBeInTheDocument();
+  });
+
+  it("finds calls by their opportunity's account name", async () => {
+    renderAt("/sales/meetings?q=Log%C3%ADstica");
+    // The account-only call, and the deal call whose opportunity is that account's.
+    await waitFor(() => expect(bodyRows()).toHaveLength(2));
+    expect(screen.getByText("Andes – solution proposal")).toBeInTheDocument();
+  });
+
+  it("shows every host team, not one from the URL, where the host team isn't applied", () => {
+    state.echoConfigured = false;
+    renderAt("/sales/meetings?team=Sales+-+EU");
+    expect(screen.getByRole("combobox", { name: "Host team" })).toHaveTextContent("All host teams");
+    expect(salesList).toHaveBeenLastCalledWith(expect.objectContaining({ region: null }));
+  });
+});
+
 describe("SalesMeetingsPage — the All scope", () => {
   it("lists from the Sales backend and asks for the page's live details in one request", async () => {
     renderAt("/sales/meetings?scope=all");
@@ -260,6 +344,23 @@ describe("SalesMeetingsPage — the All scope", () => {
     // An account-only call takes its account's region.
     const meridian = screen.getByText("Meridian Bank – monthly sync").closest("tr") as HTMLElement;
     expect(meridian).toHaveTextContent("EU");
+  });
+
+  it("asks for an account it learns from an opportunity, when that is where the region is", async () => {
+    // A deal call whose own data names no account, on an opportunity with no Sales Region.
+    const andes = MEETINGS.find((m) => m.title === "Andes – solution proposal") as Meeting;
+    state.salesMeetings = [{ ...andes, opportunityDetails: null }];
+    renderAt("/sales/meetings?scope=all");
+    await waitFor(() => expect(context).toHaveBeenCalledTimes(2));
+    expect(context.mock.calls[0][0]).toEqual({ opportunityIds: ["006Hb00000Andes001"], accountIds: [] });
+    expect(context.mock.calls[1][0]).toEqual({ opportunityIds: [], accountIds: ["001Hb00000Andes001"] });
+    await waitFor(() => expect(bodyRows()[0]).toHaveTextContent("LATAM"));
+  });
+
+  it("asks once when the page already names every account", async () => {
+    renderAt("/sales/meetings?scope=all");
+    await screen.findByRole("link", { name: "Harbourline – API platform" });
+    await waitFor(() => expect(context).toHaveBeenCalledTimes(1));
   });
 
   it("keeps the list, on today's data, when the live details fail", SLOW, async () => {

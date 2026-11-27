@@ -46,6 +46,17 @@ describe("callFilters", () => {
     expect(filters.owners).toEqual(["a@wso2.com"]);
   });
 
+  it("keeps real days and drops impossible ones", () => {
+    const dates = (from: string, to: string) => {
+      const filters = filtersFromSearch(new URLSearchParams({ from, to }));
+      return [filters.from, filters.to];
+    };
+    expect(dates("2026-11-01", "2028-02-29")).toEqual(["2026-11-01", "2028-02-29"]);
+    expect(dates("2026-13-01", "2026-02-30")).toEqual([null, null]);
+    expect(dates("2026-00-10", "2026-04-31")).toEqual([null, null]);
+    expect(dates("2027-02-29", "2026-11-00")).toEqual([null, null]);
+  });
+
   it("tells the Echo filters from the search text", () => {
     expect(hasEchoFilters({ ...NO_FILTERS, q: "x" })).toBe(false);
     expect(hasEchoFilters({ ...NO_FILTERS, hostTeam: "Sales - EU" })).toBe(false);

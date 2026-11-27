@@ -20,6 +20,7 @@ import type { Meeting } from "../../api/salesTypes";
 import type { StoredCallContext } from "../../echoCalls/types";
 import {
   NO_CONTEXT,
+  recordFor,
   contextRequestFor,
   opportunityCell,
   ownerCell,
@@ -100,6 +101,18 @@ describe("a call whose stored opportunity hasn't been read yet", () => {
     expect(opportunityCell(m, view)).toEqual({ kind: "linked", id: OPP, label: "Nordlys Energi AS" });
     expect(ownerCell(m, view)).toEqual({ kind: "host", email: "host@wso2.com", marked: true });
     expect(regionCell(m, view)).toEqual({ kind: "none" });
+  });
+});
+
+describe("an id that names an inherited property", () => {
+  it("is not taken for a record", () => {
+    expect(recordFor({}, "constructor")).toBeUndefined();
+    expect(recordFor({ [OPP]: 1 }, OPP)).toBe(1);
+    const m = meeting({ opportunityId: "constructor", accountId: "toString", accountName: "Nordlys Energi AS" });
+    const live = { status: "ready" as const, opportunities: {}, accounts: {} };
+    expect(opportunityCell(m, live)).toEqual({ kind: "linked", id: "constructor", label: "Nordlys Energi AS" });
+    expect(ownerCell(m, live)).toEqual({ kind: "host", email: "host@wso2.com", marked: true });
+    expect(regionCell(m, live)).toEqual({ kind: "none" });
   });
 });
 

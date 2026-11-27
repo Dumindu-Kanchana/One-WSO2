@@ -206,8 +206,10 @@ function matches(call: EchoCall, query: Omit<EchoCallsQuery, "page" | "pageSize"
   if (query.from && day < query.from) return false;
   if (query.to && day > query.to) return false;
   if (query.q) {
+    // The title, the call's account (its own, else its opportunity's) or the opportunity.
     const q = query.q;
-    if (!contains(meeting.title, q) && !contains(context.account?.name, q) && !contains(context.opportunity?.name, q)) {
+    const accountName = context.account?.name ?? context.opportunity?.accountName;
+    if (!contains(meeting.title, q) && !contains(accountName, q) && !contains(context.opportunity?.name, q)) {
       return false;
     }
   }

@@ -44,6 +44,16 @@ export interface CallContextView {
   rows?: Record<number, StoredCallContext>;
 }
 
+/**
+ * The record a map holds under `id`, and only one it holds itself.
+ *
+ * The maps are plain objects parsed from JSON, so an id such as "constructor" would
+ * otherwise read the object's inherited properties and be taken for a record.
+ */
+export function recordFor<T>(map: Record<string, T>, id: string | null | undefined): T | undefined {
+  return id && Object.hasOwn(map, id) ? map[id] : undefined;
+}
+
 /** No live details: every screen falls back to the meeting's own data. */
 export const NO_CONTEXT: CallContextView = { status: "unavailable", opportunities: {}, accounts: {} };
 
@@ -117,7 +127,7 @@ export function opportunityCell(meeting: Meeting, context: CallContextView): Opp
   if (stored?.name?.trim()) return { kind: "live", id: stored.id, name: stored.name.trim(), stage: stored.stage };
   const id = meetingOpportunityId(meeting);
   if (id === null) return isLinked(meeting) ? { kind: "none" } : { kind: "blank" };
-  const live = context.opportunities[id];
+  const live = recordFor(context.opportunities, id);
   if (live) return { kind: "live", id, name: live.name, stage: live.stage };
   if (context.status === "loading") return { kind: "loading" };
   return { kind: "linked", id, label: meetingCustomer(meeting) ?? "Open deal" };
@@ -147,7 +157,7 @@ export function ownerCell(meeting: Meeting, context: CallContextView): OwnerCell
     return { kind: "host", email: meeting.host, marked: true };
   }
   const id = meetingOpportunityId(meeting);
-  const live = id ? context.opportunities[id] : undefined;
+  const live = recordFor(context.opportunities, id);
   const name = live?.ownerName?.trim() || live?.ownerEmail?.trim();
   if (name) return { kind: "owner", name, email: live?.ownerEmail?.trim() || null };
   const loading = id !== null && !live && context.status === "loading";
@@ -178,11 +188,11 @@ export function regionCell(meeting: Meeting, context: CallContextView): RegionCe
   }
   if (!isLinked(meeting)) return { kind: "blank" };
   const opportunityId = meetingOpportunityId(meeting);
-  const opportunity = opportunityId ? context.opportunities[opportunityId] : undefined;
+  const opportunity = recordFor(context.opportunities, opportunityId);
   const fromOpportunity = opportunity?.salesRegion?.trim();
   if (fromOpportunity) return { kind: "value", value: fromOpportunity, title: fromOpportunity };
   const accountId = meetingAccountId(meeting) ?? opportunity?.accountId ?? null;
-  const fromAccount = accountRegion(accountId ? context.accounts[accountId] : undefined);
+  const fromAccount = accountRegion(recordFor(context.accounts, accountId));
   if (fromAccount) return { kind: "value", ...fromAccount };
   return context.status === "loading" ? { kind: "loading" } : { kind: "none" };
 }

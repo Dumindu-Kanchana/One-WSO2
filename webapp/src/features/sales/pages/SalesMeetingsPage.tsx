@@ -26,8 +26,8 @@ import { isSalesBackendConfigured, useSalesRegions, useMeetings } from "../api/u
 import { describeError, isForbidden } from "../util/salesError";
 import { meetingPath } from "../util/salesPaths";
 import { isEchoBackendConfigured } from "@config/apiConfig";
-import { useCallContext } from "../callContext/api/useCallContext";
-import { contextRequestFor, storedContextView } from "../callContext/util/callContext";
+import { usePageCallContext } from "../callContext/api/useCallContext";
+import { storedContextView } from "../callContext/util/callContext";
 import { useEchoCalls } from "../echoCalls/api/useEchoCalls";
 import EchoCallFilters from "../echoCalls/components/EchoCallFilters";
 import {
@@ -71,8 +71,11 @@ export default function SalesMeetingsPage() {
   //
   // The page is held against the filters it was chosen under, rather than reset by the
   // handlers: the filters arrive through the URL, so a Back, a pasted link or a handler all
-  // reset it the same way, and no render ever pairs new filters with an old page.
+  // reset it the same way, and no render ever pairs new filters with an old page. Reset
+  // during render, as MeetingDetailPage resets the player clock, so going back to earlier
+  // filters starts at their first page too rather than restoring a page left long ago.
   const [paging, setPaging] = useState({ key: filterKey, page: 0 });
+  if (paging.key !== filterKey) setPaging({ key: filterKey, page: 0 });
   const page = paging.key === filterKey ? paging.page : 0;
   const setPage = (next: number) => setPaging({ key: filterKey, page: next });
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -91,6 +94,11 @@ export default function SalesMeetingsPage() {
 
   // ---- The Echo scope, from the Echo backend ----------------------------------------
   const echoWanted = filters.scope === "echo" && echoConfigured;
+  // The filters the Echo list failed under. For them the page stays on the Sales backend's
+  // list, paging included (a new page is a new query with no error of its own), until
+  // Retry or a change of filters asks the Echo backend again.
+  const [echoDownFor, setEchoDownFor] = useState<string | null>(null);
+  const echoDown = echoWanted && echoDownFor === filterKey;
   const echoQuery = useEchoCalls(
     {
       page,
@@ -104,10 +112,17 @@ export default function SalesMeetingsPage() {
       from: filters.from,
       to: filters.to,
     },
-    echoWanted,
+    echoWanted && !echoDown,
   );
-  const echoFailed = echoWanted && echoQuery.isError;
+  if (echoWanted && !echoDown && echoQuery.isError && !echoQuery.isFetching) setEchoDownFor(filterKey);
+  const echoFailed = echoDown || (echoWanted && echoQuery.isError);
   const fromEcho = echoWanted && !echoFailed;
+  const retryEcho = () => {
+    // The request starts before the fallback is lifted, so the lifted render already sees it
+    // in flight rather than the old error.
+    void echoQuery.refetch();
+    setEchoDownFor(null);
+  };
 
   // ---- The All scope, and the Echo scope's fallback, from the Sales backend ----------
   // Both scopes list past meetings only; the "already ended" cutoff is computed per fetch
@@ -129,10 +144,9 @@ export default function SalesMeetingsPage() {
 
   // The calls' opportunity and account details. The Echo list brings its own; a Sales
   // backend page asks the Echo backend for the live details of every call on it, in one
-  // request. Neither blocks or breaks the list: until (or unless) they arrive, the rows
-  // show the meeting's own data.
-  const liveRequest = contextRequestFor(fromEcho ? [] : meetings);
-  const liveContext = useCallContext(liveRequest.opportunityIds, liveRequest.accountIds);
+  // request (see usePageCallContext). Neither blocks or breaks the list: until (or unless)
+  // they arrive, the rows show the meeting's own data.
+  const liveContext = usePageCallContext(fromEcho ? [] : meetings);
   const context = useMemo(() => (fromEcho ? storedContextView(calls) : liveContext), [fromEcho, calls, liveContext]);
 
   // Picked accounts and opportunities, named from the calls listed under them.
@@ -177,7 +191,9 @@ export default function SalesMeetingsPage() {
         <MeetingFilters
           scope={filters.scope}
           onScopeChange={changeScope}
-          hostTeam={filters.hostTeam}
+          // Applied in the All scope only, so shown there only: under Echo a team from the
+          // URL would sit in the disabled selector while the list ignores it.
+          hostTeam={filters.scope === "all" ? filters.hostTeam : null}
           onHostTeamChange={(hostTeam) => update({ hostTeam })}
           hostTeams={hostTeamsQuery.data?.regions ?? []}
           hostTeamsLoading={hostTeamsQuery.isLoading}
@@ -203,7 +219,7 @@ export default function SalesMeetingsPage() {
             severity="info"
             sx={{ mb: 2 }}
             action={
-              <Button color="inherit" size="small" onClick={() => void echoQuery.refetch()}>
+              <Button color="inherit" size="small" onClick={retryEcho}>
                 Retry
               </Button>
             }

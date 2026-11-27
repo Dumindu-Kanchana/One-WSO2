@@ -59,7 +59,15 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const text = (value: string | null): string | null => value?.trim() || null;
 const list = (values: string[]): string[] => [...new Set(values.map((v) => v.trim()).filter(Boolean))];
-const date = (value: string | null): string | null => (value && DATE.test(value) ? value : null);
+/** A `YYYY-MM-DD` that names a real day: 2026-02-30 and 2026-13-01 are dropped, not sent. */
+const date = (value: string | null): string | null => {
+  if (!value || !DATE.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  const real =
+    parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+  return real ? value : null;
+};
 
 export function filtersFromSearch(params: URLSearchParams): CallFilters {
   return {

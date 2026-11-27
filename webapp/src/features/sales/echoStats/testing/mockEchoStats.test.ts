@@ -101,7 +101,12 @@ describe.each(STATS_DAYS)("mockEchoAdminStats(%i)", (days) => {
     );
     expect(sum(progress.byRegion, (r) => r.stageChanges)).toBe(progress.stageChanges);
     expect(sum(progress.byOwner, (o) => o.closedWon)).toBe(progress.closedWon);
-    expect(new Set(progress.changes.map((c) => c.opportunityId)).size).toBe(Math.min(progress.stageChanges, 50));
+    // The list is the first 50 changes in range, and one opportunity can change more than
+    // once: its opportunities are some of those that moved, and all of them when it isn't cut.
+    expect(progress.changes.length).toBeLessThanOrEqual(50);
+    const listed = new Set(progress.changes.map((c) => c.opportunityId)).size;
+    expect(listed).toBeLessThanOrEqual(progress.stageChanges);
+    if (progress.changes.length < 50) expect(listed).toBe(progress.stageChanges);
     for (const change of progress.changes) expect(change.at >= stats.range.from).toBe(true);
   });
 

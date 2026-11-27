@@ -16,6 +16,7 @@
 
 import { useState } from "react";
 import {
+  Alert,
   Autocomplete,
   Box,
   Button,
@@ -319,6 +320,22 @@ export default function EchoCallFilters({
         slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: filters.from ?? undefined } }}
         sx={{ width: 160 }}
       />
+      {/* Without the options the selects offer nothing to pick, which would look like no
+          owners, regions or call types at all: say so, and offer to ask again. What is
+          already picked stays picked and applied. */}
+      {options.error && !options.data && (
+        <Alert
+          severity="error"
+          sx={{ py: 0, alignItems: "center" }}
+          action={
+            <Button color="inherit" size="small" onClick={() => void options.refetch()}>
+              Retry
+            </Button>
+          }
+        >
+          Couldn't load the filter options.
+        </Alert>
+      )}
       {hasEchoFilters(filters) && (
         <Button
           size="small"

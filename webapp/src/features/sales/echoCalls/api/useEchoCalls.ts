@@ -23,7 +23,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAsgardeo } from "@asgardeo/react";
 import { useAccessToken } from "@hooks/useAccessToken";
-import { useAsgardeoSub } from "@hooks/useAsgardeoSub";
+import { foldIdentityError, useAsgardeoSub } from "@hooks/useAsgardeoSub";
 import { isEchoBackendConfigured } from "@config/apiConfig";
 import { salesRetry } from "../../util/salesError";
 import type { CallFilterOptions, EchoCallList } from "../types";
@@ -32,11 +32,11 @@ import { httpEchoCallsClient, type EchoCallsClient, type EchoCallsQuery } from "
 function useEchoCallsBasis() {
   const { isSignedIn } = useAsgardeo();
   const getAccessToken = useAccessToken();
-  const { state: subState } = useAsgardeoSub();
+  const { state: subState, retry: retryIdentity } = useAsgardeoSub();
   const userSub = subState.status === "ready" ? subState.sub : undefined;
   const client: EchoCallsClient = useMemo(() => httpEchoCallsClient(getAccessToken), [getAccessToken]);
   const ready = isEchoBackendConfigured() && isSignedIn && Boolean(userSub);
-  return { client, userSub, ready };
+  return { client, userSub, ready, subState, retryIdentity };
 }
 
 /**
@@ -46,11 +46,14 @@ function useEchoCallsBasis() {
  * change is a new query. The previous page stays on screen while the next loads, as the
  * Sales backend's list does, so the table doesn't collapse to skeletons on every click.
  * `refetchOnMount` is opted back in for the reason useMeetings gives.
+ *
+ * A failure to tell who is signed in is reported as this query's error (with a refetch
+ * that retries it), as the Sales hooks report it, rather than as a list that never loads.
  */
 export function useEchoCalls(query: EchoCallsQuery, enabled: boolean) {
-  const { client, userSub, ready } = useEchoCallsBasis();
+  const { client, userSub, ready, subState, retryIdentity } = useEchoCallsBasis();
   const { page, pageSize, q, owners, regions, types, accounts, opportunities, from, to } = query;
-  return useQuery<EchoCallList>({
+  const result = useQuery<EchoCallList>({
     queryKey: ["echo-calls", userSub, page, pageSize, q, owners, regions, types, accounts, opportunities, from, to],
     enabled: ready && enabled,
     queryFn: () => client.calls({ page, pageSize, q, owners, regions, types, accounts, opportunities, from, to }),
@@ -60,6 +63,7 @@ export function useEchoCalls(query: EchoCallsQuery, enabled: boolean) {
       previousQuery?.queryKey[1] === userSub ? previous : undefined,
     retry: salesRetry,
   });
+  return foldIdentityError(result, subState, retryIdentity);
 }
 
 /**
@@ -69,9 +73,9 @@ export function useEchoCalls(query: EchoCallsQuery, enabled: boolean) {
  * a visit's clicks, hence five minutes.
  */
 export function useCallFilterOptions(q: string, enabled: boolean) {
-  const { client, userSub, ready } = useEchoCallsBasis();
+  const { client, userSub, ready, subState, retryIdentity } = useEchoCallsBasis();
   const term = q.trim();
-  return useQuery<CallFilterOptions>({
+  const result = useQuery<CallFilterOptions>({
     queryKey: ["echo-call-filters", userSub, term],
     enabled: ready && enabled,
     queryFn: () => client.filters(term),
@@ -81,4 +85,5 @@ export function useCallFilterOptions(q: string, enabled: boolean) {
       previousQuery?.queryKey[1] === userSub ? previous : undefined,
     retry: salesRetry,
   });
+  return foldIdentityError(result, subState, retryIdentity);
 }

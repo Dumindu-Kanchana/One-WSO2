@@ -33,6 +33,8 @@ import type { CallContextResponse, ContextAccount, ContextOpportunity } from "..
 import { httpCallContextClient, type CallContextClient } from "./callContextClient";
 import {
   NO_CONTEXT,
+  contextRequestFor,
+  recordFor,
   meetingAccountId,
   meetingOpportunityId,
   normaliseIds,
@@ -82,6 +84,34 @@ export function useCallContext(
   }, [data, enabled, isPending]);
 }
 
+/**
+ * The live details of a page of calls: one request for every opportunity and account the
+ * calls name.
+ *
+ * A call whose own data names no account, linked to an opportunity Salesforce has no Sales
+ * Region for, takes its region from the opportunity's account, which only the answer
+ * names. Those accounts are asked for in one more request, and only when there are any,
+ * so the usual page stays one request.
+ */
+export function usePageCallContext(meetings: Meeting[]): CallContextView {
+  const request = contextRequestFor(meetings);
+  const first = useCallContext(request.opportunityIds, request.accountIds);
+  const learned = meetings.flatMap((meeting) => {
+    if (meetingAccountId(meeting)) return [];
+    const opportunity = recordFor(first.opportunities, meetingOpportunityId(meeting));
+    return opportunity && !opportunity.salesRegion?.trim() && opportunity.accountId ? [opportunity.accountId] : [];
+  });
+  const second = useCallContext([], learned);
+  return useMemo<CallContextView>(() => {
+    if (second === NO_CONTEXT) return first;
+    return {
+      status: second.status === "loading" ? "loading" : first.status,
+      opportunities: first.opportunities,
+      accounts: { ...first.accounts, ...second.accounts },
+    };
+  }, [first, second]);
+}
+
 /** One linked record on the call page: its id, and its live details once (if) they arrive. */
 export interface LinkedRecord<T> {
   id: string | null;
@@ -106,7 +136,7 @@ export function useMeetingCallContext(meeting: Meeting | null | undefined): Meet
   const knownAccountId = meeting ? meetingAccountId(meeting) : null;
   const first = useCallContext([opportunityId], [knownAccountId]);
 
-  const liveOpportunity = opportunityId ? (first.opportunities[opportunityId] ?? null) : null;
+  const liveOpportunity = recordFor(first.opportunities, opportunityId) ?? null;
   const learnedAccountId = knownAccountId ? null : (liveOpportunity?.accountId ?? null);
   const second = useCallContext([], [learnedAccountId]);
 
@@ -118,7 +148,7 @@ export function useMeetingCallContext(meeting: Meeting | null | undefined): Meet
       id: accountId,
       // Still finding out which account, while the opportunity loads.
       status: !knownAccountId && first.status === "loading" ? "loading" : accountSource.status,
-      live: accountId ? (accountSource.accounts[accountId] ?? null) : null,
+      live: recordFor(accountSource.accounts, accountId) ?? null,
     },
   };
 }
