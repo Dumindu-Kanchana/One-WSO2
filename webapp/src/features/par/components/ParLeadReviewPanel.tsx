@@ -292,6 +292,11 @@ export default function ParLeadReviewPanel({
     opts?: { silent?: boolean; onSuccess?: () => void; commentOnly?: boolean },
   ) => {
     if (!parRatingData) return;
+    // Past the hard lead deadline nothing is sent, even from a confirmation opened before it: the panel locks.
+    if (!isAdminView && hardDeadline !== undefined && isDeadlinePassed(hardDeadline)) {
+      setConfirming(false);
+      return;
+    }
     saveSummaryIfChanged().then(
       () => sendRatingUpdate(status, opts),
       (err) => {
@@ -1012,8 +1017,9 @@ export default function ParLeadReviewPanel({
         </Grid>
       )}
 
-      {/* Stays open while sharing, so nothing can be edited behind it and then lost once it's shared. */}
-      <Dialog open={confirming} onClose={() => !sharing && setConfirming(false)} maxWidth="md" fullWidth>
+      {/* Stays open while sharing, so nothing can be edited behind it and then lost once it's shared. Closes when
+          the review locks, as at the hard lead deadline. */}
+      <Dialog open={confirming && !readOnly} onClose={() => !sharing && setConfirming(false)} maxWidth="md" fullWidth>
         <DialogTitle>Share Lead's Feedback?</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">

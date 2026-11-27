@@ -708,6 +708,50 @@ describe("ParLeadReviewPanel: hard lead deadline", () => {
     }
   });
 
+  it("closes an open Share confirmation when the hard lead deadline passes", () => {
+    cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2026-12-15";
+    vi.useFakeTimers({ now: new Date(2026, 11, 15, 23, 59) });
+    try {
+      show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Steady work.</p>") });
+      fireEvent.click(screen.getByRole("button", { name: "Share" }));
+      expect(screen.getByText("Share Lead's Feedback?")).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(61_000));
+      // Past its fade-out.
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(screen.queryByText("Share Lead's Feedback?")).not.toBeInTheDocument();
+      expect(ratingMutate).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("sends nothing, not even a changed 360° summary, when Share is confirmed after the hard lead deadline", async () => {
+    cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2026-12-15";
+    suggestion = {};
+    vi.useFakeTimers({ now: new Date(2026, 11, 15, 23, 59) });
+    try {
+      show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Steady work.</p>") });
+      fireEvent.change(screen.getByLabelText(FIELD), { target: { value: "<p>Clear ownership.</p>" } });
+      fireEvent.click(screen.getByRole("button", { name: "Share" }));
+      // The deadline passes before the panel's timer has redrawn it.
+      vi.setSystemTime(new Date(2026, 11, 16, 0, 0, 30));
+      fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Share" }));
+      await act(async () => {});
+      act(() => vi.advanceTimersByTime(1_000));
+      expect(save).not.toHaveBeenCalled();
+      expect(ratingMutate).not.toHaveBeenCalled();
+      expect(screen.queryByText("Share Lead's Feedback?")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("says N/A for a PAR the lead never rated, not the stored value", () => {
     cycle.parLeadDeadline = "2000-01-01";
     cycle.parLeadHardDeadline = "2000-01-04";
