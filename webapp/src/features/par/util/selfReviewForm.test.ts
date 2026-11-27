@@ -86,6 +86,16 @@ describe("selfReviewForm", () => {
     expect(answerViewHtml("<p><strong>Shipped</strong></p>")).toBe("<p><strong>Shipped</strong></p>");
   });
 
+  it("shows an editor answer's text that looks like markup as it was written, on screen and in the PDF", () => {
+    // What the editor stores for "Fixed <Widget> & the queue", with "Fixed" in bold.
+    const stored = "<p><strong>Fixed</strong> &lt;Widget&gt; &amp; the queue</p>";
+    const shown = document.createElement("div");
+    shown.innerHTML = sanitizeParHtml(answerViewHtml(stored));
+    expect(shown.textContent).toBe("Fixed <Widget> & the queue");
+    expect(shown.querySelector("strong")?.textContent).toBe("Fixed");
+    expect(htmlToPdfText(answerViewHtml(stored))).toContain("<Widget> & the queue");
+  });
+
   it("counts how far an answer is over its limit, formatting included, and stops sharing it", () => {
     const limited: FormDefinition = {
       ...definition,

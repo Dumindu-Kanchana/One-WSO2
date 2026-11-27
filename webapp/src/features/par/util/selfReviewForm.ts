@@ -32,11 +32,11 @@ export function answerHtml(value: string | null | undefined): string {
   return HTML_ANSWER.test(answer) ? answer : paragraphsToHtml(answer);
 }
 
-/** An answer for a read-only view or the PDF, which decode entities before sanitizing (sanitizeParHtml): a plain-text
- * answer is escaped once more, so text such as "<b>" still shows as it was written. */
+/** An answer for a read-only view or the PDF, which decode entities before sanitizing (sanitizeParHtml): it is
+ * escaped once more, so that decoding gives back what was stored, and text such as "<b>" shows as it was written,
+ * whether it was typed in the editor or before it. */
 export function answerViewHtml(value: string | null | undefined): string {
-  const answer = value ?? "";
-  return HTML_ANSWER.test(answer) ? answer : paragraphsToHtml(answer).replace(/&/g, "&amp;");
+  return answerHtml(value).replace(/&/g, "&amp;");
 }
 
 export function isQuestionAnswered(question: FormQuestion, answers: SelfReviewAnswers): boolean {
