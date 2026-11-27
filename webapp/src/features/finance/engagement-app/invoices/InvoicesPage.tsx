@@ -130,7 +130,7 @@ function InvoiceQueue({ queue }: { queue: "po" | "finance" | "push" }): JSX.Elem
   const list = useListView("invoice-queue");
   const invoices = useInvoices({ tab: queue === "po" ? "approve-po" : queue === "finance" ? "approve" : "push", ...list.paramsFor() });
   const rows = invoices.data?.items ?? [];
-  const work = useInvoiceWork(invoices.isPending || invoices.isPlaceholderData ? [] : rows);
+  const work = useInvoiceWork(invoices.isPending || invoices.isPlaceholderData ? [] : rows, { resetKey: queue });
   const [open, setOpen] = useState<Invoice | null>(null);
   const hint = queue === "po" ? ["Reject (PO)", "Approve (PO)"] : queue === "finance" ? ["Reject", "Approve"] : ["Push Invoices to NetSuite"];
   return (

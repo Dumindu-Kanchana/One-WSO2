@@ -157,11 +157,11 @@ function RangeBar({
 }
 
 /** Rows and period of the shown report: the left side of the filter actions row. */
-function ResultLine({ count, from, to }: { count: number | undefined; from: string; to: string }) {
+function ResultLine({ count, loading, from, to }: { count: number | undefined; loading: boolean; from: string; to: string }) {
   return (
     <>
       <Typography variant="body2" color="text.secondary">
-        Rows <b>{count ?? <Skeleton variant="text" width={24} sx={{ display: "inline-block" }} />}</b>
+        Rows <b>{loading ? <Skeleton variant="text" width={24} sx={{ display: "inline-block" }} /> : (count ?? "—")}</b>
       </Typography>
       <Typography variant="body2" color="text.secondary">
         Period <b>{fmtRange(from, to)}</b>
@@ -193,7 +193,7 @@ function TravelReport({ kind }: { kind: "invoices" | "per-diem-payments" }): JSX
         to={to}
         onSearch={(f, t) => list.setFilters({ from: f, to: t })}
         onReset={() => list.setFilters({})}
-        start={<ResultLine count={q.data ? rows.length : undefined} from={from} to={to} />}
+        start={<ResultLine count={q.isPlaceholderData ? undefined : q.data?.length} loading={q.isPending || q.isPlaceholderData} from={from} to={to} />}
         end={<ExportButton report={kind} params={params} filename={filename} disabled={!rows.length} />}
       />
       {q.isError ? (
@@ -340,7 +340,7 @@ function ConsultantReport(): JSX.Element {
           setDraft({ person: null, types: [], businessUnit: "", department: "", team: "" });
           list.setFilters({});
         }}
-        start={<ResultLine count={report.data ? rows.length : undefined} from={from} to={to} />}
+        start={<ResultLine count={report.isPlaceholderData ? undefined : report.data?.length} loading={report.isPending || report.isPlaceholderData} from={from} to={to} />}
         end={<ExportButton report="consultant-allocations" params={params} filename={`consultant-allocations-${from}-to-${to}.csv`} disabled={!rows.length} />}
       >
         {filters}

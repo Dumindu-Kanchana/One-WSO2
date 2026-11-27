@@ -61,6 +61,12 @@ describe("TotalCostCardView", () => {
     expect(line.textContent).not.toContain(";");
   });
 
+  it("leaves the split out when the viewer gets none, even if the data has one", () => {
+    const { getByText, queryByText } = render(<TotalCostCardView state={{ kind: "ready", data: summary }} split={false} />);
+    expect(getByText("USD 1,234.50")).toBeTruthy();
+    expect(queryByText(/Per Diems/)).toBeNull();
+  });
+
   it("shows a partial split, only the sources the viewer may open", () => {
     const data = { ...summary, bySource: [{ source: "invoice" as const, usd: 1000, lines: 2 }] };
     const { getByText, queryByText } = render(<TotalCostCardView state={{ kind: "ready", data }} />);

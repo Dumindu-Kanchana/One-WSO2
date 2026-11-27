@@ -78,7 +78,7 @@ function SearchBox(): JSX.Element {
     () => (settled && search.data && !search.isPlaceholderData ? [...groups.flatMap((g) => g.items.map((item) => ({ kind: g.kind, item }))), "all" as const] : []),
     [groups, settled, search.data, search.isPlaceholderData],
   );
-  const loading = wanted && (!settled || search.isPending || search.isFetching) && !search.isError;
+  const loading = wanted && (!settled || search.isPending || search.isFetching || search.isPlaceholderData) && !search.isError;
 
   useEffect(() => {
     document.getElementById(`${id}-opt-${active}`)?.scrollIntoView?.({ block: "nearest" });

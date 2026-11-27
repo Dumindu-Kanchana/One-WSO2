@@ -154,7 +154,7 @@ export default function CostTransactions({ ctx }: { ctx: WidgetCtx }): JSX.Eleme
           rows={d.groups}
           rowKey={(g) => g.key || g.label}
           onRowClick={drillGroup}
-          canOpen={(g) => Boolean(g.key)}
+          canOpen={(g) => Boolean(g.key) && !q.isPlaceholderData}
           refreshing={q.isPlaceholderData}
           pagination={pagination}
           empty={<Empty title="No transactions match these filters." />}

@@ -65,7 +65,7 @@ export function TotalCostCardView({ state, split: withSplit = true }: { readonly
     );
   }
   const { data } = state;
-  const split = splitParts(data);
+  const split = withSplit ? splitParts(data) : [];
   const notConverted = notConvertedText(data.notConverted);
   return (
     <Card variant="outlined" sx={{ px: 2, py: 1.5, mb: 2 }} component="section" aria-label="Total Cost So Far">

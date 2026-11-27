@@ -64,18 +64,22 @@ const MyAllocationsPage = lazy(() => import("./me/MyAllocationsPage"));
 const PRELOAD: readonly (readonly [RegExp, () => Promise<unknown>])[] = [
   [new RegExp(`${ENGAGEMENT_APP_PATH}(/dashboard)?/?$`), dashboardModule],
   [new RegExp(`${ENGAGEMENT_APP_PATH}/approvals/(internal|marketing)`), approvalsModule],
-  [new RegExp(`${ENGAGEMENT_APP_PATH}/engagements/(customer|internal|marketing)$`), engagementsModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/engagements/(customer|internal|marketing)/?$`), engagementsModule],
   [new RegExp(`${ENGAGEMENT_APP_PATH}/engagements/(new/|[^/]+/edit)`), formModule],
   [new RegExp(`(${ENGAGEMENT_APP_PATH}/engagements|/me/allocations)/[^/]+/(allocations|details)`), engagementModule],
   [new RegExp(`${ENGAGEMENT_APP_PATH}/allocations/`), allocationsModule],
-  [new RegExp(`${ENGAGEMENT_APP_PATH}/travel-requests/(new|in-progress|completed|all)$`), travelModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/travel-requests/(new|in-progress|completed|all)/?$`), travelModule],
   [new RegExp(`(${ENGAGEMENT_APP_PATH}|/me)/travel-requests/[^/]+/`), travelRequestModule],
   [new RegExp(`${ENGAGEMENT_APP_PATH}/invoices/`), invoicesModule],
   [new RegExp(`${ENGAGEMENT_APP_PATH}/reports/`), reportsModule],
   [new RegExp(`(${ENGAGEMENT_APP_PATH}/visas-documents|/me/passport-visas)/`), documentsModule],
   [new RegExp(`${ENGAGEMENT_APP_PATH}/settings/`), settingsModule],
 ];
-if (typeof window !== "undefined") void PRELOAD.find(([path]) => path.test(window.location.pathname))?.[1]();
+if (typeof window !== "undefined") {
+  const { pathname } = window.location;
+  // Best effort: the route asks for the module again when it renders.
+  PRELOAD.find(([path]) => path.test(pathname))?.[1]().catch((e: unknown) => console.warn(`Could not preload the page for ${pathname}`, e));
+}
 
 // Space only, no skeleton of its own: the page that loads draws the one skeleton for its body, so there is not a second one before it.
 const loading = <Box sx={{ minHeight: 240 }} aria-busy="true" />;

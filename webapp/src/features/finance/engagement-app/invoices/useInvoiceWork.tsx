@@ -42,7 +42,7 @@ export function useBatchReport() {
 type InvoiceDialog = { kind: "approve" | "reject" | "push" | "resync"; ids: string[]; stage: InvoiceStage };
 
 /** Invoice approval: PO approval, finance approval, Push to NetSuite and Re-sync. */
-export function useInvoiceWork(rows: readonly Invoice[], { tripOpen }: { tripOpen?: boolean } = {}) {
+export function useInvoiceWork(rows: readonly Invoice[], { tripOpen, resetKey }: { tripOpen?: boolean; resetKey?: string } = {}) {
   const { p } = useEngagementAccess();
   const steps = invoiceSteps(p);
   const batch = useInvoiceBatch();
@@ -51,6 +51,12 @@ export function useInvoiceWork(rows: readonly Invoice[], { tripOpen }: { tripOpe
   const report = useBatchReport();
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<InvoiceDialog | null>(null);
+  // A confirmation names the invoices of one queue, so it does not outlive a move to another.
+  const [dialogQueue, setDialogQueue] = useState(resetKey);
+  if (dialogQueue !== resetKey) {
+    setDialogQueue(resetKey);
+    setDialog(null);
+  }
 
   const stepActs = (stage: InvoiceStage): boolean =>
     (stage === "po" && steps.po) || (stage === "finance" && steps.finance) || ((stage === "push" || stage === "failed") && steps.push);
