@@ -14,7 +14,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRedrawAt } from "../hooks/useRedrawAt";
 import {
   Avatar,
   Box,
@@ -134,15 +135,7 @@ export default function ParLeadTeamRoster({
   const shareOpensAtMs = shareOpensAt.getTime();
   const shareWaits = showsPar2 && new Date() < shareOpensAt;
   // The roster redraws when Share opens, as the review panel does.
-  const [, redraw] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    if (!shareWaits) return;
-    const wait = Math.max(shareOpensAtMs - Date.now() + 1, 0);
-    // A browser timer can't wait longer than about 24 days, and no one keeps the roster open that long.
-    if (wait > 2 ** 31 - 1) return;
-    const timer = window.setTimeout(redraw, wait);
-    return () => window.clearTimeout(timer);
-  }, [shareOpensAtMs, shareWaits]);
+  useRedrawAt(shareOpensAtMs, shareWaits);
   const indexByEmail = useMemo(
     () => new Map((indexes.data?.members ?? []).map((m) => [m.employeeEmail.toLowerCase(), m.index])),
     [indexes.data],

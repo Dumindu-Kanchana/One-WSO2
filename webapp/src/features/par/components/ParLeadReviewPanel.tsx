@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -82,6 +82,7 @@ import { useParShowsPar2, useReviewResponses } from "../api/useReview360";
 import { useLead360SummarySuggestion, useSaveLead360Summary } from "../api/useLead360Summary";
 import { MIN_360_RESPONSES } from "../api/review360Types";
 import ParLead360Evidence, { ParLead360Guidance } from "./ParLead360Evidence";
+import { useRedrawAt } from "../hooks/useRedrawAt";
 import ParLead360Suggestion from "./ParLead360Suggestion";
 
 type SpecialRatingUi = "NONE" | "TOP5P" | "TOP20P";
@@ -385,17 +386,9 @@ export default function ParLeadReviewPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead360Summary, readOnly, saveSummary.isPending, parRatingData]);
 
-  // If the self-review closes while the panel is open (even between a render and this effect), the panel
+  // If the self-review closes while the panel is open (even between a render and the timer), the panel
   // redraws, so it shows what the lead can do now without a reload.
-  const [, redraw] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    if (selfReviewClosed) return;
-    const wait = Math.max(selfReviewClosesAtMs - Date.now() + 1, 0);
-    // A browser timer can't wait longer than about 24 days, and no one keeps the panel open that long.
-    if (wait > 2 ** 31 - 1) return;
-    const timer = window.setTimeout(redraw, wait);
-    return () => window.clearTimeout(timer);
-  }, [selfReviewClosesAtMs, selfReviewClosed]);
+  useRedrawAt(selfReviewClosesAtMs, !selfReviewClosed);
 
   // In a PAR 2.0 cycle a PAR is shared once all its 360° feedback is in, by PAR admins too (the backend's
   // checkShareOpen): once the 360° deadline (or the employee's later self-review deadline) has passed everywhere,
@@ -403,24 +396,12 @@ export default function ParLeadReviewPanel({
   const shareOpens = shareOpensAfter(cycle, parRatingData?.parDepartment);
   const shareOpensAtMs = deadlinePassedEverywhereAt(shareOpens.date).getTime();
   const shareWaits = showsPar2 && Date.now() < shareOpensAtMs;
-  useEffect(() => {
-    if (!shareWaits) return;
-    const wait = Math.max(shareOpensAtMs - Date.now() + 1, 0);
-    if (wait > 2 ** 31 - 1) return;
-    const timer = window.setTimeout(redraw, wait);
-    return () => window.clearTimeout(timer);
-  }, [shareOpensAtMs, shareWaits]);
+  useRedrawAt(shareOpensAtMs, shareWaits);
 
   // The lead's review closes after the hard lead deadline, by their own day as isDeadlinePassed judges it: the panel
   // redraws then too.
   const hardDeadlineEndsAtMs = hardDeadline ? new Date(`${hardDeadline}T23:59:59.999`).getTime() : NaN;
-  useEffect(() => {
-    if (isAdminView || Number.isNaN(hardDeadlineEndsAtMs) || hardDeadlinePassed) return;
-    const wait = Math.max(hardDeadlineEndsAtMs - Date.now() + 1, 0);
-    if (wait > 2 ** 31 - 1) return;
-    const timer = window.setTimeout(redraw, wait);
-    return () => window.clearTimeout(timer);
-  }, [isAdminView, hardDeadlineEndsAtMs, hardDeadlinePassed]);
+  useRedrawAt(hardDeadlineEndsAtMs, !isAdminView && !hardDeadlinePassed);
 
   if (rating.isLoading) {
     return <Skeleton variant="rectangular" height={360} sx={{ borderRadius: 1.5 }} />;
