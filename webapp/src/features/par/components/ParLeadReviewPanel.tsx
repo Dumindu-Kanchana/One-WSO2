@@ -310,7 +310,9 @@ export default function ParLeadReviewPanel({
         parRatingId: parRatingData.parRatingId,
         payload: {
           parLeadStatus: status,
-          parLeadComment: encodeParComment(leadComment),
+          // A comment never written is left out: the backend refuses an empty one. (A comment the lead
+          // clears still holds the editor's empty paragraph, so it's sent and saved empty.)
+          ...(leadComment ? { parLeadComment: encodeParComment(leadComment) } : {}),
           // The autosave fires purely off comment typing and must not also
           // commit whatever the rating dropdowns currently hold — sending
           // parSpecialRating with it would clobber a saved Top 5%/20%
@@ -332,7 +334,7 @@ export default function ParLeadReviewPanel({
               }),
           // Only an admin caller may set this field — the backend rejects a
           // non-empty value from anyone else.
-          ...(isAdminView ? { parAdminComment: encodeParComment(adminComment) } : {}),
+          ...(isAdminView && adminComment ? { parAdminComment: encodeParComment(adminComment) } : {}),
         },
       },
       {

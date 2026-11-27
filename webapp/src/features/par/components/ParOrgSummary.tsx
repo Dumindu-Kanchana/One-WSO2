@@ -15,7 +15,7 @@
 // under the License.
 
 import { useState } from "react";
-import { Box, Button, Card, Chip, Dialog, DialogContent, DialogTitle, Divider, Grid, IconButton, Link, Skeleton, Stack, Tab, Tabs, Tooltip, Typography } from "@wso2/oxygen-ui";
+import { Box, Button, Card, Chip, Divider, Grid, IconButton, Link, Skeleton, Stack, Tab, Tabs, Tooltip, Typography } from "@wso2/oxygen-ui";
 import {
   ArrowLeftIcon,
   CalendarIcon,
@@ -41,7 +41,7 @@ import { useParAdminTeams } from "../api/useParAdmin";
 import { useSetParCycleStatus } from "../api/useParMutations";
 import ParCompletionKpiTile from "./ParCompletionKpiTile";
 import ParCompletionOverview from "./ParCompletionOverview";
-import ParCycleDatesStepper from "./ParCycleDatesStepper";
+import ParCycleDatesDialog from "./ParCycleDatesDialog";
 import ParLeadReviewTabs from "./ParLeadReviewTabs";
 import ParOrgTeamRoster from "./ParOrgTeamRoster";
 import ParOrgTeamViewTab from "./ParOrgTeamViewTab";
@@ -259,15 +259,12 @@ export default function ParOrgSummary({
         {tab === 3 && <ParOrgQuotaAllocationsTab cycle={cycle} />}
       </Card>
 
-      {/* Opened at width="80vw" rather than a fixed maxWidth breakpoint —
-          the five stepper steps need the room. */}
-      <Dialog open={cycleDatesOpen} onClose={() => setCycleDatesOpen(false)} maxWidth={false} slotProps={{ paper: { sx: { width: "80vw" } } }}>
-        <DialogTitle>Cycle Dates</DialogTitle>
-        <Divider />
-        <DialogContent sx={{ pt: 4, pb: 4 }}>
-          <ParCycleDatesStepper cycle={cycle} activeStep={calculateCycleActiveStep(cycle)} />
-        </DialogContent>
-      </Dialog>
+      <ParCycleDatesDialog
+        cycle={cycle}
+        open={cycleDatesOpen}
+        onClose={() => setCycleDatesOpen(false)}
+        activeStep={calculateCycleActiveStep(cycle)}
+      />
 
       {/* Conditionally rendered, like ParEditQuotaDialog, so a fresh instance
           (and fresh form state) mounts each time it's opened. */}

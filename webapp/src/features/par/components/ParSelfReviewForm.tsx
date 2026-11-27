@@ -26,7 +26,6 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
-  TextField,
   Typography,
 } from "@wso2/oxygen-ui";
 import { CircleCheckIcon, PlayCircleIcon } from "@wso2/oxygen-ui-icons-react";
@@ -38,7 +37,17 @@ import { useSaveParRating } from "../api/useParMutations";
 import { useSaveSelfReview, useShareSelfReview } from "../api/useSelfReview";
 import { isDeadlinePassed } from "../util/parDeadline";
 import { employeeDeadlineFor } from "../util/parDepartments";
-import { answersToSave, isSectionAnswered, shareBlockers } from "../util/selfReviewForm";
+import {
+  answerHtml,
+  answerOverLimit,
+  answersToSave,
+  anyAnswerOverLimit,
+  isQuestionAnswered,
+  isSectionAnswered,
+  shareBlockers,
+} from "../util/selfReviewForm";
+import { ParCommentView } from "./ParContent";
+import ParRichTextField from "./ParRichTextField";
 
 const AUTOSAVE_DELAY_MS = 1200;
 
@@ -83,13 +92,15 @@ export default function ParSelfReviewForm({
 
   const toSave = answersToSave(definition, answers);
   const dirty = JSON.stringify(toSave) !== lastSaved.current;
+  // An answer over its limit would be refused, so nothing saves until it's shortened.
+  const overLimit = anyAnswerOverLimit(definition, answers);
 
   // The autosave in flight, if any: the answers it sends, and when it's done.
   const pendingSave = useRef<{ snapshot: string; done: Promise<void> } | null>(null);
 
   // Autosave a moment after the employee stops typing.
   useEffect(() => {
-    if (!editable || !dirty || save.isPending) return;
+    if (!editable || !dirty || save.isPending || overLimit) return;
     const timer = window.setTimeout(() => {
       const snapshot = JSON.stringify(toSave);
       const done: Promise<void> = save
@@ -115,7 +126,7 @@ export default function ParSelfReviewForm({
   // changed and changed back, or failed), so the last answers are the ones kept.
   const leaving = useRef({ answers: toSave, editable: false });
   useEffect(() => {
-    leaving.current = { answers: toSave, editable: editable && !share.isPending };
+    leaving.current = { answers: toSave, editable: editable && !share.isPending && !overLimit };
   });
   useEffect(
     () => () => {
@@ -195,24 +206,22 @@ export default function ParSelfReviewForm({
                 {section.hint}
               </Typography>
             )}
-            {section.questions.map((q) => {
-              const text = (selfReview.answers[q.id] ?? "").trim();
-              return (
-                <Box key={q.id}>
-                  {section.questions.length > 1 && (
-                    <Typography variant="caption" color="text.secondary" component="div">
-                      {q.text}
-                    </Typography>
-                  )}
-                  <Typography
-                    variant="body2"
-                    sx={{ whiteSpace: "pre-wrap", ...(!text && { color: "text.disabled", fontStyle: "italic" }) }}
-                  >
-                    {text || "Not answered"}
+            {section.questions.map((q) => (
+              <Box key={q.id}>
+                {section.questions.length > 1 && (
+                  <Typography variant="caption" color="text.secondary" component="div">
+                    {q.text}
                   </Typography>
-                </Box>
-              );
-            })}
+                )}
+                {isQuestionAnswered(q, selfReview.answers) ? (
+                  <ParCommentView html={answerHtml(selfReview.answers[q.id])} />
+                ) : (
+                  <Typography variant="body2" sx={{ color: "text.disabled", fontStyle: "italic" }}>
+                    Not answered
+                  </Typography>
+                )}
+              </Box>
+            ))}
           </Box>
         ))}
         {canUnshare && (
@@ -334,24 +343,26 @@ export default function ParSelfReviewForm({
                 {section.hint}
               </Typography>
             )}
-            {section.questions.map((q) => (
-              <TextField
-                key={q.id}
-                fullWidth
-                multiline
-                minRows={4}
-                placeholder={q.placeholder}
-                value={answers[q.id] ?? ""}
-                onChange={(e) => setAnswer(q.id, e.target.value)}
-                disabled={sharing}
-                slotProps={{
-                  htmlInput: {
-                    maxLength: q.maxLength,
-                    "aria-label": q.text,
-                  },
-                }}
-              />
-            ))}
+            {section.questions.map((q) => {
+              const over = answerOverLimit(q, answers);
+              return (
+                <Box key={q.id}>
+                  <ParRichTextField
+                    value={answerHtml(answers[q.id])}
+                    onChange={(html) => setAnswer(q.id, html)}
+                    placeholder={q.placeholder}
+                    ariaLabel={q.text}
+                    disabled={sharing}
+                    minHeight="8rem"
+                  />
+                  {over > 0 && (
+                    <Typography variant="caption" color="error" component="div" sx={{ mt: 0.5 }}>
+                      Too long by {over.toLocaleString()} characters (formatting counts too). Shorten it to save.
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
           </Box>
         ))}
       </Stack>

@@ -23,10 +23,6 @@ import {
   Card,
   Chip,
   DataGrid,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Divider,
   FormControlLabel,
   IconButton,
   InputAdornment,
@@ -49,7 +45,7 @@ import { useActiveParCycle } from "../api/useParData";
 import { useParReportLevels } from "../api/useLeadReports";
 import { filterChainReports, isEmployeeALead } from "../util/parReportChain";
 import { calculateCycleActiveStep } from "../util/parCycleActiveStep";
-import ParCycleDatesStepper from "../components/ParCycleDatesStepper";
+import ParCycleDatesDialog from "../components/ParCycleDatesDialog";
 import ParStatusChip from "../components/ParStatusChip";
 import ParLeadReviewTabs from "../components/ParLeadReviewTabs";
 import type { ParChainReport } from "../api/types";
@@ -354,18 +350,12 @@ export default function ParLeadReportChainTab() {
         )}
       </Card>
 
-      <Dialog
+      <ParCycleDatesDialog
+        cycle={cycle}
         open={cycleDatesOpen}
         onClose={() => setCycleDatesOpen(false)}
-        maxWidth={false}
-        slotProps={{ paper: { sx: { width: "80vw" } } }}
-      >
-        <DialogTitle>Cycle Dates</DialogTitle>
-        <Divider />
-        <DialogContent sx={{ pt: 4, pb: 4 }}>
-          <ParCycleDatesStepper cycle={cycle} activeStep={calculateCycleActiveStep(cycle)} />
-        </DialogContent>
-      </Dialog>
+        activeStep={calculateCycleActiveStep(cycle)}
+      />
     </Stack>
   );
 }

@@ -154,8 +154,8 @@ export function useSubmitReview(parCycleId: number | undefined) {
   });
 }
 
-// GET the people in this cycle — backs "Voluntary Feedback"'s participant
-// picker, which has no existing request row to search against.
+// GET the people in this cycle who still work here — backs "Voluntary Feedback"'s
+// participant picker, which has no existing request row to search against.
 // OfferFeedbackView.tsx: `fetchParticipants({ parCycleId, leadEmail: null })`
 // — every participant of the cycle, not one lead's team.
 export function useParticipants(parCycleId: number | undefined, enabled = true) {
@@ -168,7 +168,7 @@ export function useParticipants(parCycleId: number | undefined, enabled = true) 
     queryFn: async () => {
       const accessToken = await getAccessToken();
       return authedGet<ParParticipant[]>(
-        parServiceUrls.par360Participants(parCycleId!),
+        parServiceUrls.par360Participants(parCycleId!, true),
         accessToken,
         digiopsHeaders(),
       );

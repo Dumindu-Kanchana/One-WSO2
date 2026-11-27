@@ -34,6 +34,20 @@ vi.mock("../api/useParMutations", () => ({
 vi.mock("@context/notifications/NotificationsContext", () => ({
   useNotifications: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
 }));
+// A textarea for the rich-text editor, named as the real one is (ParRichTextField.test.tsx covers the editor).
+vi.mock("./ParRichTextField", () => ({
+  default: ({
+    value,
+    onChange,
+    ariaLabel,
+    disabled,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    ariaLabel?: string;
+    disabled?: boolean;
+  }) => <textarea aria-label={ariaLabel} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} />,
+}));
 
 const { default: ParSelfReviewForm } = await import("./ParSelfReviewForm");
 
@@ -241,5 +255,25 @@ describe("ParSelfReviewForm", () => {
     expect(screen.getByText("Shipped it")).toBeInTheDocument();
     expect(screen.queryByText(/lead/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Unshare" })).not.toBeInTheDocument();
+  });
+
+  it("doesn't save an answer over its limit, and says by how much", () => {
+    vi.useFakeTimers();
+    show("DRAFT");
+    fireEvent.change(screen.getByRole("textbox", { name: "Impact this cycle" }), {
+      target: { value: `<p>${"x".repeat(5000)}</p>` },
+    });
+    act(() => vi.advanceTimersByTime(1500));
+    expect(saveMutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByText("Too long by 7 characters (formatting counts too). Shorten it to save.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Share with lead" }));
+    expect(screen.getByText(/Impact this cycle is too long/)).toBeInTheDocument();
+  });
+
+  it("shows a shared answer's formatting, and one written before the editor as paragraphs", () => {
+    show("SHARED", { impact: "<p><strong>Shipped</strong> the port</p>", growth: "Learned Ballerina\nMentored two" });
+    expect(screen.getByText("Shipped").tagName).toBe("STRONG");
+    expect(screen.getByText("Learned Ballerina").tagName).toBe("P");
+    expect(screen.getByText("Mentored two").tagName).toBe("P");
   });
 });

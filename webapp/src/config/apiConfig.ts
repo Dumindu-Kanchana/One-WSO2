@@ -339,8 +339,10 @@ export const parServiceUrls = {
   // Backs "Voluntary Feedback"'s picker — offering a review to someone who
   // never asked has no existing request row to search against. NOT the same
   // as GET /meta/employees, which is org-wide and not scoped to this cycle.
-  par360Participants: (parCycleId: number) =>
-    `${parBackendUrl}/par-cycles/${parCycleId}/participants`,
+  // `currentOnly` leaves out people who have left since the cycle was created
+  // (the pickers for asking or giving feedback); Admin View lists them all.
+  par360Participants: (parCycleId: number, currentOnly = false) =>
+    `${parBackendUrl}/par-cycles/${parCycleId}/participants${currentOnly ? "?current=true" : ""}`,
 
   // ---- Lead Portal -------------------------------------------------------------
   //

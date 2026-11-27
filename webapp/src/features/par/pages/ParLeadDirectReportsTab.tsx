@@ -26,7 +26,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Grid,
   IconButton,
   InputAdornment,
@@ -46,7 +45,7 @@ import { useActiveParCycle } from "../api/useParData";
 import { useParTeams } from "../api/useLeadTeams";
 import { useSend360Reminder } from "../api/useLeadReminders";
 import { calculateTeamsCompletionTotals } from "../util/parTeamsSummary";
-import ParCycleDatesStepper from "../components/ParCycleDatesStepper";
+import ParCycleDatesDialog from "../components/ParCycleDatesDialog";
 import ParCompletionKpiTile from "../components/ParCompletionKpiTile";
 import ParEmptyState from "../components/ParEmptyState";
 import ParLeadTeamRoster from "../components/ParLeadTeamRoster";
@@ -250,21 +249,11 @@ export default function ParLeadDirectReportsTab() {
         />
       </Card>
 
-      {/* MultiTeamSummary.tsx opens this in its own CustomModal at
-          width="80vw" — much wider than a fixed maxWidth breakpoint, since
-          five stepper steps need the room. */}
-      <Dialog
+      <ParCycleDatesDialog
+        cycle={cycle}
         open={cycleDatesOpen}
         onClose={() => setCycleDatesOpen(false)}
-        maxWidth={false}
-        slotProps={{ paper: { sx: { width: "80vw" } } }}
-      >
-        <DialogTitle>Cycle Dates</DialogTitle>
-        <Divider />
-        <DialogContent sx={{ pt: 4, pb: 4 }}>
-          <ParCycleDatesStepper cycle={cycle} />
-        </DialogContent>
-      </Dialog>
+      />
 
       {/* ConfirmationDialog.tsx's own maxWidth="md" — every confirmation in
           source uses this same shared component and size, not a narrower

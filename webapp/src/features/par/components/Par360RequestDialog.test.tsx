@@ -68,6 +68,48 @@ function add(email: string) {
   fireEvent.keyDown(field, { key: "," });
 }
 
+describe("Par360RequestPicker: pasting addresses", () => {
+  const paste = (text: string) =>
+    fireEvent.paste(screen.getByRole("combobox"), { clipboardData: { getData: () => text } });
+  const requested = (onSubmit: ReturnType<typeof vi.fn>) => {
+    fireEvent.click(screen.getByRole("button", { name: "Request" }));
+    return onSubmit.mock.calls.at(-1)![0];
+  };
+
+  it("adds everyone in a list copied from an email's To line, in any case", () => {
+    const onSubmit = vi.fn();
+    renderPicker(onSubmit);
+    paste("Alex Morgan <Alex@Example.com>, Sam Lee <sam@example.com>");
+    expect(requested(onSubmit)).toEqual(["alex@example.com", "sam@example.com"]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("adds a list separated only by spaces or new lines", () => {
+    const onSubmit = vi.fn();
+    renderPicker(onSubmit);
+    paste("alex@example.com sam@example.com\nmaya@example.com");
+    expect(requested(onSubmit)).toEqual(["alex@example.com", "sam@example.com", "maya@example.com"]);
+  });
+
+  it("names the addresses it couldn't add, until the field is used again", () => {
+    const onSubmit = vi.fn();
+    renderPicker(onSubmit, { existingEmails: ["sam@example.com"] });
+    paste("alex@example.com; sam@example.com; gone@example.com; hannah@example.com; gone@example.com");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Not added, as they've already been asked or can't be asked: sam@example.com, gone@example.com, hannah@example.com",
+    );
+    expect(requested(onSubmit)).toEqual(["alex@example.com"]);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "ma" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("leaves a single address in the search, as typing it would", () => {
+    renderPicker(vi.fn());
+    paste("alex@example.com");
+    expect(screen.getByRole("button", { name: "Request" })).toBeDisabled();
+  });
+});
+
 describe("Par360RequestPicker", () => {
   it("requests the people picked, without asking how they work with you", () => {
     const onSubmit = vi.fn();

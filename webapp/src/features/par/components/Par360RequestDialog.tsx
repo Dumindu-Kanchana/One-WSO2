@@ -58,6 +58,9 @@ import { describeError } from "@api/errors";
 /** Calendar suggestions shown at first, and added by each Suggest more. */
 const SUGGESTIONS_PER_ROUND = 8;
 
+/** An address anywhere in pasted text, also inside "Name <address>" as an email's To line copies it. */
+const PASTED_EMAIL = /[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
 /** Someone who can be asked, from either source. */
 interface Colleague {
   workEmail: string;
@@ -107,6 +110,8 @@ export function Par360RequestPicker({
   const [selected, setSelected] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [suggestionsShown, setSuggestionsShown] = useState(SUGGESTIONS_PER_ROUND);
+  // Pasted addresses that couldn't be added, until the field is used again.
+  const [notAdded, setNotAdded] = useState<string[]>([]);
 
   const people: Colleague[] = useMemo(
     () =>
@@ -135,22 +140,24 @@ export function Par360RequestPicker({
   const handleCancel = () => {
     setSelected([]);
     setInputValue("");
+    setNotAdded([]);
     setSuggestionsShown(SUGGESTIONS_PER_ROUND);
     onCancel?.();
   };
 
-  // EmailAutocomplete.tsx's own handlePaste: a comma/semicolon/newline
-  // separated paste is split and matched against the available options,
-  // rather than left for the field to reject wholesale.
+  // A pasted list of addresses, however it's separated, or one written as an
+  // email's To line copies it ("Name <address>"), adds everyone in it who can
+  // be asked, in any case; the others are named under the field. A single
+  // bare address is left in the search, as typing it would be.
   const handlePaste = (event: React.ClipboardEvent) => {
     const pastedText = event.clipboardData.getData("text");
-    if (!/[,;\n]/.test(pastedText)) return;
+    const found = pastedText.match(PASTED_EMAIL) ?? [];
+    if (found.length === 0 || (found.length === 1 && found[0] === pastedText.trim())) return;
     event.preventDefault();
-    const pasted = pastedText
-      .split(/[,;\n\s]+/)
-      .map((e) => e.trim())
-      .filter((e) => e.length > 0 && options.includes(e));
-    setSelected((prev) => Array.from(new Set([...prev, ...pasted])));
+    const optionByAddress = new Map(options.map((o) => [o.toLowerCase(), o]));
+    const added = found.flatMap((e) => optionByAddress.get(e.toLowerCase()) ?? []);
+    setSelected((prev) => Array.from(new Set([...prev, ...added])));
+    setNotAdded(Array.from(new Set(found.filter((e) => !optionByAddress.has(e.toLowerCase())))));
     setInputValue("");
   };
 
@@ -212,7 +219,10 @@ export function Par360RequestPicker({
           value={selected}
           onChange={(_e, v) => setSelected(v as string[])}
           inputValue={inputValue}
-          onInputChange={(_e, v) => setInputValue(v)}
+          onInputChange={(_e, v) => {
+            setInputValue(v);
+            if (v) setNotAdded([]);
+          }}
           loading={employees.isLoading}
           loadingText="Loading colleagues…"
           noOptionsText={employees.isError ? "Couldn't load colleagues" : "No colleagues found"}
@@ -290,6 +300,11 @@ export function Par360RequestPicker({
             />
           )}
       />
+      {notAdded.length > 0 && (
+        <Alert severity="warning" sx={{ mt: 1.5 }}>
+          Not added, as they've already been asked or can't be asked: {notAdded.join(", ")}
+        </Alert>
+      )}
       {error !== undefined && <Alert severity="error" sx={{ mt: 2 }}>{describeError(error)}</Alert>}
       <Box sx={{ display: "flex", justifyContent: activeCycle ? "flex-start" : "flex-end", gap: 1.5, mt: activeCycle ? 1.5 : 2 }}>
         {onCancel && <Button onClick={handleCancel}>Cancel</Button>}

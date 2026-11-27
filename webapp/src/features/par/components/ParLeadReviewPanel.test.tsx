@@ -770,3 +770,49 @@ describe("ParLeadReviewPanel: sharing once all 360° feedback is in", () => {
     expect(screen.queryByText(/You can share from/)).not.toBeInTheDocument();
   });
 });
+
+describe("ParLeadReviewPanel: saving without a comment", () => {
+  const savedPayload = () => ratingMutate.mock.calls.at(-1)![0].payload;
+  const pickRating = (label: string) => {
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Rating" }));
+    fireEvent.click(screen.getByRole("option", { name: label }));
+  };
+
+  it("saves a draft with only a rating, leaving the comment out", async () => {
+    show();
+    pickRating("Successful");
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toMatchObject({ parLeadStatus: "DRAFT", parRating: "Successful" });
+    expect(savedPayload()).not.toHaveProperty("parLeadComment");
+  });
+
+  it("still sends a comment the lead has cleared, so it's saved empty", async () => {
+    show({ parRating: "Successful", parLeadComment: encodeParComment("<p>Great cycle.</p>") });
+    fireEvent.change(screen.getByLabelText("Enter your comment here"), { target: { value: "<p><br></p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toMatchObject({ parLeadComment: encodeParComment("<p><br></p>") });
+  });
+
+  it("leaves out an admin comment nobody wrote in Admin View", async () => {
+    rating = {
+      parRatingId: 7,
+      parCycleId: 2,
+      parEmployeeEmail: "alex@example.com",
+      parEmployeeStatus: "SHARED",
+      parLeadStatus: "DRAFT",
+      parIsLeadershipEmployee: false,
+    } as ParRating;
+    render(<ParLeadReviewPanel cycle={cycle} employeeEmail="alex@example.com" isAdminView />);
+    fireEvent.click(screen.getByRole("button", { name: "edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await screen.findByRole("combobox", { name: "Rating" });
+    pickRating("Successful");
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toMatchObject({ parRating: "Successful" });
+    expect(savedPayload()).not.toHaveProperty("parLeadComment");
+    expect(savedPayload()).not.toHaveProperty("parAdminComment");
+  });
+});

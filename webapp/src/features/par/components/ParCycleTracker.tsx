@@ -54,6 +54,12 @@ const STATE_TONE: Record<StepState, Tone> = {
   incomplete: "error",
 };
 
+// The tab rail's own width, below which the four steps don't fit in a row (each needs about 150px): two by two, and
+// one under another where even two don't fit (a phone, beside the shell's rail). Measured on the rail, which has the
+// steps' 12px padding each side, so a narrow window and a narrow column are the same.
+const NOT_IN_A_ROW = "@container (max-width: 635px)";
+const ONE_PER_ROW = "@container (max-width: 323px)";
+
 // A tone as small text: its main shade on a dark surface and its darker one on a light surface, where
 // the main shades are under 4.5:1 (as the theme's own alert and link text).
 const toneText = (theme: Theme, tone: Tone) =>
@@ -96,7 +102,7 @@ export default function ParCycleTracker({
 
   return (
     <Card variant="outlined" sx={{ maxWidth: 1100 }}>
-      <Box sx={(theme) => ({ bgcolor: railBg(theme), px: 1.5, pt: 1.5, pb: ready ? 0 : 1.5 })}>
+      <Box sx={(theme) => ({ bgcolor: railBg(theme), px: 1.5, pt: 1.5, pb: ready ? 0 : 1.5, containerType: "inline-size" })}>
         <Chip label={cycle.parCycleName} size="small" color="primary" variant="outlined" sx={{ mb: 1.5, fontWeight: 600 }} />
         {failed ? (
           <ErrorNotice error={failed.error} onRetry={failed.retry} retrying={failed.retrying}>
@@ -110,14 +116,13 @@ export default function ParCycleTracker({
             aria-label="Your PAR cycle"
             sx={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, minmax(150px, 1fr))",
+              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
               gap: 0.5,
               m: 0,
               p: 0,
-              // On a phone the tabs scroll sideways in one row.
-              overflowX: "auto",
-              scrollbarWidth: "none",
-              "&::-webkit-scrollbar": { display: "none" },
+              // Not in a row, the steps are tiles above the panel rather than tabs on it.
+              [NOT_IN_A_ROW]: { gridTemplateColumns: "repeat(2, minmax(0, 1fr))", mb: 1.5 },
+              [ONE_PER_ROW]: { gridTemplateColumns: "minmax(0, 1fr)" },
             }}
           >
             {steps.map((step, i) => (
@@ -189,6 +194,8 @@ function TrackerStep({
           bgcolor: selected ? "background.paper" : "transparent",
           boxShadow: selected ? `inset 0 3px 0 ${palette(theme).primary.main}` : "none",
           ...(!selected && { "&:hover": { bgcolor: "action.hover" } }),
+          // A tile when the steps aren't in a row: rounded and edged all round, the open one included.
+          [NOT_IN_A_ROW]: { borderRadius: "12px", borderBottom: 1, borderColor: selected ? line(theme) : "transparent" },
         })}
       >
         <Box

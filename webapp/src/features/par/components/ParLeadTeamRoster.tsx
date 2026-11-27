@@ -26,7 +26,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   Grid,
   IconButton,
   InputAdornment,
@@ -37,7 +36,7 @@ import {
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
+import { ArrowLeftIcon, CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import { describeError } from "@api/errors";
@@ -55,7 +54,7 @@ import { resolveGridSelectedIds } from "../util/parGridSelection";
 import { deadlinePassedEverywhereAt, isDeadlinePassed } from "../util/parDeadline";
 import { formatShortDate, formatShortDateTime } from "../util/parDate";
 import { shareOpensAfter } from "../util/parDepartments";
-import ParCycleDatesStepper from "./ParCycleDatesStepper";
+import ParCycleDatesDialog from "./ParCycleDatesDialog";
 import ParStatusChip from "./ParStatusChip";
 import ParCompletionKpiTile from "./ParCompletionKpiTile";
 import ParSyncEmployeeDialog from "./ParSyncEmployeeDialog";
@@ -443,9 +442,12 @@ export default function ParLeadTeamRoster({
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
           {showBack && (
             <>
+              <IconButton aria-label="Back to all teams" color="primary" onClick={onBack} sx={{ mr: 0.5 }}>
+                <ArrowLeftIcon size={18} />
+              </IconButton>
               <Link component="button" underline="hover" onClick={onBack} sx={{ mr: 0.5 }}>
                 All Teams
               </Link>
@@ -563,21 +565,12 @@ export default function ParLeadTeamRoster({
         />
       </Card>
 
-      {/* TeamSummary.tsx opens this in its own CustomModal at width="80vw"
-          — much wider than a fixed maxWidth breakpoint, since five stepper
-          steps need the room. */}
-      <Dialog
+      <ParCycleDatesDialog
+        cycle={cycle}
         open={cycleDatesOpen}
         onClose={() => setCycleDatesOpen(false)}
-        maxWidth={false}
-        slotProps={{ paper: { sx: { width: "80vw" } } }}
-      >
-        <DialogTitle>Cycle Dates</DialogTitle>
-        <Divider />
-        <DialogContent sx={{ pt: 4, pb: 4 }}>
-          <ParCycleDatesStepper cycle={cycle} activeStep={calculateCycleActiveStep(cycle)} />
-        </DialogContent>
-      </Dialog>
+        activeStep={calculateCycleActiveStep(cycle)}
+      />
 
       {/* ConfirmationDialog's own threeSixtyReminder copy — same dialog as
           MultiTeamSummary.tsx's, reused here since both send the same

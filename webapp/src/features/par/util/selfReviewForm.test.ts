@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { FormDefinition } from "../api/leadership360Types";
-import { answersToSave, isSectionAnswered, shareBlockers } from "./selfReviewForm";
+import { answerHtml, answerOverLimit, answersToSave, isSectionAnswered, shareBlockers } from "./selfReviewForm";
 
 const definition: FormDefinition = {
   kind: "SELF_REVIEW",
@@ -47,5 +47,40 @@ describe("selfReviewForm", () => {
   it("counts a section as answered once it has any answer", () => {
     expect(isSectionAnswered(definition.sections[1], { growth: " " })).toBe(false);
     expect(isSectionAnswered(definition.sections[1], { growth: "Learned things" })).toBe(true);
+  });
+
+  it("takes an answer the editor emptied as no answer", () => {
+    expect(isSectionAnswered(definition.sections[1], { growth: "<p><br></p>" })).toBe(false);
+    expect(shareBlockers(definition, { impact: "<p><strong>Did</strong> things</p>", growth: "<p><br></p>" })).toEqual([
+      "Growth & learning is empty",
+    ]);
+    expect(answersToSave(definition, { impact: "<p>Did things</p>", growth: "<p> </p>" })).toEqual({
+      impact: "<p>Did things</p>",
+    });
+  });
+
+  it("gives an answer from before the editor as one paragraph per line, and the editor's own as it is", () => {
+    expect(answerHtml("Shipped the port\n\nLed <the> review & demo")).toBe(
+      "<p>Shipped the port</p><p>Led &lt;the&gt; review &amp; demo</p>",
+    );
+    expect(answerHtml("<ul><li>Shipped</li></ul>")).toBe("<ul><li>Shipped</li></ul>");
+    expect(answerHtml(undefined)).toBe("");
+  });
+
+  it("counts how far an answer is over its limit, formatting included, and stops sharing it", () => {
+    const limited: FormDefinition = {
+      ...definition,
+      sections: [
+        { id: "impact", title: "Impact this cycle", questions: [{ id: "impact", type: "TEXT", text: "Impact", maxLength: 20 }] },
+      ],
+    };
+    const question = limited.sections[0].questions[0];
+    expect(answerOverLimit(question, { impact: "<p>Twelve chars</p>" })).toBe(0);
+    expect(answerOverLimit(question, { impact: "<p><strong>Twelve chars</strong></p>" })).toBe(16);
+    expect(shareBlockers(limited, { impact: "<p><strong>Twelve chars</strong></p>" })).toEqual([
+      "Impact this cycle is too long",
+    ]);
+    // Without a limit of its own, the backend's 5,000.
+    expect(answerOverLimit(definition.sections[0].questions[0], { impact: "x".repeat(5001) })).toBe(1);
   });
 });
