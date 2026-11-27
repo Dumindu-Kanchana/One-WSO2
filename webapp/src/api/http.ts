@@ -46,6 +46,55 @@ export class HttpError extends Error {
   }
 }
 
+// Thrown when a request given `timeoutMs` has had no answer in that time. Not
+// an HttpError: there is no status, and the request may never have reached the
+// backend at all — a gateway in front of it can hold a request for a minute or
+// more before forwarding it. Being a plain Error is what lets the retry
+// predicates (httpRetry, defaultQueryRetry, the global QueryClient) retry it,
+// as they retry any failure that is not an HTTP status.
+export class RequestTimeoutError extends Error {
+  readonly url: string;
+  constructor(url: string, timeoutMs: number) {
+    super(`The server did not answer within ${Math.round(timeoutMs / 1000)} seconds. Try again.`);
+    this.name = "RequestTimeoutError";
+    this.url = url;
+  }
+}
+
+/** Options for the authed helpers. */
+export interface RequestOptions {
+  /**
+   * Give up on the request after this many milliseconds and throw
+   * RequestTimeoutError. Unset, the request waits as long as the browser does.
+   * Meant for reads: abandoning a write the server may already have done
+   * invites the user to submit it twice.
+   */
+  timeoutMs?: number;
+}
+
+// Run `send` with an abort signal that fires after options.timeoutMs, turning
+// the browser's TimeoutError into RequestTimeoutError. The signal covers the
+// whole exchange — the 401 re-auth replay and reading the body included — so
+// the limit is on the caller's wait, not on one fetch.
+async function withTimeout<T>(
+  url: string,
+  options: RequestOptions,
+  send: (signal: AbortSignal | undefined) => Promise<T>,
+): Promise<T> {
+  const { timeoutMs } = options;
+  if (timeoutMs === undefined) return send(undefined);
+  try {
+    return await send(AbortSignal.timeout(timeoutMs));
+  } catch (error: unknown) {
+    // By name, not instanceof DOMException: the test environment's DOMException
+    // is not always the one fetch rejects with.
+    if ((error as { name?: unknown } | null)?.name === "TimeoutError") {
+      throw new RequestTimeoutError(url, timeoutMs);
+    }
+    throw error;
+  }
+}
+
 // One-place translator from any thrown value to a user-facing string,
 // used by every dialog / notification banner that surfaces a request
 // failure. Prefers a well-formed `{message: "..."}` body when the
@@ -262,27 +311,35 @@ export async function authedGet<T>(
   url: string,
   accessToken: string,
   extraHeaders?: Record<string, string>,
+  options: RequestOptions = {},
 ): Promise<T> {
-  const res = await fetchWithReauth(url, { headers: buildHeaders(extraHeaders) }, accessToken);
-  if (!res.ok) await throwFromError(url, res, "authedGet");
-  return readJsonOrThrow<T>(res, url);
+  return withTimeout(url, options, async (signal) => {
+    const res = await fetchWithReauth(url, { headers: buildHeaders(extraHeaders), signal }, accessToken);
+    if (!res.ok) await throwFromError(url, res, "authedGet");
+    return readJsonOrThrow<T>(res, url);
+  });
 }
 
 // Authed POST with a JSON body. Returns parsed JSON when the response has
-// a body, or null on 201/204. Same error semantics as authedGet.
+// a body, or null on 201/204. Same error semantics as authedGet. A
+// `timeoutMs` belongs only on a POST that reads (a batch lookup), never on
+// one that writes — see RequestOptions.
 export async function authedPost<T>(
   url: string,
   accessToken: string,
   body: unknown,
   extraHeaders?: Record<string, string>,
+  options: RequestOptions = {},
 ): Promise<T | null> {
-  const res = await fetchWithReauth(
-    url,
-    { method: "POST", headers: buildHeaders(extraHeaders, true), body: JSON.stringify(body) },
-    accessToken,
-  );
-  if (!res.ok) await throwFromError(url, res, "authedPost");
-  return readJsonOrNull<T>(res, url);
+  return withTimeout(url, options, async (signal) => {
+    const res = await fetchWithReauth(
+      url,
+      { method: "POST", headers: buildHeaders(extraHeaders, true), body: JSON.stringify(body), signal },
+      accessToken,
+    );
+    if (!res.ok) await throwFromError(url, res, "authedPost");
+    return readJsonOrNull<T>(res, url);
+  });
 }
 
 // Authed POST with a JSON body whose RESPONSE is plain text, not JSON —

@@ -20,6 +20,7 @@
 
 import { HttpError, authedGet, authedPost } from "@api/http";
 import { buildDealsUrl, echoServiceUrls } from "@config/apiConfig";
+import { echoRead } from "../../util/salesError";
 import type {
   ApproveRequest,
   ApproveResult,
@@ -74,20 +75,22 @@ function required<T>(url: string, value: T | null): T {
 
 export function httpMeddpiccClient(getAccessToken: () => Promise<string>): MeddpiccClient {
   return {
-    gates: async () => authedGet<GatesResponse>(echoServiceUrls.gates, await getAccessToken()),
+    gates: async () => authedGet<GatesResponse>(echoServiceUrls.gates, await getAccessToken(), undefined, echoRead),
     meetingCoverage: async (meetingIds) => {
       const body: MeetingCoverageRequest = { meetingIds };
       const url = echoServiceUrls.meetingCoverage;
-      return required(url, await authedPost<MeetingCoverageList>(url, await getAccessToken(), body));
+      return required(url, await authedPost<MeetingCoverageList>(url, await getAccessToken(), body, undefined, echoRead));
     },
     reanalyse: async (meetingId) => {
       await authedPost<unknown>(echoServiceUrls.reanalyse(meetingId), await getAccessToken(), {});
     },
-    deals: async (query) => authedGet<DealList>(buildDealsUrl(query), await getAccessToken()),
+    deals: async (query) => authedGet<DealList>(buildDealsUrl(query), await getAccessToken(), undefined, echoRead),
     deal: async (opportunityId, options) =>
       authedGet<DealDetail>(
         echoServiceUrls.deal(opportunityId) + (options?.refresh ? "?refresh=true" : ""),
         await getAccessToken(),
+        undefined,
+        echoRead,
       ),
     approve: async (opportunityId, request) => {
       const url = echoServiceUrls.approve(opportunityId);
