@@ -351,3 +351,36 @@ describe("Risk Registers — Report Download", () => {
     expect(await screen.findByRole("button", { name: "Report Download" })).toBeEnabled();
   });
 });
+
+describe("Risk Registers — Import risks", () => {
+  // Import risks is the Compliance Admin's alone: RISK_BULK_UPLOAD. Compliance
+  // Team, who can download the report, must not see it.
+  it.each([
+    ["Compliance Team", ["RISK_VIEW_RISKS", "RISK_VIEW_ALL_RISKS"]],
+    ["a risk assigner", ["RISK_VIEW_RISKS", "RISK_CREATE", "RISK_UPDATE"]],
+    ["someone with no risk role", []],
+  ])("hides Import risks from %s", async (_who, granted) => {
+    privileges = granted;
+    renderAt("");
+    await screen.findByText("2026-ASG-Q2-0001");
+    await waitFor(() => expect(requested()).toContain("/risks/me/involvement"));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    expect(screen.queryByRole("button", { name: "Import risks" })).not.toBeInTheDocument();
+  });
+
+  it("shows Import risks to the Compliance Admin and opens the import dialog", async () => {
+    privileges = ["RISK_VIEW_RISKS", "RISK_VIEW_ALL_RISKS", "RISK_BULK_UPLOAD"];
+    const user = userEvent.setup();
+    renderAt("");
+    await screen.findByText("2026-ASG-Q2-0001");
+
+    // Report Download is still there beside it.
+    expect(await screen.findByRole("button", { name: "Report Download" })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Import risks" }));
+
+    expect(await screen.findByRole("dialog", { name: "Import risks from CSV" })).toBeInTheDocument();
+  });
+});

@@ -47,7 +47,7 @@ import {
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { Download, Eye, RefreshCw, Search, X } from "@wso2/oxygen-ui-icons-react";
+import { Download, Eye, RefreshCw, Search, Upload, X } from "@wso2/oxygen-ui-icons-react";
 import type { JSX } from "react";
 import type * as React from "react";
 import { useSearchParams } from "react-router";
@@ -109,6 +109,7 @@ import ReassessmentDialog from "./risk-registers/ReassessmentDialog";
 import EditRiskDialog from "./risk-registers/EditRiskDialog";
 import UpdateAssigneesDialog from "./risk-registers/UpdateAssigneesDialog";
 import ActionPlanDialog from "./risk-registers/ActionPlanDialog";
+import BulkImportDialog from "./risk-registers/BulkImportDialog";
 import type { ActionPlanPayload } from "./risk-registers/ActionPlanDialog";
 import EscalationCommentDialog from "./risk-registers/EscalationCommentDialog";
 import ColumnFilter from "./risk-registers/ColumnFilter";
@@ -425,6 +426,11 @@ export default function RiskRegisters(): JSX.Element {
   // a caller it would refuse.
   const { can } = useRiskPrivileges();
   const canExport = can(RiskPrivilege.ViewAllRisks);
+  // Import risks is for the Compliance Admin alone (RISK_BULK_UPLOAD). The
+  // backend refuses everyone else, and refuses a register-scoped holder too, so
+  // this only keeps the button from showing to people it would never work for.
+  const canBulkImport = can(RiskPrivilege.BulkUploadRisks);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabKey>("approved");
   const [approvedFilter, setApprovedFilter] = useState<"" | "open" | "closed">("");
@@ -1074,18 +1080,28 @@ export default function RiskRegisters(): JSX.Element {
         <Typography variant="h4" fontWeight={700}>
           Risk Registers
         </Typography>
-        {canExport && (
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={exporting ? <CircularProgress size={14} /> : <Download size={16} />}
-            disabled={exporting || loading || matchesNothing || total === 0}
-            onClick={() => void handleExport()}
-          >
-            Report Download
-          </Button>
-        )}
+        <Stack direction="row" gap={1} flexWrap="wrap">
+          {canBulkImport && (
+            <Button variant="outlined" size="small" startIcon={<Upload size={16} />} onClick={() => setImportOpen(true)}>
+              Import risks
+            </Button>
+          )}
+          {canExport && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={exporting ? <CircularProgress size={14} /> : <Download size={16} />}
+              disabled={exporting || loading || matchesNothing || total === 0}
+              onClick={() => void handleExport()}
+            >
+              Report Download
+            </Button>
+          )}
+        </Stack>
       </Stack>
+      {canBulkImport && (
+        <BulkImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImported={loadRisks} />
+      )}
       {exportError && (
         <Alert severity="error" onClose={() => setExportError("")} sx={{ mb: 2 }}>
           {exportError}

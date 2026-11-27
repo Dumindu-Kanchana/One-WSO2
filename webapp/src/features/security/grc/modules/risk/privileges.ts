@@ -46,6 +46,10 @@ export const RiskPrivilege = {
   ManageActionPlans:     "RISK_MANAGE_ACTION_PLANS",
   ManageComplianceRefs:  "RISK_MANAGE_COMPLIANCE_REFS",
   ViewAnalytics:         "RISK_VIEW_ANALYTICS",
+  // BulkUploadRisks gates the Compliance Admin's CSV import of a historical
+  // register (backend: /api/v1/risks/bulk-import). The backend requires it held
+  // GLOBAL, because the import writes role grants.
+  BulkUploadRisks:       "RISK_BULK_UPLOAD",
   // SYNTHETIC: not a privilege in the privilege table. The backend reports
   // whether the caller is a risk owner or on the compliance team (the only roles
   // that may open Risk Hub > Audit Trail) on GET /api/v1/risks/me/involvement,
