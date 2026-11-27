@@ -411,6 +411,17 @@ export default function ParLeadReviewPanel({
     return () => window.clearTimeout(timer);
   }, [shareOpensAtMs, shareWaits]);
 
+  // The lead's review closes after the hard lead deadline, by their own day as isDeadlinePassed judges it: the panel
+  // redraws then too.
+  const hardDeadlineEndsAtMs = hardDeadline ? new Date(`${hardDeadline}T23:59:59.999`).getTime() : NaN;
+  useEffect(() => {
+    if (isAdminView || Number.isNaN(hardDeadlineEndsAtMs) || hardDeadlinePassed) return;
+    const wait = Math.max(hardDeadlineEndsAtMs - Date.now() + 1, 0);
+    if (wait > 2 ** 31 - 1) return;
+    const timer = window.setTimeout(redraw, wait);
+    return () => window.clearTimeout(timer);
+  }, [isAdminView, hardDeadlineEndsAtMs, hardDeadlinePassed]);
+
   if (rating.isLoading) {
     return <Skeleton variant="rectangular" height={360} sx={{ borderRadius: 1.5 }} />;
   }

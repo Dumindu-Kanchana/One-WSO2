@@ -39,6 +39,7 @@ import { isDeadlinePassed } from "../util/parDeadline";
 import { employeeDeadlineFor } from "../util/parDepartments";
 import {
   answerHtml,
+  answerViewHtml,
   answerOverLimit,
   answersToSave,
   anyAnswerOverLimit,
@@ -214,7 +215,7 @@ export default function ParSelfReviewForm({
                   </Typography>
                 )}
                 {isQuestionAnswered(q, selfReview.answers) ? (
-                  <ParCommentView html={answerHtml(selfReview.answers[q.id])} />
+                  <ParCommentView html={answerViewHtml(selfReview.answers[q.id])} />
                 ) : (
                   <Typography variant="body2" sx={{ color: "text.disabled", fontStyle: "italic" }}>
                     Not answered

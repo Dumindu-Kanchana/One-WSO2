@@ -156,16 +156,17 @@ describe("ParOpensPar2PageRoute", () => {
     setPar2(true);
     par2 = { ...par2, showsPar2: false };
     try {
-      showOld();
+      const inPar1Cycle = showOld();
       expect(screen.getByText("Provide 360° Feedback (PAR 1.0)")).toBeInTheDocument();
+      inPar1Cycle.unmount();
     } finally {
       window.config = originalConfig;
     }
     setPar2(false);
     par2 = { ...par2, showsPar2: true };
     try {
-      const view = showOld();
-      expect(view.getAllByText("Provide 360° Feedback (PAR 1.0)").length).toBeGreaterThan(0);
+      showOld();
+      expect(screen.getByText("Provide 360° Feedback (PAR 1.0)")).toBeInTheDocument();
     } finally {
       window.config = originalConfig;
     }

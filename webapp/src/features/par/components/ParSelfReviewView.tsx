@@ -17,7 +17,7 @@
 import { Box, Card, Stack, Typography } from "@wso2/oxygen-ui";
 import type { FormDefinition } from "../api/leadership360Types";
 import type { SelfReviewAnswers } from "../api/selfReviewTypes";
-import { answerHtml, isQuestionAnswered } from "../util/selfReviewForm";
+import { answerViewHtml, isQuestionAnswered } from "../util/selfReviewForm";
 import { ParCommentView } from "./ParContent";
 
 // A shared self-review, read-only: each guided section with its hint and its
@@ -46,7 +46,7 @@ export default function ParSelfReviewView({
           )}
           {section.questions.map((q) =>
             isQuestionAnswered(q, answers) ? (
-              <ParCommentView key={q.id} html={answerHtml(answers[q.id])} />
+              <ParCommentView key={q.id} html={answerViewHtml(answers[q.id])} />
             ) : (
               <Typography key={q.id} variant="body2" color="text.secondary">
                 Not answered.

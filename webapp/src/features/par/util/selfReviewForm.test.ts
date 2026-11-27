@@ -16,7 +16,16 @@
 
 import { describe, expect, it } from "vitest";
 import type { FormDefinition } from "../api/leadership360Types";
-import { answerHtml, answerOverLimit, answersToSave, isSectionAnswered, shareBlockers } from "./selfReviewForm";
+import { sanitizeParHtml } from "./parComment";
+import { htmlToPdfText } from "./parPdf";
+import {
+  answerHtml,
+  answerOverLimit,
+  answersToSave,
+  answerViewHtml,
+  isSectionAnswered,
+  shareBlockers,
+} from "./selfReviewForm";
 
 const definition: FormDefinition = {
   kind: "SELF_REVIEW",
@@ -65,6 +74,16 @@ describe("selfReviewForm", () => {
     );
     expect(answerHtml("<ul><li>Shipped</li></ul>")).toBe("<ul><li>Shipped</li></ul>");
     expect(answerHtml(undefined)).toBe("");
+  });
+
+  it("shows an answer from before the editor as it was written, angle brackets and all, on screen and in the PDF", () => {
+    const written = "Explained <strong>bold</strong> & more";
+    const shown = document.createElement("div");
+    shown.innerHTML = sanitizeParHtml(answerViewHtml(written));
+    expect(shown.textContent).toBe(written);
+    expect(shown.querySelector("strong")).toBeNull();
+    expect(htmlToPdfText(answerViewHtml(written)).trim()).toBe(written);
+    expect(answerViewHtml("<p><strong>Shipped</strong></p>")).toBe("<p><strong>Shipped</strong></p>");
   });
 
   it("counts how far an answer is over its limit, formatting included, and stops sharing it", () => {

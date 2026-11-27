@@ -32,6 +32,13 @@ export function answerHtml(value: string | null | undefined): string {
   return HTML_ANSWER.test(answer) ? answer : paragraphsToHtml(answer);
 }
 
+/** An answer for a read-only view or the PDF, which decode entities before sanitizing (sanitizeParHtml): a plain-text
+ * answer is escaped once more, so text such as "<b>" still shows as it was written. */
+export function answerViewHtml(value: string | null | undefined): string {
+  const answer = value ?? "";
+  return HTML_ANSWER.test(answer) ? answer : paragraphsToHtml(answer).replace(/&/g, "&amp;");
+}
+
 export function isQuestionAnswered(question: FormQuestion, answers: SelfReviewAnswers): boolean {
   const value = answers[question.id];
   return typeof value === "string" && !isEmptyHtml(answerHtml(value));

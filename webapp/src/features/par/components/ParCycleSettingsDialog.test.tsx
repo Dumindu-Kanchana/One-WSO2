@@ -143,6 +143,13 @@ describe("ParCycleSettingsDialog", () => {
     expect(payload).not.toHaveProperty("parCycleConfigurations");
   });
 
+  it("keeps Save off while it's not yet known whether the cycle uses the PAR 2.0 forms", () => {
+    forms = { ...resolved, isLoading: true };
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={cycle} />);
+    fireEvent.change(screen.getByLabelText("PAR F2F deadline"), { target: { value: "2027-07-28" } });
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
   it("changes the departments while the cycle runs, with par2 on", () => {
     setPar2(true);
     forms = { ...resolved, showsPar2: true };

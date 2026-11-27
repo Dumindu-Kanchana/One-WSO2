@@ -686,6 +686,22 @@ describe("ParLeadReviewPanel: hard lead deadline", () => {
     expect(screen.queryByRole("button", { name: "Save draft" })).not.toBeInTheDocument();
   });
 
+  it("closes the review when the hard lead deadline passes while it's open", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2026-12-15";
+    // The last minute of that day, in the browser's time zone.
+    vi.useFakeTimers({ now: new Date(2026, 11, 15, 23, 59) });
+    try {
+      show({ parRating: "Successful" });
+      expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(61_000));
+      expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+      expect(screen.getByText(/^The hard lead deadline passed on 15 Dec '26\./)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("says N/A for a PAR the lead never rated, not the stored value", () => {
     cycle.parLeadDeadline = "2000-01-01";
     cycle.parLeadHardDeadline = "2000-01-04";

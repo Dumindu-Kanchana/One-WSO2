@@ -16,6 +16,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 vi.mock("@features/leave/api/useLeaveData", () => ({
   useLeaveEmployees: () => ({ data: [], isLoading: false, isError: false }),
@@ -103,9 +104,22 @@ describe("Par360RequestPicker: pasting addresses", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("leaves a single address in the search, as typing it would", () => {
+  it("takes each address whole, naming one it can't add rather than adding the end of it", () => {
+    const onSubmit = vi.fn();
+    renderPicker(onSubmit);
+    paste("other/alex@example.com; sam@example.com");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Not added, as they've already been asked or can't be asked: other/alex@example.com",
+    );
+    expect(requested(onSubmit)).toEqual(["sam@example.com"]);
+  });
+
+  it("leaves a single address in the search, as typing it would", async () => {
+    const user = userEvent.setup();
     renderPicker(vi.fn());
-    paste("alex@example.com");
+    await user.click(screen.getByRole("combobox"));
+    await user.paste("alex@example.com");
+    expect(screen.getByRole("combobox")).toHaveValue("alex@example.com");
     expect(screen.getByRole("button", { name: "Request" })).toBeDisabled();
   });
 });

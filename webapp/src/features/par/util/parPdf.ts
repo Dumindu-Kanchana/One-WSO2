@@ -19,7 +19,7 @@ import autoTable from "jspdf-autotable";
 import type { Par360Review, ParLegacyHistory, ParLegacyQuestionAnswer, ParRating } from "../api/types";
 import type { FormDefinition, Leadership360Summary } from "../api/leadership360Types";
 import type { SelfReviewAnswers } from "../api/selfReviewTypes";
-import { answerHtml, isQuestionAnswered } from "./selfReviewForm";
+import { answerViewHtml, isQuestionAnswered } from "./selfReviewForm";
 import { decodeParComment, isEmptyHtml, sanitizeParHtml } from "./parComment";
 import { formatShortDate } from "./parDate";
 import { pdfRatingText } from "./parLabels";
@@ -159,7 +159,7 @@ export function downloadPar2Pdf({
       const label = s.questions.length > 1 ? q.text : s.hint ? `${s.title}\n${s.hint}` : s.title;
       rows.push([
         label,
-        { content: answered ? htmlToPdfText(answerHtml(selfReview.answers[q.id])) : "-", styles: TEXT_CELL },
+        { content: answered ? htmlToPdfText(answerViewHtml(selfReview.answers[q.id])) : "-", styles: TEXT_CELL },
       ]);
     }
   }

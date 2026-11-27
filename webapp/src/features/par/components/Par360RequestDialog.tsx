@@ -58,8 +58,9 @@ import { describeError } from "@api/errors";
 /** Calendar suggestions shown at first, and added by each Suggest more. */
 const SUGGESTIONS_PER_ROUND = 8;
 
-/** An address anywhere in pasted text, also inside "Name <address>" as an email's To line copies it. */
-const PASTED_EMAIL = /[A-Za-z0-9._%+'-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+/** What separates addresses in pasted text: spaces, commas, semicolons, and the brackets and quotes of "Name
+ * <address>" as an email's To line copies it. Each whole piece with an @ in it is one address. */
+const PASTED_SEPARATORS = /[\s,;<>()"]+/;
 
 /** Someone who can be asked, from either source. */
 interface Colleague {
@@ -151,7 +152,7 @@ export function Par360RequestPicker({
   // bare address is left in the search, as typing it would be.
   const handlePaste = (event: React.ClipboardEvent) => {
     const pastedText = event.clipboardData.getData("text");
-    const found = pastedText.match(PASTED_EMAIL) ?? [];
+    const found = pastedText.split(PASTED_SEPARATORS).filter((piece) => piece.includes("@"));
     if (found.length === 0 || (found.length === 1 && found[0] === pastedText.trim())) return;
     event.preventDefault();
     const optionByAddress = new Map(options.map((o) => [o.toLowerCase(), o]));

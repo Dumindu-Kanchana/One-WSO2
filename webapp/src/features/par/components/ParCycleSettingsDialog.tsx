@@ -422,7 +422,11 @@ export default function ParCycleSettingsDialog({
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={handleClose}>Cancel</Button>
-          <Button variant="contained" disabled={!isValid || !hasChanged || updateCycle.isPending} onClick={handleSubmit}>
+          <Button
+            variant="contained"
+            disabled={!isValid || !hasChanged || par2.isLoading || updateCycle.isPending}
+            onClick={handleSubmit}
+          >
             {updateCycle.isPending ? "Saving…" : "Save"}
           </Button>
         </DialogActions>

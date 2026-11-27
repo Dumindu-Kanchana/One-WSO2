@@ -14,12 +14,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ParCycle } from "../api/types";
 
 let showsPar2 = true;
-vi.mock("../api/useReview360", () => ({ useParShowsPar2: () => ({ showsPar2 }) }));
+let lookup: { isLoading?: boolean; error?: Error | null } = {};
+const retry = vi.fn();
+vi.mock("../api/useReview360", () => ({
+  useParShowsPar2: () => ({ showsPar2, isLoading: false, error: null, retry, retrying: false, ...lookup }),
+}));
 
 const { default: ParCycleDatesStepper } = await import("./ParCycleDatesStepper");
 
@@ -37,6 +41,10 @@ const labels = () => screen.getAllByText(/Date$|Deadline$|Submission$/).map((e) 
 
 // The steps shown as reached (a check in a filled circle).
 const reachedCount = (container: HTMLElement) => container.querySelectorAll(".MuiAvatar-root").length;
+
+afterEach(() => {
+  lookup = {};
+});
 
 describe("ParCycleDatesStepper", () => {
   it("shows a PAR 2.0 cycle's hard lead deadline right after the lead deadline, and no Top 5%/20% step", () => {
@@ -67,16 +75,35 @@ describe("ParCycleDatesStepper", () => {
 
   it("reaches a PAR 2.0 cycle's steps from the five PAR 1.0 ones", () => {
     showsPar2 = true;
-    // 3 (the Top 5%/20% deadline, its lead deadline) reaches the lead deadline; the hard lead deadline is still ahead.
-    const { container, unmount } = render(<ParCycleDatesStepper cycle={cycle} activeStep={3} />);
-    expect(reachedCount(container)).toBe(3);
-    unmount();
+    // 3 (the Top 5%/20% deadline, its lead deadline) reaches the lead deadline; the hard lead deadline is still ahead
+    // on a day before it, whenever the test runs.
+    vi.useFakeTimers({ now: new Date(2026, 11, 1), toFake: ["Date"] });
+    try {
+      const { container, unmount } = render(<ParCycleDatesStepper cycle={cycle} activeStep={3} />);
+      expect(reachedCount(container)).toBe(3);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
     const hardPassed = { ...cycle, parLeadHardDeadline: "2020-01-01" } as ParCycle;
     const second = render(<ParCycleDatesStepper cycle={hardPassed} activeStep={3} />);
     expect(reachedCount(second.container)).toBe(4);
     second.unmount();
     const ended = render(<ParCycleDatesStepper cycle={cycle} activeStep={4} />);
     expect(reachedCount(ended.container)).toBe(5);
+  });
+
+  it("shows no steps until it's known whether the cycle is a PAR 2.0 one, and says so if that fails", () => {
+    lookup = { isLoading: true };
+    const loading = render(<ParCycleDatesStepper cycle={cycle} />);
+    expect(screen.queryByText("Start Date")).not.toBeInTheDocument();
+    loading.unmount();
+    lookup = { error: new Error("Network down") };
+    render(<ParCycleDatesStepper cycle={cycle} />);
+    expect(screen.queryByText("Start Date")).not.toBeInTheDocument();
+    expect(screen.getByText(/Couldn't load the cycle's dates\./)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalled();
   });
 
   it("reaches a PAR 1.0 cycle's steps as given", () => {

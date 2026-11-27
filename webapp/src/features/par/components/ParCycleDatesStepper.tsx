@@ -14,8 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { Avatar, Box, Typography } from "@wso2/oxygen-ui";
+import { Avatar, Box, Skeleton, Typography } from "@wso2/oxygen-ui";
 import { CheckIcon } from "@wso2/oxygen-ui-icons-react";
+import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { formatShortDate } from "../util/parDate";
 import { isDeadlinePassed } from "../util/parDeadline";
 import { useParShowsPar2 } from "../api/useReview360";
@@ -62,7 +63,8 @@ export default function ParCycleDatesStepper({
 }) {
   // A PAR 2.0 cycle shows its hard lead deadline right after the lead deadline, and no Top 5%/20% step: its
   // Top 5%/20% deadline is the lead deadline.
-  const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
+  const par2 = useParShowsPar2(cycle.parCycleId);
+  const { showsPar2 } = par2;
   const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
   const steps = showsPar2
     ? [
@@ -91,6 +93,16 @@ export default function ParCycleDatesStepper({
         : hardDeadline && isDeadlinePassed(hardDeadline)
           ? 3
           : 2;
+
+  // The steps differ in a PAR 2.0 cycle, so none show until that's known.
+  if (par2.isLoading) return <Skeleton variant="rectangular" height={88} sx={{ borderRadius: 1 }} />;
+  if (par2.error) {
+    return (
+      <ErrorNotice error={par2.error} onRetry={par2.retry} retrying={par2.retrying}>
+        Couldn't load the cycle's dates.
+      </ErrorNotice>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex" }}>
