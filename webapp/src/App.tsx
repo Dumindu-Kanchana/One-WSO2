@@ -84,6 +84,7 @@ import MyProfilePage from "@features/my/pages/MyProfilePage";
 import ParGroupPage, {
   ParGroupIndex,
   ParRequiresActiveCycleRoute,
+  ParOpensPar2PageRoute,
   ParRequiresLeadRoute,
   ParRequiresPar2CycleRoute,
   ParRequiresSomethingToShowRoute,
@@ -663,39 +664,46 @@ export default function App() {
                 route, the same way the tab bar itself is filtered.
                 ParRequiresActiveCycleRoute wraps every tab but History and
                 Give feedback: none of them has anything to act on once the
-                cycle closes. */}
+                cycle closes. In a PAR 2.0 cycle (par2 on) these four PAR 1.0
+                addresses open their PAR 2.0 pages (ParOpensPar2PageRoute). */}
             <Route
               path="employee-feedback"
               element={
-                <ParRequiresActiveCycleRoute>
-                  <ParRequiresLeadRoute>
-                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                      <ParEmployeeFeedbackTab />
-                    </Suspense>
-                  </ParRequiresLeadRoute>
-                </ParRequiresActiveCycleRoute>
+                <ParOpensPar2PageRoute to="/me/performance/cycle/self-review">
+                  <ParRequiresActiveCycleRoute>
+                    <ParRequiresLeadRoute>
+                      <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                        <ParEmployeeFeedbackTab />
+                      </Suspense>
+                    </ParRequiresLeadRoute>
+                  </ParRequiresActiveCycleRoute>
+                </ParOpensPar2PageRoute>
               }
             />
             <Route
               path="request-360"
               element={
-                <ParRequiresActiveCycleRoute>
-                  <ParRequiresLeadRoute>
-                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                      <ParRequestFeedbackTab />
-                    </Suspense>
-                  </ParRequiresLeadRoute>
-                </ParRequiresActiveCycleRoute>
+                <ParOpensPar2PageRoute to="/me/performance/cycle/360">
+                  <ParRequiresActiveCycleRoute>
+                    <ParRequiresLeadRoute>
+                      <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                        <ParRequestFeedbackTab />
+                      </Suspense>
+                    </ParRequiresLeadRoute>
+                  </ParRequiresActiveCycleRoute>
+                </ParOpensPar2PageRoute>
               }
             />
             <Route
               path="provide-360"
               element={
-                <ParRequiresActiveCycleRoute>
-                  <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                    <ParProvideFeedbackTab />
-                  </Suspense>
-                </ParRequiresActiveCycleRoute>
+                <ParOpensPar2PageRoute to="/me/performance/give-feedback">
+                  <ParRequiresActiveCycleRoute>
+                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                      <ParProvideFeedbackTab />
+                    </Suspense>
+                  </ParRequiresActiveCycleRoute>
+                </ParOpensPar2PageRoute>
               }
             />
             {/* F2F is leadless-gated too — OngoingCycleView.tsx's leadless
@@ -704,13 +712,15 @@ export default function App() {
             <Route
               path="f2f"
               element={
-                <ParRequiresActiveCycleRoute>
-                  <ParRequiresLeadRoute>
-                    <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
-                      <ParF2fTab />
-                    </Suspense>
-                  </ParRequiresLeadRoute>
-                </ParRequiresActiveCycleRoute>
+                <ParOpensPar2PageRoute to="/me/performance/cycle/f2f">
+                  <ParRequiresActiveCycleRoute>
+                    <ParRequiresLeadRoute>
+                      <Suspense fallback={<Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}>
+                        <ParF2fTab />
+                      </Suspense>
+                    </ParRequiresLeadRoute>
+                  </ParRequiresActiveCycleRoute>
+                </ParOpensPar2PageRoute>
               }
             />
             <Route

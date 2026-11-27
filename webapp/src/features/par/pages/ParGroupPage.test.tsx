@@ -32,7 +32,7 @@ vi.mock("../api/useParData", () => ({
 }));
 vi.mock("../api/useReview360", () => ({ useParShowsPar2: () => par2 }));
 
-const { ParRequiresLeadRoute, ParRequiresPar2CycleRoute } = await import("./ParGroupPage");
+const { ParOpensPar2PageRoute, ParRequiresLeadRoute, ParRequiresPar2CycleRoute } = await import("./ParGroupPage");
 
 const SELF_REVIEW = "/me/performance/cycle/self-review";
 
@@ -115,5 +115,59 @@ describe("ParRequiresLeadRoute", () => {
     unmount();
     showLeadOnly("/me/performance/give-feedback");
     expect(screen.getByTestId("where")).toHaveTextContent("/me/performance/give-feedback");
+  });
+});
+
+describe("ParOpensPar2PageRoute", () => {
+  const originalConfig = window.config;
+  const setPar2 = (on: boolean) => {
+    window.config = { ...(originalConfig ?? {}), ONE_WSO2_PREVIEW_FEATURES: { par2: on } } as Window["config"];
+  };
+  const showOld = () =>
+    render(
+      <MemoryRouter initialEntries={["/me/performance/provide-360"]}>
+        <Where />
+        <Routes>
+          <Route path="/me/performance/give-feedback" element={<div>Provide Feedback</div>} />
+          <Route
+            path="/me/performance/provide-360"
+            element={
+              <ParOpensPar2PageRoute to="/me/performance/give-feedback">
+                <div>Provide 360° Feedback (PAR 1.0)</div>
+              </ParOpensPar2PageRoute>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it("opens the PAR 2.0 page from a PAR 1.0 address in a PAR 2.0 cycle, with par2 on", () => {
+    setPar2(true);
+    try {
+      showOld();
+      expect(screen.getByTestId("where")).toHaveTextContent("/me/performance/give-feedback");
+      expect(screen.queryByText("Provide 360° Feedback (PAR 1.0)")).not.toBeInTheDocument();
+    } finally {
+      window.config = originalConfig;
+    }
+  });
+
+  it("keeps the PAR 1.0 page in a PAR 1.0 cycle, or with par2 off", () => {
+    setPar2(true);
+    par2 = { ...par2, showsPar2: false };
+    try {
+      showOld();
+      expect(screen.getByText("Provide 360° Feedback (PAR 1.0)")).toBeInTheDocument();
+    } finally {
+      window.config = originalConfig;
+    }
+    setPar2(false);
+    par2 = { ...par2, showsPar2: true };
+    try {
+      const view = showOld();
+      expect(view.getAllByText("Provide 360° Feedback (PAR 1.0)").length).toBeGreaterThan(0);
+    } finally {
+      window.config = originalConfig;
+    }
   });
 });
