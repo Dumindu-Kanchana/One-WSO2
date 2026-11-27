@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ParCycle, ParRating } from "../api/types";
 import { encodeParComment } from "../util/parComment";
+import { formatShortDateTime } from "../util/parDate";
 import type { ParRichTextFieldHandle } from "./ParRichTextField";
 
 let rating: ParRating;
@@ -417,7 +418,7 @@ describe("ParLeadReviewPanel: sharing before the employee has", () => {
   it("turns Share on when the self-review closes while the panel is open, in a cycle with no missed-deadline rating", () => {
     setPar2(true);
     rating = ready;
-    // The self-review closes everywhere at 23:59:59 at UTC-12 on its deadline: 2026-12-02 11:59:59 UTC.
+    // The self-review deadline has passed everywhere from the end of that day at UTC-12: 2026-12-02 12:00 UTC.
     vi.useFakeTimers({ now: new Date("2026-12-02T11:59:00Z") });
     try {
       const closing = {
@@ -427,7 +428,9 @@ describe("ParLeadReviewPanel: sharing before the employee has", () => {
       } as unknown as ParCycle;
       render(<ParLeadReviewPanel cycle={closing} employeeEmail="alex@example.com" />);
       expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
-      act(() => vi.advanceTimersByTime(60_000));
+      act(() => vi.advanceTimersByTime(59_000));
+      expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+      act(() => vi.advanceTimersByTime(2_000));
       expect(screen.getByRole("button", { name: "Share" })).toBeEnabled();
     } finally {
       vi.useRealTimers();
@@ -543,6 +546,8 @@ describe("ParLeadReviewPanel: a PAR not shared by its deadline", () => {
     expect(
       screen.getByText(/You can share once Alex shares their self-review\. If they don't by .+, their rating will be Needs Improvements\./),
     ).toBeInTheDocument();
+    // The moment the deadline has passed everywhere: the start of the next day at UTC-12.
+    expect(screen.getByText(new RegExp(`by ${formatShortDateTime(new Date("2999-12-02T12:00:00Z"))},`))).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
   });
 });
@@ -671,6 +676,7 @@ describe("ParLeadReviewPanel: hard lead deadline", () => {
     expect(
       screen.getByText("The lead review deadline passed on 1 Jan '00. You can still share until 30 Dec '99, but it's late."),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/before the deadline/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
   });
 

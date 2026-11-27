@@ -62,7 +62,7 @@ import { useParEmployeeReviews } from "../api/useLeadHistory";
 import { useGoogleDrivePicker } from "../hooks/useGoogleDrivePicker";
 import { decodeParComment, encodeParComment, isEmptyHtml, paragraphsToHtml } from "../util/parComment";
 import { isPreviewEnabled } from "@config/previewFeatures";
-import { deadlineEndsEverywhereAt, deadlinePassedEverywhereAt, hasEndedEverywhere, isDeadlinePassed } from "../util/parDeadline";
+import { deadlinePassedEverywhereAt, hasEndedEverywhere, isDeadlinePassed } from "../util/parDeadline";
 import { formatShortDate, formatShortDateTime } from "../util/parDate";
 import { downloadParPdf } from "../util/parPdf";
 import { isOpenableUrl, parseSavedUrls, type DriveFile } from "../util/parDriveFile";
@@ -152,11 +152,11 @@ export default function ParLeadReviewPanel({
   const autoSaveTokenRef = useRef(0);
 
   const parRatingData = rating.data;
-  // When the employee's self-review has closed everywhere (their department's
-  // own deadline, or the cycle's): they can no longer share it.
-  const selfReviewClosesAt = deadlineEndsEverywhereAt(employeeDeadlineFor(cycle, parRatingData?.parDepartment));
+  // When the employee's self-review deadline has passed everywhere (their department's
+  // own deadline, or the cycle's): from then they can no longer share it.
+  const selfReviewClosesAt = deadlinePassedEverywhereAt(employeeDeadlineFor(cycle, parRatingData?.parDepartment));
   const selfReviewClosesAtMs = selfReviewClosesAt.getTime();
-  const selfReviewClosed = new Date() > selfReviewClosesAt;
+  const selfReviewClosed = new Date() >= selfReviewClosesAt;
   // A PAR the employee didn't share by then gets the cycle's missed-deadline
   // rating (the leadership team's own for them), and the lead has nothing to
   // submit: the backend refuses the lead's saves and shares. People Ops can
@@ -459,12 +459,15 @@ export default function ParLeadReviewPanel({
     </Alert>
   ) : parRatingData.parLeadStatus === "DRAFT" ? (
     <Alert severity="warning">
-      You have saved your PAR as a draft.{" "}
+      You have saved your PAR as a draft.
+      {/* Once late, the late note below says until when. */}
       {isAdminView
-        ? `Please share before the cycle ends: ${formatShortDate(deadlineDate)}.`
-        : `Please share on or before the deadline: ${formatShortDate(deadlineDate)}.`}
+        ? ` Please share before the cycle ends: ${formatShortDate(deadlineDate)}.`
+        : leadLate
+          ? ""
+          : ` Please share on or before the deadline: ${formatShortDate(deadlineDate)}.`}
     </Alert>
-  ) : (
+  ) : leadLate ? null : (
     <Alert severity="info">
       {isAdminView
         ? `Please share the lead's feedback before the cycle ends: ${formatShortDate(deadlineDate)}.`
