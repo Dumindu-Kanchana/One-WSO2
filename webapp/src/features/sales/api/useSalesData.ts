@@ -30,7 +30,7 @@ import {
   isSalesBackendConfigured,
 } from "@config/apiConfig";
 import { foldIdentityError, useAsgardeoSub } from "@hooks/useAsgardeoSub";
-import { salesRetry } from "../util/salesError";
+import { echoRead, retryOnTimeout, salesRetry } from "../util/salesError";
 import type {
   AttachmentList,
   SalesUserInfo,
@@ -68,7 +68,7 @@ export function useSalesUserInfo(enabled = true) {
     // `enabled` lets the rail ask only while Sales is the open perspective, rather than
     // calling meet-app from every page. Same key, so the rail and the page share one request.
     enabled: ready && enabled,
-    queryFn: async () => authedGet<SalesUserInfo>(salesServiceUrls.userInfo, await getAccessToken()),
+    queryFn: async () => authedGet<SalesUserInfo>(salesServiceUrls.userInfo, await getAccessToken(), undefined, echoRead),
     staleTime: 5 * 60 * 1000,
     retry: salesRetry,
   });
@@ -87,7 +87,7 @@ export function useSalesRegions() {
   return useQuery<Regions>({
     queryKey: ["sales-regions", userSub],
     enabled: ready,
-    queryFn: async () => authedGet<Regions>(salesServiceUrls.regions, await getAccessToken()),
+    queryFn: async () => authedGet<Regions>(salesServiceUrls.regions, await getAccessToken(), undefined, echoRead),
     // Regions change about never; an hour keeps the filter from re-fetching on
     // every visit to the page.
     staleTime: 60 * 60 * 1000,
@@ -142,6 +142,8 @@ export function useMeetings(params: MeetingsQueryParams) {
           offset: page * pageSize,
         }),
         await getAccessToken(),
+        undefined,
+        echoRead,
       ),
     staleTime: 60 * 1000,
     refetchOnMount: true,
@@ -179,6 +181,8 @@ export function useMeetingAttachments(meetingId: number | null) {
       authedGet<AttachmentList>(
         salesServiceUrls.attachments(meetingId as number),
         await getAccessToken(),
+        undefined,
+        echoRead,
       ),
     staleTime: 5 * 60 * 1000,
     retry: salesRetry,
@@ -194,8 +198,9 @@ export function useMeetingAttachments(meetingId: number | null) {
  * `staleTime: 0` and no caching beyond the component's life: the URL expires, and a cached
  * one handed to a player an hour later is a token that fails on its first range request.
  
- * `retry: false` on purpose. The failures here are 404 (playback not configured, or no
- * recording attached yet) and 403 (not your meeting) 
+ * No retry on an answer: the failures here are 404 (playback not configured, or no
+ * recording attached yet) and 403 (not your meeting), both final. A timeout is retried
+ * once, since it says nothing about the answer.
  */
 export function useRecordingPlayback(meetingId: number | null, recordingId?: number) {
   const { getAccessToken, userSub, ready } = useSalesQueryBasis();
@@ -207,10 +212,12 @@ export function useRecordingPlayback(meetingId: number | null, recordingId?: num
       authedGet<PlaybackUrl>(
         salesServiceUrls.playback(meetingId as number, recordingId),
         await getAccessToken(),
+        undefined,
+        echoRead,
       ),
     staleTime: 0,
     gcTime: 0,
-    retry: false,
+    retry: retryOnTimeout,
   });
 }
 
@@ -230,6 +237,8 @@ export function useMeeting(meetingId: number | null) {
       authedGet<Meeting>(
         salesServiceUrls.meetingById(meetingId as number),
         await getAccessToken(),
+        undefined,
+        echoRead,
       ),
     staleTime: 60 * 1000,
     retry: salesRetry,
@@ -242,8 +251,8 @@ export function useMeeting(meetingId: number | null) {
  *
  * `enabled` on a non-null id so nothing is fetched until the tab is openedd.
  *
- * `retry: false`: the failures are 404 (no timed transcript for this meeting) and 403 (not
- * yours), both final.
+ * No retry on an answer: the failures are 404 (no timed transcript for this meeting) and
+ * 403 (not yours), both final. A timeout is retried once.
  */
 export function useTranscript(meetingId: number | null, transcriptId?: number) {
   const { getAccessToken, userSub, ready } = useSalesQueryBasis();
@@ -279,10 +288,12 @@ function transcriptQuery(
       authedGet<Transcript>(
         salesServiceUrls.transcript(meetingId as number, transcriptId),
         await getAccessToken(),
+        undefined,
+        echoRead,
       ),
     // A finished meeting's transcript never changes, so it is worth holding for the visit.
     staleTime: 30 * 60 * 1000,
-    retry: false,
+    retry: retryOnTimeout,
   };
 }
 
@@ -296,8 +307,10 @@ export function useSmartNotes(meetingId: number | null, smartNoteId?: number) {
       authedGet<SmartNotes>(
         salesServiceUrls.smartNotes(meetingId as number, smartNoteId),
         await getAccessToken(),
+        undefined,
+        echoRead,
       ),
     staleTime: 30 * 60 * 1000,
-    retry: false,
+    retry: retryOnTimeout,
   });
 }

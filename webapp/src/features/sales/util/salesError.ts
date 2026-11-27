@@ -22,13 +22,36 @@
 // privileges to view the attachments!"), and discarding those in favour of a
 // generic line would leave someone unable to tell a permission problem from an
 // outage.
-import { HttpError } from "@api/http";
+import { HttpError, RequestTimeoutError } from "@api/http";
 import { describeError, httpRetry } from "@api/errors";
 
 export { describeError };
 
 /** No retries on 4xx — a 403 on someone else's meeting will not improve. */
 export const salesRetry = httpRetry;
+
+/**
+ * How long an Echo read waits for an answer before giving up and retrying.
+ *
+ * The backends answer in well under a second, and a cold deal read that goes to
+ * Salesforce takes a few. What this is for is the request the API gateway holds
+ * for a minute or more before forwarding it, then answers fine on a second try:
+ * without a limit, the meeting page waited 60–125 s on one of those. Reads only;
+ * a write is never abandoned (see RequestOptions in @api/http).
+ */
+export const ECHO_READ_TIMEOUT_MS = 15_000;
+
+/** The options every Echo read passes to authedGet / a reading authedPost. */
+export const echoRead = { timeoutMs: ECHO_READ_TIMEOUT_MS } as const;
+
+/**
+ * For the queries that otherwise never retry — their failures (404 nothing
+ * attached, 403 not yours) are final — one retry when the request timed out,
+ * which says nothing about the answer.
+ */
+export function retryOnTimeout(failureCount: number, error: unknown): boolean {
+  return error instanceof RequestTimeoutError && failureCount < 1;
+}
 
 /**
  * True when the failure is the backend refusing this caller outright.
