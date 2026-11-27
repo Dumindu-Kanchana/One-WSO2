@@ -226,10 +226,13 @@ export default function ParLeadReviewPanel({
   const deadlineDate = isAdminView ? cycle.parCycleEndDate : cycle.parLeadDeadline;
   const deadlinePassed = isDeadlinePassed(deadlineDate);
   const shared = parRatingData?.parLeadStatus === "SHARED";
-  // A lead can still save and share after the lead deadline, until the cycle closes; it's shown as late.
-  // People Ops' edits stop at the cycle's end date.
-  const editingClosed = isAdminView ? deadlinePassed : cycle.parCycleStatus === "CLOSED";
-  const leadLate = !isAdminView && !shared && deadlinePassed;
+  // A lead can still save and share after the lead deadline, shown as late, until the hard lead deadline in a
+  // PAR 2.0 cycle (until the cycle closes in a PAR 1.0 one). After it, only PAR admins can. PAR admins' edits stop
+  // at the cycle's end date.
+  const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
+  const hardDeadlinePassed = !isAdminView && hardDeadline !== undefined && isDeadlinePassed(hardDeadline);
+  const editingClosed = isAdminView ? deadlinePassed : cycle.parCycleStatus === "CLOSED" || hardDeadlinePassed;
+  const leadLate = !isAdminView && !shared && deadlinePassed && !hardDeadlinePassed;
   const specialRatingClosed =
     !isAdminView && Boolean(cycle.parSpecialRatingDeadline) && isDeadlinePassed(cycle.parSpecialRatingDeadline!);
   const readOnly = isAdminView ? !adminForceEdit : shared || editingClosed;
@@ -501,7 +504,16 @@ export default function ParLeadReviewPanel({
             )}
             {leadLate && (
               <Alert severity="error" sx={{ mt: 1.5 }}>
-                The lead review deadline passed on {formatShortDate(deadlineDate)}. You can still share, but it's late.
+                The lead review deadline passed on {formatShortDate(deadlineDate)}.{" "}
+                {hardDeadline
+                  ? `You can still share until ${formatShortDate(hardDeadline)}, but it's late.`
+                  : "You can still share, but it's late."}
+              </Alert>
+            )}
+            {hardDeadlinePassed && !shared && hardDeadline && (
+              <Alert severity="error" sx={{ mt: 1.5 }}>
+                The hard lead deadline passed on {formatShortDate(hardDeadline)}. Only PAR admins can rate and share
+                this PAR now.
               </Alert>
             )}
           </Box>
@@ -690,7 +702,7 @@ export default function ParLeadReviewPanel({
                     )}
                   </Typography>
                   {readOnly ? (
-                    parRatingData.parRating ? (
+                    parRatingData.parRating && parRatingData.parRating !== "NOT_ASSIGNED" ? (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                         <Chip size="small" label={parRatingData.parRating} />
                         {parRatingData.parRatingUpdatedBy === "SYSTEM" && <ParAutoAssignedChip />}

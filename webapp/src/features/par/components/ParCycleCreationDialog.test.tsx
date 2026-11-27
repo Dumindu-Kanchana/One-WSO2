@@ -74,6 +74,9 @@ function fillNameAndDates() {
     ["PAR F2F deadline", "2027-07-25"],
   ];
   for (const [label, value] of dates) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  // Asked only with par2 on.
+  const hardDeadline = screen.queryByLabelText("Hard lead deadline");
+  if (hardDeadline) fireEvent.change(hardDeadline, { target: { value: "2027-07-18" } });
 }
 
 describe("ParCycleCreationDialog", () => {
@@ -156,6 +159,19 @@ describe("ParCycleCreationDialog", () => {
     expect(refetch).toHaveBeenCalled();
   });
 
+  it("asks for a hard lead deadline after the lead deadline, with par2 on", () => {
+    setPar2(true);
+    render(<ParCycleCreationDialog open onClose={vi.fn()} />);
+    fillNameAndDates();
+    fireEvent.change(screen.getByLabelText("Hard lead deadline"), { target: { value: "2027-07-15" } });
+    expect(screen.getByRole("button", { name: "Start Cycle" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("Hard lead deadline"), { target: { value: "2027-07-18" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start Cycle" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Start PAR Cycle" })).getByRole("button", { name: "Confirm" }));
+    expect(mutate.mock.calls[0][0].parLeadHardDeadline).toBe("2027-07-18");
+  });
+
   it("keeps the questions and both rating lists, with par2 off", () => {
     setPar2(false);
     render(<ParCycleCreationDialog open onClose={vi.fn()} />);
@@ -165,12 +181,14 @@ describe("ParCycleCreationDialog", () => {
     expect(screen.getByRole("combobox", { name: "PAR ratings" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "360° feedback ratings" })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Leadership group" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Hard lead deadline")).not.toBeInTheDocument();
 
     fillNameAndDates();
     fireEvent.click(screen.getByRole("button", { name: "Start Cycle" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Start PAR Cycle" })).getByRole("button", { name: "Confirm" }));
     const [payload] = mutate.mock.calls[0];
     expect(payload.par2Forms).toBeUndefined();
+    expect(payload).not.toHaveProperty("parLeadHardDeadline");
     expect(payload.parCycleConfigurations).toEqual({
       employeeParQuestion: "What went well?",
       threeSixtyReviewQuestion: "What could be better?",

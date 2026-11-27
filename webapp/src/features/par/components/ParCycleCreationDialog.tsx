@@ -32,6 +32,7 @@ import {
 import { describeError } from "@api/errors";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import ParDateField from "./ParDateField";
+import { dayAfter } from "../util/parDate";
 import ParRatingSettingsFields from "./ParRatingSettingsFields";
 import ParDepartmentSettingsFields from "./ParDepartmentSettingsFields";
 import ConfirmationDialog, { type ConfirmationContent } from "@components/confirmation-dialog/ConfirmationDialog";
@@ -70,6 +71,7 @@ const EMPTY_FORM = {
   parEmployeeDeadline: "",
   parThreeSixtyRatingDeadline: "",
   parLeadDeadline: "",
+  parLeadHardDeadline: "",
   parSpecialRatingDeadline: "",
   parF2FDeadline: "",
 };
@@ -160,7 +162,11 @@ export default function ParCycleCreationDialog({
     form.parSpecialRatingDeadline &&
     form.parF2FDeadline &&
     (par2
-      ? ratingsSeeded && ratingSettingsProblem(ratingSettings) === null && deadlinesProblem === null
+      ? ratingsSeeded &&
+        ratingSettingsProblem(ratingSettings) === null &&
+        deadlinesProblem === null &&
+        form.parLeadHardDeadline > form.parLeadDeadline &&
+        form.parLeadHardDeadline <= form.parEvaluationEndDate
       : employeeQuestion.trim() && reviewQuestion.trim() && ratings.length > 0 && reviewRatings.length > 0);
 
   const buildPayload = (): ParCycleCreate => ({
@@ -172,6 +178,7 @@ export default function ParCycleCreationDialog({
     parEmployeeDeadline: form.parEmployeeDeadline,
     parThreeSixtyRatingDeadline: form.parThreeSixtyRatingDeadline,
     parLeadDeadline: form.parLeadDeadline,
+    ...(par2 ? { parLeadHardDeadline: form.parLeadHardDeadline } : {}),
     parSpecialRatingDeadline: form.parSpecialRatingDeadline,
     parF2FDeadline: form.parF2FDeadline,
     parCycleConfigurations: par2
@@ -309,6 +316,26 @@ export default function ParCycleCreationDialog({
                 onChange={set("parLeadDeadline")}
               />
             </Grid>
+            {par2 && (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <ParDateField
+                  label="Hard lead deadline"
+                  fullWidth
+                  ariaLabel="Hard lead deadline"
+                  value={form.parLeadHardDeadline}
+                  min={form.parLeadDeadline ? dayAfter(form.parLeadDeadline) : tomorrow}
+                  max={form.parEvaluationEndDate || undefined}
+                  disabled={!form.parLeadDeadline}
+                  error={Boolean(form.parLeadHardDeadline) && form.parLeadHardDeadline <= form.parLeadDeadline}
+                  helperText={
+                    form.parLeadHardDeadline && form.parLeadHardDeadline <= form.parLeadDeadline
+                      ? "Must be later than the lead's feedback deadline"
+                      : undefined
+                  }
+                  onChange={set("parLeadHardDeadline")}
+                />
+              </Grid>
+            )}
             <Grid size={{ xs: 12, sm: 6 }}>
               <ParDateField
                 label="Top 5%/20% rating submission"

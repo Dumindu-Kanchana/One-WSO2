@@ -53,6 +53,7 @@ import { formatIndex } from "../util/review360Form";
 import { calculateCycleActiveStep } from "../util/parCycleActiveStep";
 import { resolveGridSelectedIds } from "../util/parGridSelection";
 import { isDeadlinePassed } from "../util/parDeadline";
+import { formatShortDate } from "../util/parDate";
 import ParCycleDatesStepper from "./ParCycleDatesStepper";
 import ParStatusChip from "./ParStatusChip";
 import ParCompletionKpiTile from "./ParCompletionKpiTile";
@@ -192,6 +193,12 @@ export default function ParLeadTeamRoster({
 
   // Validated before the confirm dialog opens, not only at confirm-time.
   const handleOpenShareConfirm = () => {
+    // After the hard lead deadline of a PAR 2.0 cycle, only PAR admins can share.
+    const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
+    if (hardDeadline !== undefined && isDeadlinePassed(hardDeadline)) {
+      showError(`The hard lead deadline passed on ${formatShortDate(hardDeadline)}. Only PAR admins can share now.`);
+      return;
+    }
     if (!selectedMembers.every((m) => m.parLeadStatus === "DRAFT")) {
       showError("Unable to share selected reviews. Please select only draft reviews.");
       return;

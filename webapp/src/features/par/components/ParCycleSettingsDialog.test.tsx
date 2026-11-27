@@ -53,6 +53,7 @@ const cycle = {
   parEmployeeDeadline: "2027-07-05",
   parThreeSixtyRatingDeadline: "2027-07-10",
   parLeadDeadline: "2027-07-15",
+  parLeadHardDeadline: "2027-07-18",
   parSpecialRatingDeadline: "2027-07-20",
   parF2FDeadline: "2027-07-25",
   parCycleConfigurations: {
@@ -93,6 +94,25 @@ describe("ParCycleSettingsDialog", () => {
       employeeParQuestion: "What went well?",
       threeSixtyReviewQuestion: "What could be better?",
     });
+  });
+
+  it("leaves the hard lead deadline out for a cycle without the PAR 2.0 forms", () => {
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={cycle} />);
+    expect(screen.queryByLabelText("Hard lead deadline")).not.toBeInTheDocument();
+    expect(moveF2FDeadlineAndSave()).not.toHaveProperty("parLeadHardDeadline");
+  });
+
+  it("shows and sends the hard lead deadline of a PAR 2.0 cycle, after the lead deadline", () => {
+    forms = { ...resolved, showsPar2: true };
+    render(<ParCycleSettingsDialog open onClose={vi.fn()} cycle={cycle} />);
+    const hardDeadline = screen.getByLabelText("Hard lead deadline");
+    expect(hardDeadline).toHaveValue("2027-07-18");
+
+    fireEvent.change(hardDeadline, { target: { value: "2027-07-15" } });
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    fireEvent.change(hardDeadline, { target: { value: "2027-07-20" } });
+    expect(moveF2FDeadlineAndSave().parLeadHardDeadline).toBe("2027-07-20");
   });
 
   it("says when the forms lookup fails, offers a retry, and leaves the questions out", () => {

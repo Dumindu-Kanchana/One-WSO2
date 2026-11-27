@@ -26,6 +26,7 @@ import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useUpdateParCycle } from "../api/useParMutations";
 import { useParShowsPar2 } from "../api/useReview360";
 import type { DepartmentDeadline, ParCycle } from "../api/types";
+import { dayAfter } from "../util/parDate";
 import { departmentDeadlinesProblem } from "../util/parDepartments";
 
 function fieldsFromCycle(cycle: ParCycle) {
@@ -36,6 +37,7 @@ function fieldsFromCycle(cycle: ParCycle) {
     parEmployeeDeadline: cycle.parEmployeeDeadline,
     parThreeSixtyRatingDeadline: cycle.parThreeSixtyRatingDeadline,
     parLeadDeadline: cycle.parLeadDeadline,
+    parLeadHardDeadline: cycle.parLeadHardDeadline ?? "",
     parSpecialRatingDeadline: cycle.parSpecialRatingDeadline ?? "",
     parF2FDeadline: cycle.parF2FDeadline,
   };
@@ -59,6 +61,8 @@ export default function ParCycleSettingsDialog({
   // shown, checked or sent until it's known the cycle has none.
   const par2 = useParShowsPar2(cycle.parCycleId);
   const showsQuestions = !par2.showsPar2 && !par2.isLoading && par2.error === null;
+  // Only a PAR 2.0 cycle holds leads to it. Elsewhere it isn't shown or sent, and moves with the lead deadline.
+  const showsHardDeadline = par2.showsPar2 && cycle.parLeadHardDeadline !== undefined;
   const { showSuccess, showError } = useNotifications();
 
   const [form, setForm] = useState(fieldsFromCycle(cycle));
@@ -99,6 +103,8 @@ export default function ParCycleSettingsDialog({
     form.parSpecialRatingDeadline > evalStart &&
     form.parF2FDeadline &&
     form.parF2FDeadline > evalStart &&
+    (!showsHardDeadline ||
+      (form.parLeadHardDeadline > form.parLeadDeadline && form.parLeadHardDeadline <= form.parEvaluationEndDate)) &&
     (!showsQuestions || (employeeQuestion.trim() && reviewQuestion.trim())) &&
     deadlinesProblem === null;
 
@@ -123,9 +129,11 @@ export default function ParCycleSettingsDialog({
       title: "Update PAR Cycle Settings",
       text: "Are you sure you want to update the PAR cycle settings? This may affect active dashboards and notifications.",
       confirmAction: () => {
+        const { parLeadHardDeadline, ...dates } = form;
         updateCycle.mutate(
           {
-            ...form,
+            ...dates,
+            ...(showsHardDeadline ? { parLeadHardDeadline } : {}),
             // Partial update — rating scales aren't edited by this dialog, so
             // only the two question fields and the departments go out.
             ...(showsQuestions || showsDepartments
@@ -265,6 +273,25 @@ export default function ParCycleSettingsDialog({
                 onChange={set("parLeadDeadline")}
               />
             </Grid>
+            {showsHardDeadline && (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <ParDateField
+                  label="Hard lead deadline"
+                  fullWidth
+                  ariaLabel="Hard lead deadline"
+                  value={form.parLeadHardDeadline}
+                  min={form.parLeadDeadline ? dayAfter(form.parLeadDeadline) : evalStart}
+                  max={form.parEvaluationEndDate || undefined}
+                  error={Boolean(form.parLeadHardDeadline) && form.parLeadHardDeadline <= form.parLeadDeadline}
+                  helperText={
+                    form.parLeadHardDeadline && form.parLeadHardDeadline <= form.parLeadDeadline
+                      ? "Must be later than the lead's feedback deadline"
+                      : undefined
+                  }
+                  onChange={set("parLeadHardDeadline")}
+                />
+              </Grid>
+            )}
             <Grid size={{ xs: 12, sm: 6 }}>
               <ParDateField
                 label="Top 5%/20% rating submission"

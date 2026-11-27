@@ -50,3 +50,10 @@ export function formatShortDate(value: string | undefined): string {
   if (!monthName) return value;
   return `${Number(day)} ${monthName} '${year.slice(-2)}`;
 }
+
+// The day after a `YYYY-MM-DD` date, in the same form, counted in local time.
+export function dayAfter(date: string): string {
+  const d = new Date(`${date}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}

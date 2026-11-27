@@ -101,6 +101,9 @@ export interface ParCycle {
   parEmployeeDeadline: string;
   parThreeSixtyRatingDeadline: string;
   parLeadDeadline: string;
+  // After it, only PAR admins can rate and share in a PAR 2.0 cycle. Absent
+  // from a backend that predates it.
+  parLeadHardDeadline?: string;
   parF2FDeadline: string;
   parSpecialRatingDeadline?: string;
   parCycleConfigurations: ParCycleConfigurations;
@@ -474,6 +477,8 @@ export interface ParCycleCreate {
   parF2FDeadline: string;
   parEmployeeDeadline: string;
   parLeadDeadline: string;
+  // Left out, the backend takes the lead deadline plus three days.
+  parLeadHardDeadline?: string;
   // Anything left out is taken from the global configurations.
   parCycleConfigurations: Partial<ParCycleConfigurations>;
   // PAR 2.0: the cycle uses the guided self-review and structured 360° forms.

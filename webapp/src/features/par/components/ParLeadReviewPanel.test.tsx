@@ -145,6 +145,8 @@ beforeEach(() => {
   responsesFail = false;
   retryResponses.mockReset();
   cycle.parThreeSixtyRatingDeadline = "2999-12-01";
+  cycle.parLeadDeadline = "2999-12-31";
+  delete cycle.parLeadHardDeadline;
   suggestion = { data: SUGGESTED };
   suggestionAskedFor = false;
   save.mockReset();
@@ -618,5 +620,38 @@ describe("ParLeadReviewPanel: evidence links", () => {
     await act(async () => {});
     expect(savedPayload()).toMatchObject({ parRating: "Needs Improvements" });
     expect(savedPayload()).not.toHaveProperty("parPerformanceNoticeAck");
+  });
+});
+
+describe("ParLeadReviewPanel: hard lead deadline", () => {
+  it("tells a late lead until when they can still share", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2999-12-30";
+    show({ parRating: "Successful" });
+    expect(
+      screen.getByText("The lead review deadline passed on 1 Jan '00. You can still share until 30 Dec '99, but it's late."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeInTheDocument();
+  });
+
+  it("closes the review after it: only PAR admins can rate and share", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2000-01-04";
+    show({ parRating: "Successful" });
+    expect(
+      screen.getByText("The hard lead deadline passed on 4 Jan '00. Only PAR admins can rate and share this PAR now."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/You can still share/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save draft" })).not.toBeInTheDocument();
+  });
+
+  it("says N/A for a PAR the lead never rated, not the stored value", () => {
+    cycle.parLeadDeadline = "2000-01-01";
+    cycle.parLeadHardDeadline = "2000-01-04";
+    show({ parRating: "NOT_ASSIGNED", parLeadStatus: "PENDING" });
+    expect(screen.getByText("N/A")).toBeInTheDocument();
+    expect(screen.queryByText("NOT_ASSIGNED")).not.toBeInTheDocument();
+    expect(screen.getByText("Lead's feedback is pending")).toBeInTheDocument();
   });
 });
