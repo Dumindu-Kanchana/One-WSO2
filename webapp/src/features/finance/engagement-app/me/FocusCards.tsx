@@ -15,7 +15,7 @@
 // under the License.
 
 import type { JSX } from "react";
-import { Box } from "@wso2/oxygen-ui";
+import { Box, Skeleton } from "@wso2/oxygen-ui";
 import { localIsoDate, localIsoDateOffset } from "@utils/localDate";
 import type { TravelRequestSummary } from "../api/engagementTypes";
 import { useMyOverview } from "../api/useEngagementApi";
@@ -26,13 +26,32 @@ import { fmtRange, place } from "../model/format";
 
 const MAX = 3;
 
+/** A focus card while its rows load: the title over one placeholder row, so the list below is not pushed down when they arrive. */
+function FocusSkeleton({ title }: { title: string }): JSX.Element {
+  return (
+    <Box sx={{ mb: 2 }} aria-busy="true" data-testid="focus-loading">
+      <Mini title={title}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1.25 }}>
+          <Skeleton variant="rounded" width={46} height={50} />
+          <Box sx={{ flex: 1 }}>
+            <Skeleton variant="text" width="40%" sx={{ fontSize: 13.5 }} />
+            <Skeleton variant="text" width="25%" sx={{ fontSize: 12.5 }} />
+          </Box>
+          <Skeleton variant="rounded" width={84} height={22} />
+        </Box>
+      </Mini>
+    </Box>
+  );
+}
+
 /**
- * The current and next allocations (at most three), above the Allocations list; nothing when there are none. A row
+ * The current and next allocations (at most three), above the Allocations list; a placeholder while they load, nothing when there are none. A row
  * opens its engagement when the overview or the list (`canOpen`) says the person may open it, and is plain otherwise.
  */
 export function AllocationsFocus({ canOpen }: { canOpen: (engagementId: string) => boolean }): JSX.Element | null {
   const overview = useMyOverview();
   const allocations = (overview.data?.allocations ?? []).slice(0, MAX);
+  if (overview.isPending) return <FocusSkeleton title="Current and Upcoming" />;
   if (!allocations.length) return null;
   const today = localIsoDate();
   const current = allocations.filter((a) => a.current ?? (a.start <= today && today <= a.end)).length;
@@ -62,11 +81,11 @@ const UNDER_WAY: ReadonlySet<string> = new Set(["In Progress", "Extended"]);
 const GRACE_DAYS = 30;
 
 /**
- * Trips under way or still to come (at most three), above the Travels list; nothing when there are none. A trip counts
+ * Trips under way or still to come (at most three), above the Travels list; a placeholder while they load, nothing when there are none. A trip counts
  * while its end date is today or later, and an In Progress or Extended one also for 30 days after it. Current trips
  * come first, then upcoming ones by start date. Older trips nobody closed stay out.
  */
-export function TravelsFocus({ trips }: { trips: readonly TravelRequestSummary[] }): JSX.Element | null {
+export function TravelsFocus({ trips, loading = false }: { trips: readonly TravelRequestSummary[]; loading?: boolean }): JSX.Element | null {
   const today = localIsoDate();
   const graceStart = localIsoDateOffset(-GRACE_DAYS);
   const current = (t: TravelRequestSummary) => t.start <= today;
@@ -79,6 +98,7 @@ export function TravelsFocus({ trips }: { trips: readonly TravelRequestSummary[]
     )
     .sort((a, b) => Number(!current(a)) - Number(!current(b)) || (a.start < b.start ? -1 : a.start > b.start ? 1 : 0))
     .slice(0, MAX);
+  if (loading) return <FocusSkeleton title="Under Way and Upcoming" />;
   if (!focus.length) return null;
   const ongoing = focus.filter((t) => t.start <= today).length;
   return (

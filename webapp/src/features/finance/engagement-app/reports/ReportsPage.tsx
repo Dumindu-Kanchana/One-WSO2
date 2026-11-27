@@ -16,7 +16,7 @@
 
 import { useState, type JSX, type ReactNode } from "react";
 import { Navigate } from "react-router";
-import { Alert, Autocomplete, Button, Stack, Typography } from "@wso2/oxygen-ui";
+import { Alert, Autocomplete, Button, Skeleton, Stack, Typography } from "@wso2/oxygen-ui";
 import { DownloadIcon } from "@wso2/oxygen-ui-icons-react";
 import RoutedTabs from "@components/routed-tabs/RoutedTabs";
 import { describeError } from "@api/errors";
@@ -157,11 +157,11 @@ function RangeBar({
 }
 
 /** Rows and period of the shown report: the left side of the filter actions row. */
-function ResultLine({ count, from, to }: { count: number; from: string; to: string }) {
+function ResultLine({ count, from, to }: { count: number | undefined; from: string; to: string }) {
   return (
     <>
       <Typography variant="body2" color="text.secondary">
-        Rows <b>{count}</b>
+        Rows <b>{count ?? <Skeleton variant="text" width={24} sx={{ display: "inline-block" }} />}</b>
       </Typography>
       <Typography variant="body2" color="text.secondary">
         Period <b>{fmtRange(from, to)}</b>
@@ -193,7 +193,7 @@ function TravelReport({ kind }: { kind: "invoices" | "per-diem-payments" }): JSX
         to={to}
         onSearch={(f, t) => list.setFilters({ from: f, to: t })}
         onReset={() => list.setFilters({})}
-        start={<ResultLine count={rows.length} from={from} to={to} />}
+        start={<ResultLine count={q.data ? rows.length : undefined} from={from} to={to} />}
         end={<ExportButton report={kind} params={params} filename={filename} disabled={!rows.length} />}
       />
       {q.isError ? (
@@ -340,7 +340,7 @@ function ConsultantReport(): JSX.Element {
           setDraft({ person: null, types: [], businessUnit: "", department: "", team: "" });
           list.setFilters({});
         }}
-        start={<ResultLine count={rows.length} from={from} to={to} />}
+        start={<ResultLine count={report.data ? rows.length : undefined} from={from} to={to} />}
         end={<ExportButton report="consultant-allocations" params={params} filename={`consultant-allocations-${from}-to-${to}.csv`} disabled={!rows.length} />}
       >
         {filters}

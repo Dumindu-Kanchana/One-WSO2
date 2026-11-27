@@ -128,3 +128,19 @@ describe("RoutedTabs badges", () => {
     expect(screen.getByRole("tab", { name: "One" })).toBeTruthy();
   });
 });
+
+describe("with a badge", () => {
+  it("holds the badge's place with a placeholder while it loads, and keeps the label", () => {
+    renderTabs("/app/one", { tabs: [{ segment: "one", label: "One", badgeLoading: true }, { segment: "two", label: "Two" }] });
+    const one = screen.getByRole("tab", { name: "One" });
+    expect(within(one).getByTestId("tab-badge-loading")).toBeInTheDocument();
+    expect(within(screen.getByRole("tab", { name: "Two" })).queryByTestId("tab-badge-loading")).toBeNull();
+  });
+
+  it("draws the badge, not the placeholder, once it is known", () => {
+    renderTabs("/app/one", { tabs: [{ segment: "one", label: "One", badge: { label: "3", reason: "3 rows" }, badgeLoading: true }] });
+    const one = screen.getByRole("tab", { name: /One/ });
+    expect(within(one).getByText("3")).toBeInTheDocument();
+    expect(within(one).queryByTestId("tab-badge-loading")).toBeNull();
+  });
+});

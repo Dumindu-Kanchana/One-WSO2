@@ -82,7 +82,7 @@ export default function MyAllocationsPage(): JSX.Element {
             sorting={list.sorting}
             canOpen={(a) => a.engagement.canOpen === true}
             onRowClick={(a) => navigate(myEngagementPaths.allocation(a.engagement.id))}
-            pagination={list.pager(allocations.data?.total ?? 0)}
+            pagination={list.pager(allocations.data?.total ?? 0, allocations.isPlaceholderData)}
             empty={
               filtered ? (
                 <Empty title="No Allocations Match" body="Change the search or the filters to see more." />

@@ -47,3 +47,6 @@ export function screenBadgePillSx(badge: ScreenBadge) {
     ...(badge.label.length === 1 && { width: BADGE_HEIGHT, "& .MuiChip-label": { px: 0 } }),
   };
 }
+
+/** The placeholder drawn where a badge will be while its count loads. */
+export const SCREEN_BADGE_SKELETON_SX = { flexShrink: 0, width: 24, height: BADGE_HEIGHT, borderRadius: `${BADGE_HEIGHT / 2}px` } as const;

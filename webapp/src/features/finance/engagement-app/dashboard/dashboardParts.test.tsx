@@ -17,7 +17,7 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { STACKED_MONTHS_MARGIN } from "./chartLayout";
-import { HBars, InfoHint, StackedMonths } from "./dashboardParts";
+import { HBars, InfoHint, Kpi, StackedMonths } from "./dashboardParts";
 import { notConvertedSummary, notConvertedText, USD_RATE_HINT } from "./travelCostText";
 
 const chart = vi.hoisted(() => ({ props: undefined as Record<string, unknown> | undefined }));
@@ -110,5 +110,13 @@ describe("InfoHint", () => {
   it("is a button with an accessible name, so the hint opens on focus", () => {
     const { getByRole } = render(<InfoHint label="How USD is calculated">{USD_RATE_HINT}</InfoHint>);
     expect(getByRole("button", { name: "How USD is calculated" })).toBeTruthy();
+  });
+});
+
+describe("Kpi", () => {
+  it("keeps its label while loading, with a placeholder for the figure and for the note it will have", () => {
+    const { getByText, container } = render(<Kpi label="Travels" value="" note=" " loading />);
+    expect(getByText("Travels")).toBeTruthy();
+    expect(container.querySelectorAll(".MuiSkeleton-root")).toHaveLength(2);
   });
 });

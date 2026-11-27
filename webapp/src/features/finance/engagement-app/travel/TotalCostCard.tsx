@@ -14,10 +14,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import type { JSX } from "react";
+import { useEffect, type JSX } from "react";
 import { Box, Card, Skeleton, Typography } from "@wso2/oxygen-ui";
 import type { JobCostSummary } from "../api/dashboardTypes";
-import { useJobCostSummary } from "../api/useEngagementApi";
+import { useEngagementAccess } from "../api/useEngagementUserInfo";
 import { InfoHint } from "../dashboard/dashboardParts";
 import { COST_SOURCE_LABEL, notConvertedText, USD_RATE_HINT } from "../dashboard/travelCostText";
 import { usd2, utcStamp } from "../dashboard/travelCosts/costFormat";
@@ -28,15 +28,32 @@ function splitParts(data: JobCostSummary): readonly string[] {
   return (data.bySource ?? []).filter((s) => s.lines > 0).map((s) => `${COST_SOURCE_LABEL[s.source]} ${usd2(s.usd)}`);
 }
 
-/** The "Total Cost So Far" card, from the state alone so it can be shown and tested without the network. */
-export function TotalCostCardView({ state }: { readonly state: TotalCostState }): JSX.Element | null {
+const VALUE_SX = { fontSize: 22, fontWeight: 650, fontVariantNumeric: "tabular-nums", lineHeight: 1.3 } as const;
+
+/** The "Total Cost So Far" card, from the state alone so it can be shown and tested without the network. `split` is whether the viewer gets the split line, which the loading card then holds a place for. */
+export function TotalCostCardView({ state, split: withSplit = true }: { readonly state: TotalCostState; readonly split?: boolean }): JSX.Element | null {
   if (state.kind === "hidden") return null;
+  const title = (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+      <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 500 }}>Total Cost So Far</Typography>
+      <InfoHint label="How USD is calculated">{USD_RATE_HINT}</InfoHint>
+    </Box>
+  );
   if (state.kind === "loading") {
     return (
-      <Card variant="outlined" sx={{ px: 2, py: 1.5, mb: 2 }} aria-hidden data-testid="total-cost-loading">
-        <Skeleton variant="text" width={140} sx={{ fontSize: 12 }} />
-        <Skeleton variant="text" width={180} sx={{ fontSize: 22 }} />
-        <Skeleton variant="text" width="60%" sx={{ fontSize: 12 }} />
+      <Card variant="outlined" sx={{ px: 2, py: 1.5, mb: 2 }} component="section" aria-label="Total Cost So Far" aria-busy="true" data-testid="total-cost-loading">
+        {title}
+        <Typography sx={VALUE_SX}>
+          <Skeleton variant="text" width={180} />
+        </Typography>
+        {withSplit ? (
+          <Typography sx={{ fontSize: 12.5 }}>
+            <Skeleton variant="text" width="60%" />
+          </Typography>
+        ) : null}
+        <Typography sx={{ fontSize: 11.5, mt: 0.5 }}>
+          <Skeleton variant="text" width={170} />
+        </Typography>
       </Card>
     );
   }
@@ -52,11 +69,8 @@ export function TotalCostCardView({ state }: { readonly state: TotalCostState })
   const notConverted = notConvertedText(data.notConverted);
   return (
     <Card variant="outlined" sx={{ px: 2, py: 1.5, mb: 2 }} component="section" aria-label="Total Cost So Far">
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 500 }}>Total Cost So Far</Typography>
-        <InfoHint label="How USD is calculated">{USD_RATE_HINT}</InfoHint>
-      </Box>
-      <Typography sx={{ fontSize: 22, fontWeight: 650, fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>{usd2(data.totalUsd)}</Typography>
+      {title}
+      <Typography sx={VALUE_SX}>{usd2(data.totalUsd)}</Typography>
       {split.length ? <Typography sx={{ fontSize: 12.5, color: "text.secondary" }}>{split.join(", ")}</Typography> : null}
       {notConverted ? <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}>{notConverted}</Typography> : null}
       {data.hasUnconvertedHidden ? (
@@ -74,8 +88,17 @@ export function TotalCostCardView({ state }: { readonly state: TotalCostState })
   );
 }
 
-/** The total cost so far of one travel request, for the travel request page and My Travels. */
-export default function TotalCostCard({ jobNumber }: { readonly jobNumber: string }): JSX.Element | null {
-  const q = useJobCostSummary(jobNumber);
-  return <TotalCostCardView state={totalCostState(q)} />;
+/** Whether the last cost summary asked for was refused. The next card then stays out while it loads, instead of showing and going away. */
+let lastRefused = false;
+
+/** The total cost so far of one travel request, from the page's `useJobCostSummary` query. */
+export default function TotalCostCard({ cost }: { readonly cost: Parameters<typeof totalCostState>[0] }): JSX.Element | null {
+  const { isAgent } = useEngagementAccess();
+  const state = totalCostState(cost);
+  useEffect(() => {
+    if (state.kind === "hidden") lastRefused = true;
+    else if (state.kind === "ready") lastRefused = false;
+  }, [state.kind]);
+  if (state.kind === "loading" && lastRefused) return null;
+  return <TotalCostCardView state={state} split={!isAgent} />;
 }

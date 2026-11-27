@@ -138,7 +138,7 @@ function EngagementAllocations(): JSX.Element {
             (a.canChangeStatus ?? canEditAllocationStatus(p, a.engagement.typeId)) && !/Cancelled/.test(a.status) ? [{ label: "Update Allocation Status", onClick: () => setStatusOf(a) }] : []
           }
           sorting={list.sorting}
-          pagination={list.pager(allocations.data?.total ?? 0)}
+          pagination={list.pager(allocations.data?.total ?? 0, allocations.isPlaceholderData)}
           empty={
             filtered ? (
               <Empty title="No Allocations Match" body="Change the search or the filters to see more." />

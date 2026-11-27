@@ -16,7 +16,7 @@
 
 import { useEffect, useRef, useState, type JSX } from "react";
 import { Link as RouterLink, Navigate, useSearchParams } from "react-router";
-import { Alert, Box, Divider, InputAdornment, Link, OutlinedInput, Stack, Typography } from "@wso2/oxygen-ui";
+import { Alert, Box, Divider, InputAdornment, Link, OutlinedInput, Skeleton, Stack, Typography } from "@wso2/oxygen-ui";
 import { SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import { useEngagementSearch } from "../api/useEngagementApi";
 import { useEngagementAccess, useEngagementUserInfo } from "../api/useEngagementUserInfo";
@@ -87,13 +87,19 @@ export default function SearchPage(): JSX.Element {
           <Stack spacing={2}>
             {[0, 1].map((i) => (
               <ListCard key={i}>
-                <Box sx={{ height: 120 }} />
+                <Skeleton variant="text" width={140} sx={{ fontSize: 15, mb: 0.5 }} />
+                {[0, 1, 2].map((row) => (
+                  <Box key={row} sx={{ px: 0.5, py: 1, borderTop: row ? 1 : 0, borderColor: "divider" }}>
+                    <Skeleton variant="text" width={`${45 + ((i + row) % 3) * 12}%`} sx={{ fontSize: 13.5 }} />
+                    <Skeleton variant="text" width="30%" sx={{ fontSize: 12 }} />
+                  </Box>
+                ))}
               </ListCard>
             ))}
           </Stack>
         </DelayedSkeleton>
       ) : (
-        <Stack spacing={2}>
+        <Stack spacing={2} sx={{ opacity: search.isPlaceholderData ? 0.55 : 1, transition: "opacity 120ms" }} aria-busy={search.isPlaceholderData || undefined}>
           {failed.length ? (
             <Alert severity="warning">Couldn&apos;t search {failed.map((k) => SEARCH_LABEL[k]).join(", ")}. The rest of the results are below.</Alert>
           ) : null}

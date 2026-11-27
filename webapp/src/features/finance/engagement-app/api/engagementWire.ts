@@ -451,6 +451,7 @@ export interface WTravelRequestDetail extends WTravelRequestSummary {
   address?: string | null;
   fundingSources?: WFundingSource[] | null;
   tabs: { perDiems?: boolean; invoices?: boolean; travelCards?: boolean; payments?: boolean; expenses?: boolean };
+  counts?: { perDiems?: number; invoices?: number; payments?: number; cardExpenses?: number; expenseClaims?: number } | null;
 }
 
 export interface WPerDiem {

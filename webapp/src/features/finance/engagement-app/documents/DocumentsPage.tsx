@@ -132,7 +132,7 @@ function AllDocuments({ tab, tabs }: { tab: DocumentsTab; tabs: DocumentsTab[] }
             onRowClick={canInfo ? setOpen : undefined}
             actions={canEdit ? (v) => [{ label: "Edit Visa", onClick: () => setEditing(v) }] : undefined}
             sorting={list.sorting}
-            pagination={list.pager(visas.data?.total ?? 0)}
+            pagination={list.pager(visas.data?.total ?? 0, visas.isPlaceholderData)}
             empty={
               filtered ? (
                 <Empty title="No Visas Match" body="Change the search or the filters to see more." />
@@ -151,7 +151,7 @@ function AllDocuments({ tab, tabs }: { tab: DocumentsTab; tabs: DocumentsTab[] }
             onRowClick={canInfo ? setOpen : undefined}
             actions={canEdit ? (d) => [{ label: "Edit Travel Document", onClick: () => setEditing(d) }] : undefined}
             sorting={list.sorting}
-            pagination={list.pager(docs.data?.total ?? 0)}
+            pagination={list.pager(docs.data?.total ?? 0, docs.isPlaceholderData)}
             empty={
               filtered ? (
                 <Empty title="No Travel Documents Match" body="Change the search or the filters to see more." />

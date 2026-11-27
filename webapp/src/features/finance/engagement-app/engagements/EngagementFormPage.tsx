@@ -16,7 +16,7 @@
 
 import { useState, type JSX, type ReactNode } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router";
-import { Alert, Box, Button, Card, Checkbox, FormControlLabel, TextField, Typography } from "@wso2/oxygen-ui";
+import { Alert, Box, Button, Card, Checkbox, FormControlLabel, Skeleton, TextField, Typography } from "@wso2/oxygen-ui";
 import { describeError } from "@api/errors";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import type { Engagement, EngagementTypeId } from "../api/engagementTypes";
@@ -47,7 +47,6 @@ import { EVENT_NATURES, NATURES } from "../model/statuses";
 import { HttpError } from "@api/http";
 import { CheckIcon } from "@wso2/oxygen-ui-icons-react";
 import { eaError } from "../api/engagementHttp";
-import { FactsSkeleton } from "../components/EaSkeletons";
 import { useUnsavedGuard } from "../components/useUnsavedGuard";
 import { AccountSearchField, CampaignField, FundingSourcesField, LabelWithLock, SelectField } from "./formFields";
 
@@ -83,7 +82,7 @@ export function EditEngagementPage({ pending: pendingMode = false }: { pending?:
   if (engagement.isPending) {
     return (
       <EaPage title={`Edit ${id}`} back={back}>
-        <FactsSkeleton count={10} columns={2} />
+        <FormSkeleton />
       </EaPage>
     );
   }
@@ -519,7 +518,7 @@ function EngagementForm({
               {isEdit && paid ? (
                 <Full>
                   <Button variant="outlined" size="small" onClick={fetchNewDates} disabled={update.isPending}>
-                    Fetch New Dates
+                    {update.isPending && update.variables?.fields?.refreshDatesFromSalesforce ? "Fetching New Dates…" : "Fetch New Dates"}
                   </Button>
                   <Hint>Refreshes the dates from the Salesforce line item.</Hint>
                 </Full>
@@ -636,6 +635,26 @@ function EngagementForm({
 
 function Grid({ children }: { children: ReactNode }) {
   return <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2.25, alignItems: "start" }}>{children}</Box>;
+}
+
+/** The form while its engagement loads: the fields every kind has, each a real label over a bar the size of its input. */
+function FormSkeleton(): JSX.Element {
+  const field = (label: string, height = 40) => (
+    <Box key={label}>
+      <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>{label}</Typography>
+      <Skeleton variant="rounded" height={height} />
+    </Box>
+  );
+  return (
+    <Card variant="outlined" sx={{ p: { xs: 2, sm: 3 }, maxWidth: 960 }} aria-busy="true">
+      <Grid>
+        {["Engagement ID", "Allocation Type", "Engagement Code", "Country", "Start Date", "End Date"].map((label) => field(label))}
+        <Full>{field("Location Address", 88)}</Full>
+        <Full>{field("Engagement Scope", 157)}</Full>
+        <Full>{field("Comments", 65)}</Full>
+      </Grid>
+    </Card>
+  );
 }
 
 function Full({ children }: { children: ReactNode }) {

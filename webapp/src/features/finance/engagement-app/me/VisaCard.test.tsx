@@ -67,6 +67,13 @@ describe("the visa card on the Me overview", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("keeps its title and count label while the trips load", () => {
+    state.overview = { data: undefined, isPending: true, isError: false, isFetching: true, error: null };
+    draw();
+    expect(screen.getByText("Visas for Upcoming Travels")).toBeInTheDocument();
+    expect(screen.getByText("Travels Waiting for a Visa")).toBeInTheDocument();
+  });
+
   it("is not drawn when there are no upcoming trips", () => {
     const { container } = draw();
     expect(container).toBeEmptyDOMElement();

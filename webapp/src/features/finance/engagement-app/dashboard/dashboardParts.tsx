@@ -16,7 +16,7 @@
 
 import type { JSX, ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
-import { Box, Button, ButtonBase, Card, IconButton, Stack, Tooltip, Typography } from "@wso2/oxygen-ui";
+import { Box, Button, ButtonBase, Card, IconButton, Skeleton, Stack, Tooltip, Typography } from "@wso2/oxygen-ui";
 import { BarChart } from "@wso2/oxygen-ui-charts-react";
 import { STACKED_MONTHS_MARGIN } from "./chartLayout";
 import { CircleCheckIcon, InfoIcon } from "@wso2/oxygen-ui-icons-react";
@@ -90,13 +90,13 @@ export function Calm({ children }: { children: ReactNode }): JSX.Element {
   );
 }
 
-/** A compact figure tile. `delta` is a line under the note ("▲ 12% vs last year"); `onClick` makes the tile a button. */
-export function Kpi({ label, value, note, delta, deltaTone, onClick, actionLabel }: { label: string; value: string; note?: string; delta?: string; deltaTone?: "error" | "success"; onClick?: () => void; actionLabel?: string }): JSX.Element {
+/** A compact figure tile. `delta` is a line under the note ("▲ 12% vs last year"); `onClick` makes the tile a button. While `loading`, the label stays and bars hold the place of the value and of the note, if one is passed. */
+export function Kpi({ label, value, note, delta, deltaTone, onClick, actionLabel, loading = false }: { label: string; value: string; note?: string; delta?: string; deltaTone?: "error" | "success"; onClick?: () => void; actionLabel?: string; loading?: boolean }): JSX.Element {
   const body = (
     <>
       <Typography sx={{ fontSize: 12, color: "text.secondary", fontWeight: 500 }}>{label}</Typography>
-      <Typography sx={{ fontSize: 20, fontWeight: 650, fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>{value}</Typography>
-      {note ? <Typography sx={{ fontSize: 11.5, color: "text.secondary" }}>{note}</Typography> : null}
+      <Typography sx={{ fontSize: 20, fontWeight: 650, fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>{loading ? <Skeleton variant="text" width={72} /> : value}</Typography>
+      {note ? <Typography sx={{ fontSize: 11.5, color: "text.secondary" }}>{loading ? <Skeleton variant="text" width="70%" /> : note}</Typography> : null}
       {delta ? <Typography sx={{ fontSize: 11.5, color: deltaTone ? `${deltaTone}.main` : "text.secondary", fontWeight: deltaTone ? 600 : undefined }}>{delta}</Typography> : null}
     </>
   );

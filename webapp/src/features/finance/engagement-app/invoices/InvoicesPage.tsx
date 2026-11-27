@@ -25,6 +25,7 @@ import { useInvoiceBatch, usePaymentBatch } from "../api/useEngagementMutations"
 import { useEngagementAccess, useEngagementUserInfo } from "../api/useEngagementUserInfo";
 import { ConfirmDialog } from "../components/EaDialog";
 import EaPage from "../components/EaPage";
+import { countBadge } from "../components/tabBadge";
 import EaTable, { type Column, tableState } from "../components/EaTable";
 import { Empty, Failed, ListCard } from "../components/ListCard";
 import ListToolbar, { type FilterDef } from "../components/ListToolbar";
@@ -57,7 +58,7 @@ function useInvoiceTabs(): InvoicesTab[] {
 }
 
 /** How many records wait in each queue tab: the lists' tabCounts and the sync failures' total. */
-function useQueueCounts(tabs: readonly InvoicesTab[]): { counts: Partial<Record<InvoicesTab, number>> } {
+function useQueueCounts(tabs: readonly InvoicesTab[]): { counts: Partial<Record<InvoicesTab, number>>; loading: Partial<Record<InvoicesTab, boolean>> } {
   // Ask with a tab the person holds; tabCounts covers the others they may see.
   const invTab = (["po", "finance", "push", "all-invoices"] as const).find((t) => tabs.includes(t));
   const payTab = (["payments-push", "all-payments"] as const).find((t) => tabs.includes(t));
@@ -69,6 +70,7 @@ function useQueueCounts(tabs: readonly InvoicesTab[]): { counts: Partial<Record<
   const pc = pay.data?.counts ?? {};
   return {
     counts: { po: ic["approve-po"], finance: ic.approve, push: ic.push, "payments-push": pc.push, "sync-failures": failures.data?.total },
+    loading: { po: inv.isPending, finance: inv.isPending, push: inv.isPending, "payments-push": pay.isPending, "sync-failures": failures.isPending },
   };
 }
 
@@ -81,12 +83,12 @@ export function InvoicesIndex(): JSX.Element {
 /** Invoices & Payments: invoices from the travel agents and per diem payments to travellers, with their approval and NetSuite status. */
 export default function InvoicesPage({ tab }: { tab: InvoicesTab }): JSX.Element {
   const tabs = useInvoiceTabs();
-  const { counts } = useQueueCounts(tabs);
+  const { counts, loading } = useQueueCounts(tabs);
   if (!tabs.includes(tab)) return <Navigate to={engagementPaths.invoices()} replace />;
   const defs: RoutedTabDef[] = tabs.map((t) => ({
     segment: t,
     label: LABEL[t],
-    badge: !t.startsWith("all") && counts[t] !== undefined ? { label: String(counts[t]), reason: `${counts[t]} waiting` } : undefined,
+    ...(t.startsWith("all") ? {} : countBadge(counts[t], (n) => `${n} waiting`, Boolean(loading[t]))),
   }));
   return (
     <EaPage collapsedSearch title="Invoices & Payments" subtitle="Invoices from the travel agents and per diem payments to travellers, with their approval and NetSuite status.">
@@ -101,7 +103,7 @@ export default function InvoicesPage({ tab }: { tab: InvoicesTab }): JSX.Element
         ) : tab === "all-invoices" ? (
           <AllInvoices />
         ) : (
-          <InvoiceQueue queue={tab} key={tab} />
+          <InvoiceQueue queue={tab} />
         )}
       </ListCard>
     </EaPage>

@@ -289,6 +289,8 @@ export interface TravelRequest extends TravelRequestSummary {
   readonly funding?: readonly FundingSource[];
   /** Which tabs the caller may open. */
   readonly tabs: { readonly perDiems: boolean; readonly invoices: boolean; readonly travelCards: boolean; readonly payments: boolean; readonly expenses: boolean };
+  /** How many rows each tab holds, for the tabs the caller may open. Absent from a backend that does not count them. */
+  readonly counts?: { readonly perDiems?: number; readonly invoices?: number; readonly payments?: number; readonly cardExpenses?: number; readonly expenseClaims?: number };
 }
 
 export interface PerDiem {

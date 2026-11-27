@@ -31,7 +31,7 @@ import { useAllocationTimeline, useEngagement, useOrgStructure, useReferenceData
 import { useEngagementAccess } from "../api/useEngagementUserInfo";
 import EaPage from "../components/EaPage";
 import { FactsCard } from "../components/Facts";
-import { DetailSkeleton } from "../components/EaSkeletons";
+import { FactsSkeleton } from "../components/EaSkeletons";
 import { Empty, Failed, ListCard, SectionTitle } from "../components/ListCard";
 import PersonPicker from "../components/PersonPicker";
 import SearchSelect from "../components/SearchSelect";
@@ -60,7 +60,14 @@ export default function AllocatePage(): JSX.Element {
   if (engagement.isPending) {
     return (
       <EaPage title={`Allocate ${id}`} back={back}>
-        <DetailSkeleton facts={8} tabs={1} />
+        <FactsSkeleton labels={["Engagement ID", "Engagement Code", "Account", "Opportunity Name", "Dates", "Location"]} two={["Location"]} />
+        <ListCard>
+          <Skeleton variant="rounded" height={300} />
+        </ListCard>
+        <ListCard spaced>
+          <SectionTitle>Allocation Records</SectionTitle>
+          <AllocationRecords allocations={[]} loading canChangeStatus={false} onChangeStatus={() => undefined} empty={<></>} />
+        </ListCard>
       </EaPage>
     );
   }

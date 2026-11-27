@@ -17,10 +17,10 @@
  */
 
 import { Link, useLocation } from "react-router";
-import { Box, Chip, Tab, Tabs } from "@wso2/oxygen-ui";
+import { Box, Chip, Skeleton, Tab, Tabs } from "@wso2/oxygen-ui";
 import type { ScreenBadge } from "@components/screen-badge/screenBadge";
 import ScreenBadgeLabel from "@components/screen-badge/ScreenBadgeLabel";
-import { screenBadgePillSx } from "@components/screen-badge/screenBadgeSx";
+import { SCREEN_BADGE_SKELETON_SX, screenBadgePillSx } from "@components/screen-badge/screenBadgeSx";
 
 // A tab bar whose tabs are links, so which tab is open lives in the URL rather
 // than in component state. That makes a tab linkable, survivable across a
@@ -37,6 +37,8 @@ export interface RoutedTabDef {
   label: string;
   /** A badge drawn beside the label. */
   badge?: ScreenBadge;
+  /** The badge is still loading: a placeholder holds its place until `badge` is set. */
+  badgeLoading?: boolean;
 }
 
 /** A tab bar whose tabs link to routes under `basePath`, with the current route's tab selected. */
@@ -99,7 +101,7 @@ export default function RoutedTabs({
         <Tab
           key={t.segment}
           value={t.segment}
-          label={t.badge ? badgedLabel(t.label, t.badge) : t.label}
+          label={t.badge || t.badgeLoading ? badgedLabel(t.label, t.badge) : t.label}
           component={Link}
           to={`${t.segment ? `${basePath}/${t.segment}` : basePath}${kept}`}
         />
@@ -108,17 +110,16 @@ export default function RoutedTabs({
   );
 }
 
-/** A tab label with its badge beside it. */
-function badgedLabel(label: string, badge: ScreenBadge) {
+/** A tab label with its badge beside it, or the badge's placeholder while it loads. */
+function badgedLabel(label: string, badge: ScreenBadge | undefined) {
   return (
     <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
       {label}
-      <Chip
-        size="small"
-        color="primary"
-        sx={screenBadgePillSx(badge)}
-        label={<ScreenBadgeLabel badge={badge} placement="top" />}
-      />
+      {badge ? (
+        <Chip size="small" color="primary" sx={screenBadgePillSx(badge)} label={<ScreenBadgeLabel badge={badge} placement="top" />} />
+      ) : (
+        <Skeleton variant="rounded" sx={SCREEN_BADGE_SKELETON_SX} aria-hidden data-testid="tab-badge-loading" />
+      )}
     </Box>
   );
 }

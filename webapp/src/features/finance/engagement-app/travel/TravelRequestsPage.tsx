@@ -22,6 +22,7 @@ import type { TravelRequestSummary } from "../api/engagementTypes";
 import { useReferenceData, useTravelRequests } from "../api/useEngagementApi";
 import { useEngagementAccess } from "../api/useEngagementUserInfo";
 import EaPage from "../components/EaPage";
+import { countBadge } from "../components/tabBadge";
 import EaTable, { tableState } from "../components/EaTable";
 import { Empty, Failed, ListCard, SectionTitle } from "../components/ListCard";
 import ListToolbar, { type FilterDef } from "../components/ListToolbar";
@@ -55,7 +56,8 @@ export default function TravelRequestsPage({ segment }: { segment: TravelSegment
   const list = useListView("travel");
   const ref = useReferenceData();
   // With one or two new requests, In Progress shows them as a short block above it.
-  const fresh = useTravelRequests({ segment: "new", limit: 3 }, access.newTravelRequests && segment === "in-progress" && !list.search);
+  const wantFresh = access.newTravelRequests && segment === "in-progress" && !list.search;
+  const fresh = useTravelRequests({ segment: "new", limit: 3 }, wantFresh);
   const { rowActions, dialogs } = useTravelRowActions();
   const agent = access.isAgent;
   const pair = (v: string): readonly [string, string] => [v, v];
@@ -70,7 +72,9 @@ export default function TravelRequestsPage({ segment }: { segment: TravelSegment
   if (!segments.includes(segment)) return <Navigate to={engagementPaths.travelRequests(segments[0])} replace />;
   const counts = trips.data?.counts;
   const freshRows = fresh.data?.items ?? [];
-  const showFresh = segment === "in-progress" && freshRows.length > 0 && freshRows.length <= 2 && !list.search;
+  // Until the new requests arrive, the list's own count of them says whether the block is coming, so it holds its place from the start.
+  const freshCount = fresh.data ? freshRows.length : (counts?.new ?? 0);
+  const showFresh = wantFresh && !fresh.isError && freshCount > 0 && freshCount <= 2;
   const columns = travelColumns({ agent });
   const open = (t: TravelRequestSummary) => navigate(engagementPaths.travelRequest(t.jobNumber));
 
@@ -89,7 +93,7 @@ export default function TravelRequestsPage({ segment }: { segment: TravelSegment
         <Box sx={{ mb: 2 }}>
           <ListCard>
             <SectionTitle>New Travel Requests</SectionTitle>
-            <EaTable ariaLabel="New travel requests" columns={columns} rows={freshRows} rowKey={(t) => t.jobNumber} onRowClick={open} actions={rowActions} empty={null} />
+            <EaTable ariaLabel="New travel requests" columns={columns} rows={freshRows} rowKey={(t) => t.jobNumber} onRowClick={open} actions={rowActions} empty={null} loading={fresh.isPending} loadingRows={freshCount} />
           </ListCard>
         </Box>
       ) : null}
@@ -101,7 +105,7 @@ export default function TravelRequestsPage({ segment }: { segment: TravelSegment
           tabs={segments.map((s) => ({
             segment: s,
             label: LABEL[s],
-            badge: counts?.[s] !== undefined && s !== "all" ? { label: String(counts[s]), reason: `${counts[s]} ${LABEL[s]}` } : undefined,
+            ...(s === "all" ? {} : countBadge(counts?.[s], (n) => `${n} ${LABEL[s]}`, trips.isPending)),
           }))}
         />
         <ListToolbar
@@ -125,7 +129,7 @@ export default function TravelRequestsPage({ segment }: { segment: TravelSegment
             onRowClick={open}
             actions={rowActions}
             sorting={list.sorting}
-            pagination={list.pager(trips.data?.total ?? 0)}
+            pagination={list.pager(trips.data?.total ?? 0, trips.isPlaceholderData)}
             empty={
               Object.keys(list.filters).length || list.search ? (
                 <Empty title="No Travels Match" body="Change the search or the filters to see more." />

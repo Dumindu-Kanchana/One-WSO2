@@ -75,8 +75,8 @@ function SearchBox(): JSX.Element {
   const groups: readonly SearchGroup[] = useMemo(() => search.data?.groups ?? [], [search.data]);
   const failed = search.data?.failed ?? [];
   const rows: Row[] = useMemo(
-    () => (settled && search.data ? [...groups.flatMap((g) => g.items.map((item) => ({ kind: g.kind, item }))), "all" as const] : []),
-    [groups, settled, search.data],
+    () => (settled && search.data && !search.isPlaceholderData ? [...groups.flatMap((g) => g.items.map((item) => ({ kind: g.kind, item }))), "all" as const] : []),
+    [groups, settled, search.data, search.isPlaceholderData],
   );
   const loading = wanted && (!settled || search.isPending || search.isFetching) && !search.isError;
 

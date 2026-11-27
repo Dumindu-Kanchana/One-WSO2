@@ -61,11 +61,15 @@ export default function AllocationsTodayWidget({ ctx }: { ctx: WidgetCtx }): JSX
       {!a ? (
         query.isError ? null : (
           <DelayedSkeleton minHeight={260}>
-            <Tiles count={4} />
+            <KpiRow>
+              <Tiles tiles={[["Allocations", true], "Consultants Allocated", ["Paid Allocations", true], "Non Paid Allocations"]} />
+            </KpiRow>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "repeat(3, minmax(0, 1fr))" }, gap: 3, mt: 2.5 }}>
-              <Bars rows={4} />
-              <Bars rows={4} />
-              <Bars rows={4} />
+              {["Allocations by Engagement Type", "Paid Allocations by Allocation Type", "Non Paid Allocations by Allocation Type"].map((title) => (
+                <Block key={title} title={title}>
+                  <Bars rows={4} />
+                </Block>
+              ))}
             </Box>
           </DelayedSkeleton>
         )

@@ -16,7 +16,7 @@
 
 import type { JSX, ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
-import { Box, Button, ButtonBase, Card, Typography } from "@wso2/oxygen-ui";
+import { Box, Button, ButtonBase, Card, Skeleton, Typography } from "@wso2/oxygen-ui";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { isEngagementAppBackendConfigured } from "@config/apiConfig";
 import { localIsoDate } from "@utils/localDate";
@@ -59,7 +59,20 @@ export default function UpcomingCard(): JSX.Element | null {
   const access = engagementAccess(info.data);
   const enabled = on && info.isSuccess && (access.myAllocations || access.myTravelRequests);
   const overview = useMyOverview(enabled);
-  if (!enabled || overview.isPending) return null;
+  if (!enabled) return null;
+  if (overview.isPending) {
+    return (
+      <Card variant="outlined" sx={{ ...EA_SCOPE_SX, p: 2 }} aria-busy="true">
+        <Typography sx={{ ...CAP, mb: 1 }}>Allocations &amp; Travels</Typography>
+        {[0, 1].map((i) => (
+          <Box key={i} sx={{ py: 1.125 }}>
+            <Skeleton variant="text" width={`${55 - i * 10}%`} sx={{ fontSize: 13 }} />
+            <Skeleton variant="text" width="35%" sx={{ fontSize: 12 }} />
+          </Box>
+        ))}
+      </Card>
+    );
+  }
   if (overview.isError) {
     return (
       <Card variant="outlined" sx={{ p: 2 }}>

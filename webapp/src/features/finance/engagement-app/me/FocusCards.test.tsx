@@ -45,6 +45,16 @@ describe("TravelsFocus", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("holds its place with its title while the trips load", () => {
+    render(
+      <MemoryRouter>
+        <TravelsFocus trips={[]} loading />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("focus-loading")).toBeInTheDocument();
+    expect(screen.getByText("Under Way and Upcoming")).toBeInTheDocument();
+  });
+
   it("leaves out an In Progress trip from 2018 that was never closed", () => {
     draw([trip({ jobNumber: "TRV-OLD", status: "In Progress", start: "2018-02-26", end: "2018-03-02" }), trip({ jobNumber: "TRV-NEW", status: "New", start: "2027-11-01", end: "2027-11-05" })]);
     expect(screen.queryByText("TRV-OLD")).toBeNull();

@@ -144,7 +144,7 @@ export default function CostTransactions({ ctx }: { ctx: WidgetCtx }): JSX.Eleme
         <Failed what="the transactions" error={q.error} onRetry={() => void q.refetch()} retrying={q.isFetching} />
       ) : q.isPending ? (
         <DelayedSkeleton minHeight={260}>
-          <TableSkeleton columns={6} rows={6} />
+          {view.group ? <TableSkeleton ariaLabel="Transactions by group" columns={groupColumns} /> : <TableSkeleton ariaLabel="Transactions" columns={LINE_COLUMNS} />}
         </DelayedSkeleton>
       ) : d?.kind === "groups" ? (
         <EaTable
@@ -155,7 +155,7 @@ export default function CostTransactions({ ctx }: { ctx: WidgetCtx }): JSX.Eleme
           rowKey={(g) => g.key || g.label}
           onRowClick={drillGroup}
           canOpen={(g) => Boolean(g.key)}
-          loading={q.isPlaceholderData}
+          refreshing={q.isPlaceholderData}
           pagination={pagination}
           empty={<Empty title="No transactions match these filters." />}
         />
@@ -167,7 +167,7 @@ export default function CostTransactions({ ctx }: { ctx: WidgetCtx }): JSX.Eleme
           rows={d.items}
           rowKey={(l) => l.id}
           onRowClick={setOpen}
-          loading={q.isPlaceholderData}
+          refreshing={q.isPlaceholderData}
           pagination={pagination}
           empty={<Empty title="No transactions match these filters." />}
         />

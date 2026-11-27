@@ -16,7 +16,7 @@
 
 import type { JSX } from "react";
 import { Link as RouterLink } from "react-router";
-import { Box, ButtonBase, Card, Typography } from "@wso2/oxygen-ui";
+import { Box, ButtonBase, Card, Skeleton, Typography } from "@wso2/oxygen-ui";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { isEngagementAppBackendConfigured } from "@config/apiConfig";
 import { tripsWaiting } from "../api/dashboardMappers";
@@ -60,7 +60,22 @@ export default function VisaCard(): JSX.Element | null {
   const access = engagementAccess(info.data);
   const enabled = on && info.isSuccess && access.myTravelRequests;
   const overview = useMyOverview(enabled);
-  if (!enabled || overview.isPending) return null;
+  if (!enabled) return null;
+  if (overview.isPending) {
+    return (
+      <Card variant="outlined" sx={{ ...EA_SCOPE_SX, p: 2 }} aria-busy="true">
+        <Typography sx={{ ...CAP, mb: 1 }}>Visas for Upcoming Travels</Typography>
+        <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, mb: 0.75 }}>
+          <Typography sx={{ fontSize: 22, fontWeight: 650, lineHeight: 1.15 }}>
+            <Skeleton variant="text" width={24} />
+          </Typography>
+          <Typography sx={{ fontSize: 12.5, color: "text.secondary", fontWeight: 500 }}>Travels Waiting for a Visa</Typography>
+        </Box>
+        <Skeleton variant="text" width="55%" sx={{ fontSize: 13 }} />
+        <Skeleton variant="text" width="40%" sx={{ fontSize: 12 }} />
+      </Card>
+    );
+  }
   if (overview.isError) {
     return (
       <Card variant="outlined" sx={{ ...EA_SCOPE_SX, p: 2 }}>

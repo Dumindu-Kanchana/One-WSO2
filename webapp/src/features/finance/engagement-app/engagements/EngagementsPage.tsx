@@ -23,6 +23,7 @@ import type { EngagementSummary } from "../api/engagementTypes";
 import { useEngagements, useEngagementTypes, useReferenceData } from "../api/useEngagementApi";
 import { useEngagementAccess } from "../api/useEngagementUserInfo";
 import EaPage from "../components/EaPage";
+import { countBadge } from "../components/tabBadge";
 import EaTable, { type Column, tableState } from "../components/EaTable";
 import { Empty, Failed, ListCard } from "../components/ListCard";
 import ListToolbar, { type FilterDef } from "../components/ListToolbar";
@@ -151,7 +152,7 @@ export default function EngagementsPage({ segment }: { segment: EngagementSegmen
             tabs={segments.map((s) => ({
               segment: s,
               label: SEGMENT_LABEL[s],
-              badge: counts?.[s] !== undefined ? { label: String(counts[s]), reason: `${counts[s]} ${SEGMENT_LABEL[s]}` } : undefined,
+              ...countBadge(counts?.[s], (n) => `${n} ${SEGMENT_LABEL[s]}`, engagements.isPending),
             }))}
           />
         ) : null}
@@ -177,7 +178,7 @@ export default function EngagementsPage({ segment }: { segment: EngagementSegmen
             onRowClick={(e) => navigate(engagementPaths.engagement(e.id))}
             actions={rowActionsFor}
             sorting={list.sorting}
-            pagination={list.pager(engagements.data?.total ?? 0)}
+            pagination={list.pager(engagements.data?.total ?? 0, engagements.isPlaceholderData)}
             empty={
               filtered ? (
                 <Empty title="No Engagements Match" body="Change the search or the filters to see more." />

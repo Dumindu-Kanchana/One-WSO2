@@ -39,7 +39,7 @@ import { useSortedRows } from "../model/useSortedRows";
 import { engagementName, fmtDate, fmtRange, place } from "../model/format";
 import { useEngagementActions } from "./useEngagementActions";
 import RowActions from "../components/RowActions";
-import { DetailSkeleton } from "../components/EaSkeletons";
+import { DetailSkeleton, FactsGridSkeleton } from "../components/EaSkeletons";
 
 const TABS: readonly EngagementTab[] = ["allocations", "details"];
 
@@ -71,7 +71,19 @@ export default function EngagementPage({ area = "finance" }: { area?: "finance" 
   if (engagement.isPending) {
     return (
       <EaPage title={`Engagement ${id}`} back={back}>
-        <DetailSkeleton facts={10} />
+        <DetailSkeleton
+          facts={["Engagement ID", "Engagement Code", "Account", "Opportunity Name", "Allocation Type", "Dates", "Location"]}
+          two={["Location"]}
+          tabs={["Allocations", "Details"]}
+        >
+          {tab === "details" ? (
+            <Box sx={{ pt: 1 }}>
+              <FactsGridSkeleton columns={3} labels={["Engagement Type", "Customer Contact", "Business Domain", "Opportunity Owner", "Technical Owner", "Created By", "Created On"]} two={["Created By"]} />
+            </Box>
+          ) : (
+            <AllocationRecords allocations={[]} loading canChangeStatus={false} onChangeStatus={() => undefined} empty={<></>} />
+          )}
+        </DetailSkeleton>
       </EaPage>
     );
   }
@@ -188,12 +200,15 @@ export function AllocationRecords({
   onChangeStatus,
   empty,
   travelBase,
+  loading = false,
 }: {
   allocations: readonly Allocation[];
   canChangeStatus: boolean;
   onChangeStatus: (a: Allocation) => void;
   empty: JSX.Element;
   travelBase?: (job: string) => string;
+  /** The engagement is still loading: the real headers over placeholder rows. */
+  loading?: boolean;
 }): JSX.Element {
   const columns: Column<Allocation>[] = [
     { key: "id", label: "Allocation", sortKey: "id", sortValue: (a) => a.id, render: (a) => <Mono>{a.id}</Mono> },
@@ -211,6 +226,7 @@ export function AllocationRecords({
       rows={sorted.rows}
       rowKey={(a) => a.id}
       sorting={sorted.sorting}
+      loading={loading}
       actions={canChangeStatus ? (a) => (/Cancelled/.test(a.status) ? [] : [{ label: "Update Allocation Status", onClick: () => onChangeStatus(a) }]) : undefined}
       empty={empty}
     />

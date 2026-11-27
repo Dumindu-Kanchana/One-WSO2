@@ -22,13 +22,14 @@ import RoutedTabs, { type RoutedTabDef } from "@components/routed-tabs/RoutedTab
 import { HttpError } from "@api/http";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import type { CardExpense, ExpenseClaim, Invoice, PerDiem, PerDiemPayment, TravelRequest, TripExpenses, TripPayments } from "../api/engagementTypes";
-import { useTravelRequest, useTripExpenses, useTripInvoices, useTripPayments, useTripPerDiems } from "../api/useEngagementApi";
+import { useJobCostSummary, useTravelRequest, useTripExpenses, useTripInvoices, useTripPayments, useTripPerDiems } from "../api/useEngagementApi";
 import { useDeletePerDiem } from "../api/useEngagementMutations";
 import { useEngagementAccess } from "../api/useEngagementUserInfo";
 import { ConfirmDialog } from "../components/EaDialog";
+import { countBadge } from "../components/tabBadge";
 import EaPage from "../components/EaPage";
 import RecordLink from "../components/RecordLink";
-import { DetailSkeleton, TableSkeleton } from "../components/EaSkeletons";
+import { DetailSkeleton, FactsGridSkeleton, TableSkeleton } from "../components/EaSkeletons";
 import EaTable, { type Column } from "../components/EaTable";
 import { FactsCard, FactsGrid } from "../components/Facts";
 import { Empty, Failed, ListCard, SectionTitle } from "../components/ListCard";
@@ -49,10 +50,50 @@ import { AssignDialog, InvoiceDialog, PaymentDialog, PerDiemDialog, UpdateTravel
 
 const TABS: readonly TravelTab[] = ["info", "per-diems", "invoices", "payments", "card-expenses", "expense-claims"];
 
+const TAB_LABEL: Readonly<Record<TravelTab, string>> = {
+  info: "Travel Information",
+  "per-diems": "Per Diems",
+  invoices: "Travel Invoices",
+  payments: "Per Diem Payments",
+  "card-expenses": "Credit Card Expenses",
+  "expense-claims": "Expense Claims",
+};
+
+const PAYMENT_TILES = ["Total Per Diem Amount", "Initial Currency Paid", "Total Travel Card Amount", "Total Payment Amount", "Remaining Balance"] as const;
+const PAYMENT_TILES_SX = { display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, minmax(0, 1fr))" }, gap: 1.5, mb: 2 } as const;
+
+const PER_DIEM_COLUMNS: readonly Column<PerDiem>[] = [
+  { key: "s", label: "Start Date/Time", sortKey: "start", sortValue: (r) => r.start, render: (r) => fmtDateTime(r.start) },
+  { key: "e", label: "End Date/Time", sortKey: "end", sortValue: (r) => r.end, render: (r) => fmtDateTime(r.end) },
+  { key: "d", label: "No. of Days", align: "right", sortKey: "days", sortValue: (r) => r.days, render: (r) => r.days },
+  { key: "r", label: "Per Diem Amount", align: "right", sortKey: "rate", sortValue: (r) => r.rate, render: (r) => money(r.rate, r.currency) },
+  { key: "t", label: "Total Amount", align: "right", sortKey: "total", sortValue: (r) => r.total, render: (r) => money(r.total, r.currency) },
+];
+
+const CARD_COLUMNS: readonly Column<CardExpense>[] = [
+  { key: "d", label: "Date", sortKey: "date", sortValue: (c) => c.date, render: (c) => (c.date ? fmtDate(c.date) : "—") },
+  { key: "t", label: "Expense Type", sortKey: "type", sortValue: (c) => c.expenseType, render: (c) => <Two main={c.expenseType ?? "—"} sub={c.reference} /> },
+  { key: "e", label: "Employee", sortKey: "employee", sortValue: (c) => c.employee, render: (c) => c.employee ?? "—" },
+  { key: "s", label: "Status", sortKey: "status", sortValue: (c) => c.status, render: (c) => <ExpenseStatusChip status={c.status} /> },
+  { key: "a", label: "Amount", align: "right", sortKey: "amount", sortValue: (c) => c.amount, render: (c) => money(c.amount, c.currency) },
+];
+
+const CLAIM_COLUMNS: readonly Column<ExpenseClaim>[] = [
+  { key: "d", label: "Date", sortKey: "date", sortValue: (c) => c.date, render: (c) => (c.date ? fmtDate(c.date) : "—") },
+  { key: "n", label: "Claim", sortKey: "claim", sortValue: (c) => c.claimNumber, render: (c) => <Two main={c.expenseType ?? "—"} sub={c.claimNumber ? `Claim ${c.claimNumber}` : undefined} /> },
+  { key: "e", label: "Employee", sortKey: "employee", sortValue: (c) => c.employee, render: (c) => c.employee ?? "—" },
+  { key: "s", label: "Status", sortKey: "status", sortValue: (c) => c.status, render: (c) => <ExpenseStatusChip status={c.status} /> },
+  { key: "a", label: "Amount", align: "right", sortKey: "amount", sortValue: (c) => c.amount, render: (c) => money(c.amount, c.currency) },
+  { key: "r", label: "Reimbursement", align: "right", sortKey: "reimbursement", sortValue: (c) => c.reimbursementAmount, render: (c) => money(c.reimbursementAmount, c.reimbursementCurrency) },
+];
+
 /** One travel request: the traveller, the engagement and the trip, then its detail and expense tabs — Travel Information, Per Diems, Travel Invoices, Per Diem Payments, Credit Card Expenses and Expense Claims. */
 export default function TravelRequestPage({ area = "finance" }: { area?: "finance" | "me" }): JSX.Element {
   const { job = "", tab = "info" } = useParams();
   const trip = useTravelRequest(job);
+  // Asked for alongside the request, not after it: it needs only the job number.
+  const cost = useJobCostSummary(job, Boolean(job));
+  const { isAgent } = useEngagementAccess();
   const pathOf = area === "me" ? myEngagementPaths.travelRequest : engagementPaths.travelRequest;
   const back = area === "me" ? { to: myEngagementPaths.travelRequests, label: "Travels" } : { to: engagementPaths.travelRequests(), label: "Travels" };
 
@@ -60,7 +101,15 @@ export default function TravelRequestPage({ area = "finance" }: { area?: "financ
   if (trip.isPending) {
     return (
       <EaPage title={`Travel Request ${job}`} back={back}>
-        <DetailSkeleton facts={12} tabs={6} />
+        <DetailSkeleton
+          facts={["Traveller", ...(isAgent ? [] : ["Engagement"]), "Destination", "Dates", "Travel Agent", "Visa"]}
+          two={["Traveller", "Engagement"]}
+          tabs={tab === "info" ? [TAB_LABEL.info] : [TAB_LABEL.info, TAB_LABEL[tab as TravelTab]]}
+          moreTabs={2}
+          between={<TotalCostCard cost={cost} />}
+        >
+          <SectionLoading tab={tab as TravelTab} />
+        </DetailSkeleton>
       </EaPage>
     );
   }
@@ -76,7 +125,7 @@ export default function TravelRequestPage({ area = "finance" }: { area?: "financ
       </EaPage>
     );
   }
-  return <TravelRequestView t={trip.data} tab={tab as TravelTab} area={area} back={back} />;
+  return <TravelRequestView t={trip.data} cost={cost} tab={tab as TravelTab} area={area} back={back} />;
 }
 
 /** The sections of one travel request, each its own call, made only for the tabs the backend says the viewer may open. */
@@ -87,7 +136,7 @@ interface TripSections {
   readonly expenses?: TripExpenses;
 }
 
-function TravelRequestView({ t, tab, area, back }: { t: TravelRequest; tab: TravelTab; area: "finance" | "me"; back: { to: string; label: string } }): JSX.Element {
+function TravelRequestView({ t, cost, tab, area, back }: { t: TravelRequest; cost: ReturnType<typeof useJobCostSummary>; tab: TravelTab; area: "finance" | "me"; back: { to: string; label: string } }): JSX.Element {
   const { p, newTravelRequests, agencyScope, agencyName } = useEngagementAccess();
   const [dialog, setDialog] = useState<"assign" | "update" | null>(null);
   const perDiems = useTripPerDiems(t.jobNumber, t.tabs.perDiems);
@@ -100,16 +149,17 @@ function TravelRequestView({ t, tab, area, back }: { t: TravelRequest; tab: Trav
   const a = t.actions;
   const canEdit = area === "finance" && (a ? Boolean(a.update) : has(TRAVEL.EDIT_STATUS) || has(TRAVEL.EDIT_AGENT) || has(TRAVEL.EDIT_VISA));
   const canAssign = area === "finance" && (a ? Boolean(a.assign) : newTravelRequests);
-  const count = (n: number | undefined) => (n === undefined ? undefined : { label: String(n), reason: `${n} rows` });
+  // The request's own counts fill the badges at once. A loaded list's length takes over, so a badge matches its rows after a change.
+  const count = (list: { length: number } | undefined, known: number | undefined, loading: boolean) => countBadge(list?.length ?? known, (n) => `${n} rows`, loading);
   const tabs: RoutedTabDef[] = [
-    { segment: "info", label: "Travel Information" },
-    ...(t.tabs.perDiems ? [{ segment: "per-diems", label: "Per Diems", badge: count(perDiems.data?.length) }] : []),
-    ...(t.tabs.invoices ? [{ segment: "invoices", label: "Travel Invoices", badge: count(invoices.data?.length) }] : []),
-    ...(t.tabs.payments ? [{ segment: "payments", label: "Per Diem Payments", badge: count(payments.data?.items.length) }] : []),
+    { segment: "info", label: TAB_LABEL.info },
+    ...(t.tabs.perDiems ? [{ segment: "per-diems", label: TAB_LABEL["per-diems"], ...count(perDiems.data, t.counts?.perDiems, perDiems.isPending) }] : []),
+    ...(t.tabs.invoices ? [{ segment: "invoices", label: TAB_LABEL.invoices, ...count(invoices.data, t.counts?.invoices, invoices.isPending) }] : []),
+    ...(t.tabs.payments ? [{ segment: "payments", label: TAB_LABEL.payments, ...count(payments.data?.items, t.counts?.payments, payments.isPending) }] : []),
     ...(t.tabs.expenses
       ? [
-          { segment: "card-expenses", label: "Credit Card Expenses", badge: count(expenses.data?.cardExpenses.length) },
-          { segment: "expense-claims", label: "Expense Claims", badge: count(expenses.data?.expenseClaims.length) },
+          { segment: "card-expenses", label: TAB_LABEL["card-expenses"], ...count(expenses.data?.cardExpenses, t.counts?.cardExpenses, expenses.isPending) },
+          { segment: "expense-claims", label: TAB_LABEL["expense-claims"], ...count(expenses.data?.expenseClaims, t.counts?.expenseClaims, expenses.isPending) },
         ]
       : []),
   ];
@@ -164,13 +214,13 @@ function TravelRequestView({ t, tab, area, back }: { t: TravelRequest; tab: Trav
           { label: "Visa", value: t.visa || "—" },
         ]}
       />
-      <TotalCostCard jobNumber={t.jobNumber} />
+      <TotalCostCard cost={cost} />
       <ListCard>
         <RoutedTabs basePath={basePath} tabs={tabs} ariaLabel="Travel request sections" scrollable />
         {sectionQuery?.isError ? (
           <Failed what="this section" error={sectionQuery.error} onRetry={() => void sectionQuery.refetch()} retrying={sectionQuery.isFetching} />
         ) : sectionQuery?.isPending ? (
-          <TableSkeleton />
+          <SectionLoading tab={tab} />
         ) : tab === "per-diems" ? (
           <PerDiemsTab t={t} s={sections} />
         ) : tab === "invoices" ? (
@@ -189,6 +239,39 @@ function TravelRequestView({ t, tab, area, back }: { t: TravelRequest; tab: Trav
       {dialog === "update" ? <UpdateTravelDialog trip={t} onClose={() => setDialog(null)} /> : null}
     </EaPage>
   );
+}
+
+/** A tab while its rows load: its real headings and table headers over placeholder rows. */
+function SectionLoading({ tab }: { tab: TravelTab }): JSX.Element {
+  const { isAgent } = useEngagementAccess();
+  switch (tab) {
+    case "per-diems":
+      return <TableSkeleton ariaLabel="Per diems" columns={PER_DIEM_COLUMNS} />;
+    case "invoices":
+      return <TableSkeleton ariaLabel="Travel invoices" columns={invoiceColumns({ job: false, agent: isAgent })} />;
+    case "payments":
+      return (
+        <>
+          <SectionTitle>Payment Summary</SectionTitle>
+          <Box sx={PAYMENT_TILES_SX}>
+            {PAYMENT_TILES.map((label) => (
+              <Kpi key={label} label={label} value="" loading />
+            ))}
+          </Box>
+          <TableSkeleton ariaLabel="Per diem payments" columns={paymentColumns({ traveller: false, job: false })} />
+        </>
+      );
+    case "card-expenses":
+      return <TableSkeleton ariaLabel="Credit card expenses" columns={CARD_COLUMNS} />;
+    case "expense-claims":
+      return <TableSkeleton ariaLabel="Expense claims" columns={CLAIM_COLUMNS} />;
+    default:
+      return (
+        <Box sx={{ pt: 1 }}>
+          <FactsGridSkeleton columns={3} labels={[...(isAgent ? [] : ["Engagement Code", "Engagement Type", "Customer"]), "Country", "Travel Location"]} />
+        </Box>
+      );
+  }
 }
 
 function InfoTab({ t }: { t: TravelRequest }): JSX.Element {
@@ -268,20 +351,13 @@ function PerDiemsTab({ t, s }: { t: TravelRequest; s: TripSections }): JSX.Eleme
   const canDelete = p.t.has(TRAVEL.DELETE_PER_DIEMS) && open;
   const rows = s.perDiems ?? [];
   const add = canAdd ? <AddButton label="Add Per Diem" allowed={open} why={`Per diems cannot be added: the travel request is ${t.status}.`} onClick={() => setAdding(true)} /> : null;
-  const columns: Column<PerDiem>[] = [
-    { key: "s", label: "Start Date/Time", sortKey: "start", sortValue: (r) => r.start, render: (r) => fmtDateTime(r.start) },
-    { key: "e", label: "End Date/Time", sortKey: "end", sortValue: (r) => r.end, render: (r) => fmtDateTime(r.end) },
-    { key: "d", label: "No. of Days", align: "right", sortKey: "days", sortValue: (r) => r.days, render: (r) => r.days },
-    { key: "r", label: "Per Diem Amount", align: "right", sortKey: "rate", sortValue: (r) => r.rate, render: (r) => money(r.rate, r.currency) },
-    { key: "t", label: "Total Amount", align: "right", sortKey: "total", sortValue: (r) => r.total, render: (r) => money(r.total, r.currency) },
-  ];
-  const sorted = useSortedRows(rows, columns);
+  const sorted = useSortedRows(rows, PER_DIEM_COLUMNS);
   return (
     <>
       {rows.length && add ? <TabBar>{add}</TabBar> : null}
       <EaTable
         ariaLabel="Per diems"
-        columns={columns}
+        columns={PER_DIEM_COLUMNS}
         rows={sorted.rows}
         rowKey={(r) => r.id}
         sorting={sorted.sorting}
@@ -356,18 +432,11 @@ function InvoicesTab({ t, s, area }: { t: TravelRequest; s: TripSections; area: 
 
 /** Credit card transactions tagged with this travel's job number (read only). */
 function CardExpensesTab({ rows }: { rows: readonly CardExpense[] }): JSX.Element {
-  const columns: Column<CardExpense>[] = [
-    { key: "d", label: "Date", sortKey: "date", sortValue: (c) => c.date, render: (c) => (c.date ? fmtDate(c.date) : "—") },
-    { key: "t", label: "Expense Type", sortKey: "type", sortValue: (c) => c.expenseType, render: (c) => <Two main={c.expenseType ?? "—"} sub={c.reference} /> },
-    { key: "e", label: "Employee", sortKey: "employee", sortValue: (c) => c.employee, render: (c) => c.employee ?? "—" },
-    { key: "s", label: "Status", sortKey: "status", sortValue: (c) => c.status, render: (c) => <ExpenseStatusChip status={c.status} /> },
-    { key: "a", label: "Amount", align: "right", sortKey: "amount", sortValue: (c) => c.amount, render: (c) => money(c.amount, c.currency) },
-  ];
-  const sorted = useSortedRows(rows, columns);
+  const sorted = useSortedRows(rows, CARD_COLUMNS);
   return (
     <EaTable
       ariaLabel="Credit card expenses"
-      columns={columns}
+      columns={CARD_COLUMNS}
       rows={sorted.rows}
       rowKey={(c) => c.id}
       sorting={sorted.sorting}
@@ -378,19 +447,11 @@ function CardExpensesTab({ rows }: { rows: readonly CardExpense[] }): JSX.Elemen
 
 /** Expense claim lines tagged with this travel's job number (read only). */
 function ExpenseClaimsTab({ rows }: { rows: readonly ExpenseClaim[] }): JSX.Element {
-  const columns: Column<ExpenseClaim>[] = [
-    { key: "d", label: "Date", sortKey: "date", sortValue: (c) => c.date, render: (c) => (c.date ? fmtDate(c.date) : "—") },
-    { key: "n", label: "Claim", sortKey: "claim", sortValue: (c) => c.claimNumber, render: (c) => <Two main={c.expenseType ?? "—"} sub={c.claimNumber ? `Claim ${c.claimNumber}` : undefined} /> },
-    { key: "e", label: "Employee", sortKey: "employee", sortValue: (c) => c.employee, render: (c) => c.employee ?? "—" },
-    { key: "s", label: "Status", sortKey: "status", sortValue: (c) => c.status, render: (c) => <ExpenseStatusChip status={c.status} /> },
-    { key: "a", label: "Amount", align: "right", sortKey: "amount", sortValue: (c) => c.amount, render: (c) => money(c.amount, c.currency) },
-    { key: "r", label: "Reimbursement", align: "right", sortKey: "reimbursement", sortValue: (c) => c.reimbursementAmount, render: (c) => money(c.reimbursementAmount, c.reimbursementCurrency) },
-  ];
-  const sorted = useSortedRows(rows, columns);
+  const sorted = useSortedRows(rows, CLAIM_COLUMNS);
   return (
     <EaTable
       ariaLabel="Expense claims"
-      columns={columns}
+      columns={CLAIM_COLUMNS}
       rows={sorted.rows}
       rowKey={(c) => c.id}
       sorting={sorted.sorting}
@@ -425,7 +486,7 @@ function PaymentsTab({ t, s: sections, area }: { t: TravelRequest; s: TripSectio
     <>
       <SectionTitle>Payment Summary</SectionTitle>
       {s ? (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, minmax(0, 1fr))" }, gap: 1.5, mb: 2 }}>
+        <Box sx={PAYMENT_TILES_SX}>
           {tile("Total Per Diem Amount", money(s.totalPerDiem, s.currency), "The total per diem amount found for this job number and currency")}
           {tile("Initial Currency Paid", s.initialCurrencyPaid ? money(s.initialCurrencyPaid, s.currency) : "—", "The invoices that are paid as currency")}
           {tile("Total Travel Card Amount", s.travelCards ? money(s.travelCards, s.currency) : "—", "The total travel card amount found for this job number and currency")}

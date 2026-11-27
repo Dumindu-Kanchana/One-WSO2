@@ -25,6 +25,7 @@ import {
   ListItemButton,
   ListItemText,
   MenuItem,
+  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -43,7 +44,6 @@ import { useDeleteAllocationType, useIdempotencyKey, useSaveAllocationType, useS
 import { useEngagementAccess } from "../api/useEngagementUserInfo";
 import EaDialog, { ConfirmDialog } from "../components/EaDialog";
 import EaPage from "../components/EaPage";
-import { TableSkeleton } from "../components/EaSkeletons";
 import EaTable, { type Column, tableState } from "../components/EaTable";
 import { Empty, Failed, ListCard, SectionTitle } from "../components/ListCard";
 import ListToolbar from "../components/ListToolbar";
@@ -92,6 +92,64 @@ export default function SettingsPage({ tab }: { tab: SettingsTab }): JSX.Element
   );
 }
 
+const ROLE_GRID_SX = { display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) minmax(0, 1.8fr)" }, gap: 2.5 } as const;
+
+/** Role Settings while it loads: the role list and the privilege table, with their real headings. */
+function RoleSettingsSkeleton(): JSX.Element {
+  return (
+    <Box sx={ROLE_GRID_SX} aria-busy="true">
+      <Box>
+        <SectionTitle>Select Role</SectionTitle>
+        <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1.5 }}>
+          {Array.from({ length: 6 }, (_, i) => (
+            <Box key={i} sx={{ px: 2, py: 1, borderBottom: i < 5 ? 1 : 0, borderColor: "divider" }}>
+              <Skeleton variant="text" width={`${50 + ((i * 13) % 30)}%`} sx={{ fontSize: 12.5 }} />
+              <Skeleton variant="text" width={80} sx={{ fontSize: 12 }} />
+            </Box>
+          ))}
+        </Box>
+      </Box>
+      <Box>
+        <SectionTitle
+          aside={
+            <Button variant="contained" size="small" disabled>
+              Save
+            </Button>
+          }
+        >
+          Privileges
+        </SectionTitle>
+        <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, overflowX: "auto" }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={TABLE_HEAD_SX}>
+                <TableCell padding="checkbox" />
+                <TableCell>Privilege</TableCell>
+                <TableCell>Description</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {Array.from({ length: 8 }, (_, i) => (
+                <TableRow key={i}>
+                  <TableCell padding="checkbox">
+                    <Skeleton variant="rounded" width={18} height={18} sx={{ mx: "auto", my: 1 }} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton variant="text" width={`${50 + ((i * 17) % 40)}%`} sx={{ fontSize: 13 }} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton variant="text" width={`${60 + ((i * 11) % 35)}%`} sx={{ fontSize: 12.5 }} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 /** Role Settings: pick a role (an Asgardeo group), tick its privileges; Save replaces them after a Yes / No. */
 function RoleSettings({ app }: { app: "allocations" | "travel" }): JSX.Element {
   const settings = useRoleSettings(app);
@@ -101,14 +159,14 @@ function RoleSettings({ app }: { app: "allocations" | "travel" }): JSX.Element {
   const [ticks, setTicks] = useState<Record<string, ReadonlySet<number>>>({});
   const [confirm, setConfirm] = useState(false);
   if (settings.isError) return <Failed what="the role settings" error={settings.error} onRetry={() => void settings.refetch()} retrying={settings.isFetching} />;
-  if (settings.isPending) return <TableSkeleton columns={3} rows={6} />;
+  if (settings.isPending) return <RoleSettingsSkeleton />;
   const roles = settings.data.roles;
   if (!roles.length) return <Empty title="No Roles Yet" body="Roles appear here once they are set up for this app." />;
   const current = roles.find((r) => r.role === role) ?? roles[0];
   const ticked = ticks[current.role] ?? new Set(current.privileges);
   const changed = JSON.stringify([...ticked].sort()) !== JSON.stringify([...current.privileges].sort());
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) minmax(0, 1.8fr)" }, gap: 2.5 }}>
+    <Box sx={ROLE_GRID_SX}>
       <Box>
         <SectionTitle>Select Role</SectionTitle>
         <List dense sx={{ border: 1, borderColor: "divider", borderRadius: 1.5, py: 0 }}>

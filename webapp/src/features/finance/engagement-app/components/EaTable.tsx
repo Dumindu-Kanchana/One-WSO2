@@ -95,6 +95,7 @@ export default function EaTable<T>({
   selection,
   empty,
   loading = false,
+  loadingRows,
   refreshing = false,
   pagination,
   sorting,
@@ -113,6 +114,8 @@ export default function EaTable<T>({
   readonly empty: ReactNode;
   /** The first load: placeholder rows. */
   readonly loading?: boolean;
+  /** How many placeholder rows the first load shows, when the number to come is known. */
+  readonly loadingRows?: number;
   /** Another page, sort or search is on its way: the rows stay, dimmed, and a progress bar appears if it takes a moment. */
   readonly refreshing?: boolean;
   /** `pageSizes` with `onPageSize` lets the reader pick how many rows a page shows. */
@@ -175,7 +178,7 @@ export default function EaTable<T>({
           </TableHead>
           <TableBody>
             {loading
-              ? Array.from({ length: Math.min(Math.max(rows.length, 3), 10) }, (_, i) => (
+              ? Array.from({ length: loadingRows ?? Math.min(Math.max(rows.length, 3), 10) }, (_, i) => (
                   <TableRow key={`s${i}`} aria-hidden>
                     {selection ? (
                       <TableCell padding="checkbox">

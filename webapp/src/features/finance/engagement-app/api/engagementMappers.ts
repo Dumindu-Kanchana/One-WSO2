@@ -350,6 +350,7 @@ export function travelDetail(t: W.WTravelRequestDetail): V.TravelRequest {
       payments: Boolean(t.tabs.payments),
       expenses: Boolean(t.tabs.expenses),
     },
+    counts: t.counts ?? undefined,
   };
 }
 

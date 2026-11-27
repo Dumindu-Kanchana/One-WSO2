@@ -24,15 +24,14 @@ import EngagementShell, { EngagementLanding, EngagementRequires, type Engagement
 
 const dashboardModule = () => import("./dashboard/DashboardPage");
 const DashboardPage = lazy(dashboardModule);
-// The dashboard is where people land: fetch its code while sign-in and /user-info are still running, not after them.
-if (typeof window !== "undefined" && new RegExp(`${ENGAGEMENT_APP_PATH}(/dashboard)?/?$`).test(window.location.pathname)) void dashboardModule();
 const approvalsModule = () => import("./approvals/ApprovalsPage");
 const ApprovalsPage = lazy(approvalsModule);
 const ApprovalsIndex = lazy(() => approvalsModule().then((m) => ({ default: m.ApprovalsIndex })));
 const engagementsModule = () => import("./engagements/EngagementsPage");
 const EngagementsPage = lazy(engagementsModule);
 const EngagementsIndex = lazy(() => engagementsModule().then((m) => ({ default: m.EngagementsIndex })));
-const EngagementPage = lazy(() => import("./engagements/EngagementPage"));
+const engagementModule = () => import("./engagements/EngagementPage");
+const EngagementPage = lazy(engagementModule);
 const formModule = () => import("./engagements/EngagementFormPage");
 const CreateEngagementPage = lazy(() => formModule().then((m) => ({ default: m.CreateEngagementPage })));
 const EditEngagementPage = lazy(() => formModule().then((m) => ({ default: m.EditEngagementPage })));
@@ -43,7 +42,8 @@ const AllocationsIndex = lazy(() => allocationsModule().then((m) => ({ default: 
 const travelModule = () => import("./travel/TravelRequestsPage");
 const TravelRequestsPage = lazy(travelModule);
 const TravelRequestsIndex = lazy(() => travelModule().then((m) => ({ default: m.TravelRequestsIndex })));
-const TravelRequestPage = lazy(() => import("./travel/TravelRequestPage"));
+const travelRequestModule = () => import("./travel/TravelRequestPage");
+const TravelRequestPage = lazy(travelRequestModule);
 const invoicesModule = () => import("./invoices/InvoicesPage");
 const InvoicesPage = lazy(invoicesModule);
 const InvoicesIndex = lazy(() => invoicesModule().then((m) => ({ default: m.InvoicesIndex })));
@@ -59,6 +59,23 @@ const SettingsIndex = lazy(() => settingsModule().then((m) => ({ default: m.Sett
 const SearchPage = lazy(() => import("./search/SearchPage"));
 const MyTravelRequestsPage = lazy(() => import("./me/MyTravelRequestsPage"));
 const MyAllocationsPage = lazy(() => import("./me/MyAllocationsPage"));
+
+// The page the address opens: fetch its code while sign-in and /user-info are still running, not after them. The first match wins.
+const PRELOAD: readonly (readonly [RegExp, () => Promise<unknown>])[] = [
+  [new RegExp(`${ENGAGEMENT_APP_PATH}(/dashboard)?/?$`), dashboardModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/approvals/(internal|marketing)`), approvalsModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/engagements/(customer|internal|marketing)$`), engagementsModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/engagements/(new/|[^/]+/edit)`), formModule],
+  [new RegExp(`(${ENGAGEMENT_APP_PATH}/engagements|/me/allocations)/[^/]+/(allocations|details)`), engagementModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/allocations/`), allocationsModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/travel-requests/(new|in-progress|completed|all)$`), travelModule],
+  [new RegExp(`(${ENGAGEMENT_APP_PATH}|/me)/travel-requests/[^/]+/`), travelRequestModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/invoices/`), invoicesModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/reports/`), reportsModule],
+  [new RegExp(`(${ENGAGEMENT_APP_PATH}/visas-documents|/me/passport-visas)/`), documentsModule],
+  [new RegExp(`${ENGAGEMENT_APP_PATH}/settings/`), settingsModule],
+];
+if (typeof window !== "undefined") void PRELOAD.find(([path]) => path.test(window.location.pathname))?.[1]();
 
 // Space only, no skeleton of its own: the page that loads draws the one skeleton for its body, so there is not a second one before it.
 const loading = <Box sx={{ minHeight: 240 }} aria-busy="true" />;

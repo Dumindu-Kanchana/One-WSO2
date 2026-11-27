@@ -46,7 +46,7 @@ export default function MyTravelRequestsPage(): JSX.Element {
   const pair = (v: string): readonly [string, string] => [v, v];
   return (
     <EaPage collapsedSearch title="Travels" subtitle="Your travels, with the per diems, invoices and payments booked against them.">
-      <TravelsFocus trips={all} />
+      <TravelsFocus trips={all} loading={trips.isPending} />
       <ListCard>
         <ListToolbar
             search={list.search}

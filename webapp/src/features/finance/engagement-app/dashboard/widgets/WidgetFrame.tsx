@@ -50,7 +50,7 @@ export default function WidgetFrame({
   const state = widgetState(def, ctx);
   const heading = def.heading?.(ctx) ?? def.title;
   const note = typeof def.note === "function" ? def.note(ctx) : def.note;
-  // A refetch (a new period or filter) dims the previous figures briefly, then shows the skeleton until the new ones arrive. Allocations Today handles its own.
+  // A refetch (a new period or filter) keeps the previous figures, dimmed, until the new ones arrive. Allocations Today handles its own.
   const dim = def.source === "cost" && ctx.cost.query.isPlaceholderData;
   const items: RowAction[] = [
     { label: pinned ? "Unpin" : "Pin to Top", icon: pinned ? <PinOffIcon size={15} /> : <PinIcon size={15} />, onClick: onPin },
@@ -90,12 +90,10 @@ export default function WidgetFrame({
         <Failed what={heading} error={state.error ?? null} onRetry={retry} retrying={def.source === "cost" ? ctx.cost.query.isFetching : ctx.retrying} />
       ) : state.kind === "empty" ? (
         <Calm>{def.empty}</Calm>
-      ) : dim ? (
-        <Refreshing skeleton={<WidgetSkeleton id={def.id} delay={0} />}>
+      ) : (
+        <Refreshing active={dim}>
           <Body ctx={ctx} />
         </Refreshing>
-      ) : (
-        <Body ctx={ctx} />
       )}
     </Card>
   );

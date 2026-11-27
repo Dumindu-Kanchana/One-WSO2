@@ -21,6 +21,7 @@ import type { EngagementSummary } from "../api/engagementTypes";
 import { useApprovals } from "../api/useEngagementApi";
 import { useEngagementAccess } from "../api/useEngagementUserInfo";
 import EaPage from "../components/EaPage";
+import { countBadge } from "../components/tabBadge";
 import EaTable, { type Column, tableState } from "../components/EaTable";
 import { Empty, Failed, ListCard } from "../components/ListCard";
 import ListToolbar from "../components/ListToolbar";
@@ -51,6 +52,10 @@ export default function ApprovalsPage({ segment }: { segment: ApprovalSegment })
   const mkt = segment === "marketing";
   const query = useApprovals(mkt ? "events" : "internal", list.paramsFor(), segments.includes(segment));
   const { rowActionsFor, dialogs } = useEngagementActions();
+  const counts = query.data?.counts;
+  // A backend that sends no counts: each tab's is asked for on its own, so neither badge depends on the tab that is open.
+  const needCounts = segments.length > 1 && Boolean(query.data) && !counts;
+  const tabTotal = { internal: useApprovals("internal", { limit: 1 }, needCounts), events: useApprovals("events", { limit: 1 }, needCounts) };
 
   if (!segments.includes(segment)) return <Navigate to={engagementPaths.approvals(segments[0])} replace />;
 
@@ -79,11 +84,8 @@ export default function ApprovalsPage({ segment }: { segment: ApprovalSegment })
   ];
 
   const what = segments.length > 1 ? "Internal engagements and marketing events" : mkt ? "Marketing events" : "Internal engagements";
-  const counts = query.data?.counts;
-  const count = (key: string) => {
-    const n = counts?.[key] ?? (key === (mkt ? "events" : "internal") && !list.search ? query.data?.total : undefined);
-    return n === undefined ? undefined : { label: String(n), reason: `${n} waiting for approval` };
-  };
+  const count = (key: "internal" | "events") =>
+    countBadge(counts?.[key] ?? tabTotal[key].data?.total, (n) => `${n} waiting for approval`, query.isPending || (needCounts && tabTotal[key].isPending));
 
   return (
     <EaPage collapsedSearch title="Approvals" subtitle={`${what} waiting for approval. People can be allocated once they are approved.`}>
@@ -94,8 +96,8 @@ export default function ApprovalsPage({ segment }: { segment: ApprovalSegment })
             ariaLabel="Approval kinds"
             keepSearchParams={["q", "sort"]}
             tabs={[
-              { segment: "internal", label: "Internal Engagements", badge: count("internal") },
-              { segment: "marketing", label: "Marketing Events", badge: count("events") },
+              { segment: "internal", label: "Internal Engagements", ...count("internal") },
+              { segment: "marketing", label: "Marketing Events", ...count("events") },
             ]}
           />
         ) : null}
@@ -109,7 +111,7 @@ export default function ApprovalsPage({ segment }: { segment: ApprovalSegment })
             rows={rows}
             rowKey={(e) => e.id}
             {...tableState(query)}
-            pagination={list.pager(query.data?.total ?? 0)}
+            pagination={list.pager(query.data?.total ?? 0, query.isPlaceholderData)}
             // Everything here is waiting for approval, so a row opens on Details, where the approver reads what is being approved.
             onRowClick={(e) => navigate(engagementPaths.engagement(e.id, "details"))}
             actions={rowActionsFor}

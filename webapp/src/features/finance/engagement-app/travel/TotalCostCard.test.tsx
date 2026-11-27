@@ -80,9 +80,18 @@ describe("TotalCostCardView", () => {
     expect(getByText("Credit Card Expenses could not be read, so this total may be too low.")).toBeTruthy();
   });
 
-  it("shows a skeleton while loading", () => {
-    const { getByTestId } = render(<TotalCostCardView state={{ kind: "loading" }} />);
-    expect(getByTestId("total-cost-loading")).toBeTruthy();
+  it("keeps the title and the rate hint while loading, with placeholders only where the figures will be", () => {
+    const { getByTestId, getByText, getByRole, queryByText } = render(<TotalCostCardView state={{ kind: "loading" }} />);
+    const card = getByTestId("total-cost-loading");
+    expect(getByText("Total Cost So Far")).toBeTruthy();
+    expect(getByRole("button", { name: "How USD is calculated" })).toBeTruthy();
+    expect(card.querySelectorAll(".MuiSkeleton-root")).toHaveLength(3);
+    expect(queryByText(/USD \d/)).toBeNull();
+  });
+
+  it("holds no place for the split line while loading for a viewer who gets none", () => {
+    const { getByTestId } = render(<TotalCostCardView state={{ kind: "loading" }} split={false} />);
+    expect(getByTestId("total-cost-loading").querySelectorAll(".MuiSkeleton-root")).toHaveLength(2);
   });
 
   it("renders nothing when hidden", () => {

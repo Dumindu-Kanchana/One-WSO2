@@ -30,6 +30,10 @@ import type * as V from "./engagementTypes";
 import type * as W from "./engagementWire";
 
 const MINUTE = 60 * 1000;
+/** How long an answer nobody is looking at is kept, so a page opened again within it shows at once. */
+const CACHE_TIME = 30 * MINUTE;
+/** How long an answer counts as fresh unless a hook says otherwise: a page opened again within it does not ask again. */
+const FRESH_TIME = MINUTE / 2;
 
 /** One GET against the Engagement App Backend, keyed by `parts`, mapped by `select`. */
 function useEngagementGet<TWire, TView>(
@@ -38,7 +42,7 @@ function useEngagementGet<TWire, TView>(
   select: (wire: TWire) => TView,
   {
     enabled = true,
-    staleTime = 0,
+    staleTime = FRESH_TIME,
     keepPrevious = false,
     persist,
     expectForbidden = false,
@@ -69,8 +73,11 @@ function useEngagementGet<TWire, TView>(
     staleTime,
     initialData: persist ? () => readSessionCache<TWire>(persist.name, sub) : undefined,
     initialDataUpdatedAt: 0,
-    // The app's client does not refetch on mount by default, but a copy from a reload (never fetched, so updated at 0) must be asked again.
-    refetchOnMount: persist ? (query) => query.state.dataUpdatedAt === 0 : undefined,
+    // The app's client does not refetch on mount, so a page opened again would show what it last held. Here it shows that at once and
+    // asks again quietly once the answer is older than `staleTime` (a copy from a reload is updated at 0, so always). A change made in
+    // the app still asks again at once: mutations invalidate what they affect.
+    refetchOnMount: true,
+    gcTime: CACHE_TIME,
     retry: httpRetry,
     // Keep the previous result (its total, for the pager) while the next page loads, the table showing a skeleton meanwhile; never another subject's rows (key[1] is the subject).
     placeholderData: keepPrevious ? (previous, previousQuery) => (previousQuery?.queryKey[1] === sub ? previous : undefined) : undefined,
@@ -96,6 +103,7 @@ export const useEngagementSearch = (q: string, limit: number, enabled = true) =>
   return useEngagementGet(["search", text, limit], urls.search(text, limit), M.searchResults, {
     enabled: enabled && text.length >= SEARCH_MIN_CHARS,
     staleTime: MINUTE,
+    keepPrevious: true,
   });
 };
 
@@ -168,7 +176,9 @@ export function useDashboardSectionGroups(groups: readonly (readonly string[])[]
       queryFn: async () => authedGet<W.WDashboard>(urls.dashboardSections(sections), await getToken()),
       select: M.dashboard,
       enabled: ready && Boolean(enabled[i]) && sections.length > 0,
-      staleTime: 0,
+      staleTime: FRESH_TIME,
+      refetchOnMount: true,
+      gcTime: CACHE_TIME,
       retry: httpRetry,
     })),
   }) as UseQueryResult<V.Dashboard, Error>[];
@@ -291,14 +301,16 @@ export const useSyncFailures = (params: EngagementQueryParams = {}, enabled = tr
 export const useConsultantReport = (params: EngagementQueryParams, enabled: boolean) =>
   useEngagementGet(["reports", "consultant-allocations", params], urls.report("consultant-allocations", params), items(M.consultantRow), {
     enabled,
+    keepPrevious: true,
   });
 
 export const useInvoiceReport = (params: EngagementQueryParams, enabled: boolean) =>
-  useEngagementGet(["reports", "invoices", params], urls.report("invoices", params), (w: W.WPage<W.WInvoice>) => w.items.map(M.invoice), { enabled });
+  useEngagementGet(["reports", "invoices", params], urls.report("invoices", params), (w: W.WPage<W.WInvoice>) => w.items.map(M.invoice), { enabled, keepPrevious: true });
 
 export const usePaymentReport = (params: EngagementQueryParams, enabled: boolean) =>
   useEngagementGet(["reports", "per-diem-payments", params], urls.report("per-diem-payments", params), (w: W.WPage<W.WPerDiemPayment>) => w.items.map(M.payment), {
     enabled,
+    keepPrevious: true,
   });
 
 // ---------------------------------------------------------------- visas and documents
