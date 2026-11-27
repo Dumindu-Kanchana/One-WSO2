@@ -55,7 +55,9 @@ export default function ApprovalsPage({ segment }: { segment: ApprovalSegment })
   const counts = query.data?.counts;
   // A backend that sends no counts: each tab's is asked for on its own, so neither badge depends on the tab that is open.
   const needCounts = segments.length > 1 && Boolean(query.data) && !counts;
-  const tabTotal = { internal: useApprovals("internal", { limit: 1 }, needCounts), events: useApprovals("events", { limit: 1 }, needCounts) };
+  // The open tab's own total is the badge unless a search narrows it.
+  const own = (key: "internal" | "events") => key === (mkt ? "events" : "internal") && !list.search;
+  const tabTotal = { internal: useApprovals("internal", { limit: 1 }, needCounts && !own("internal")), events: useApprovals("events", { limit: 1 }, needCounts && !own("events")) };
 
   if (!segments.includes(segment)) return <Navigate to={engagementPaths.approvals(segments[0])} replace />;
 
@@ -85,7 +87,11 @@ export default function ApprovalsPage({ segment }: { segment: ApprovalSegment })
 
   const what = segments.length > 1 ? "Internal engagements and marketing events" : mkt ? "Marketing events" : "Internal engagements";
   const count = (key: "internal" | "events") =>
-    countBadge(counts?.[key] ?? tabTotal[key].data?.total, (n) => `${n} waiting for approval`, query.isPending || (needCounts && tabTotal[key].isPending));
+    countBadge(
+      counts?.[key] ?? (own(key) ? query.data?.total : tabTotal[key].data?.total),
+      (n) => `${n} waiting for approval`,
+      query.isPending || (needCounts && !own(key) && tabTotal[key].isPending),
+    );
 
   return (
     <EaPage collapsedSearch title="Approvals" subtitle={`${what} waiting for approval. People can be allocated once they are approved.`}>

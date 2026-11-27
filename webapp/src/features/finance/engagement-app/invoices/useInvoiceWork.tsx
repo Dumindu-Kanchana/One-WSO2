@@ -51,11 +51,12 @@ export function useInvoiceWork(rows: readonly Invoice[], { tripOpen, resetKey }:
   const report = useBatchReport();
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<InvoiceDialog | null>(null);
-  // A confirmation names the invoices of one queue, so it does not outlive a move to another.
+  // A confirmation and the ticks name the invoices of one queue, so they do not outlive a move to another.
   const [dialogQueue, setDialogQueue] = useState(resetKey);
   if (dialogQueue !== resetKey) {
     setDialogQueue(resetKey);
     setDialog(null);
+    setSelected(new Set());
   }
 
   const stepActs = (stage: InvoiceStage): boolean =>

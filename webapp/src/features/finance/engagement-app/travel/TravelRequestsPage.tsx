@@ -72,8 +72,8 @@ export default function TravelRequestsPage({ segment }: { segment: TravelSegment
   if (!segments.includes(segment)) return <Navigate to={engagementPaths.travelRequests(segments[0])} replace />;
   const counts = trips.data?.counts;
   const freshRows = fresh.data?.items ?? [];
-  // Until the new requests arrive, the list's own count of them says whether the block is coming, so it holds its place from the start.
-  const freshCount = fresh.data ? freshRows.length : (counts?.new ?? 0);
+  // Until the new requests arrive, the list's own count of them says whether the block is coming, so it holds its place from the start. Filters narrow that count, so then it is not used.
+  const freshCount = fresh.data ? freshRows.length : Object.keys(list.filters).length ? 0 : (counts?.new ?? 0);
   const showFresh = wantFresh && !fresh.isError && freshCount > 0 && freshCount <= 2;
   const columns = travelColumns({ agent });
   const open = (t: TravelRequestSummary) => navigate(engagementPaths.travelRequest(t.jobNumber));

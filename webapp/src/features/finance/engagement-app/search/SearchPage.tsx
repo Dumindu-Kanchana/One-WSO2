@@ -103,7 +103,7 @@ export default function SearchPage(): JSX.Element {
           {failed.length ? (
             <Alert severity="warning">Couldn&apos;t search {failed.map((k) => SEARCH_LABEL[k]).join(", ")}. The rest of the results are below.</Alert>
           ) : null}
-          {groups.length === 0 && !failed.length ? (
+          {groups.length === 0 && !failed.length && !search.isPlaceholderData ? (
             <ListCard>
               <Empty title="No Matches" body={`Nothing matches "${q}". Try a shorter search, or the job number without TRV-.`} />
             </ListCard>
