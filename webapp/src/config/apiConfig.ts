@@ -2690,7 +2690,52 @@ export const echoServiceUrls = {
   // Ask AI: a question about the opportunity, answered from it and the Library passages sent.
   ask: (opportunityId: string): string =>
     `${echoBackendUrl}/deals/${encodeURIComponent(opportunityId)}/ask`,
+  // Echo stats, for Sales admins only (anyone else gets 403): usage, calls, deal progress,
+  // quiet deals, AM decisions, Salesforce completeness and Claude usage over the last `days`
+  // (7, 30 or 90).
+  adminStats: (days: number): string => `${echoBackendUrl}/admin/stats?days=${days}`,
+  // POST, but a READ: live Salesforce details of many opportunities and accounts in one
+  // call — the calls list asks for every id on its visible page.
+  salesforceContext: `${echoBackendUrl}/salesforce/context`,
+  // The Echo scope of the calls list, filtered and paged on the server; see buildEchoCallsUrl.
+  calls: `${echoBackendUrl}/calls`,
+  // What the calls list can be filtered by. `q` narrows the accounts and opportunities
+  // offered (the top matches by name), for the search-as-you-type picker.
+  callFilters: (q: string): string =>
+    `${echoBackendUrl}/calls/filters${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`,
 };
+
+/**
+ * The Echo calls list URL with only the filters that are set. Every filter repeats (any of
+ * its values matches); the filters together all have to. An account matches the call's own
+ * account or its opportunity's.
+ */
+export function buildEchoCallsUrl(params: {
+  page: number;
+  pageSize: number;
+  owners: string[];
+  regions: string[];
+  types: string[];
+  accounts: string[];
+  opportunities: string[];
+  /** `YYYY-MM-DD`, inclusive. */
+  from: string | null;
+  to: string | null;
+  q: string | null;
+}): string {
+  const qs = new URLSearchParams();
+  qs.set("page", String(params.page));
+  qs.set("pageSize", String(params.pageSize));
+  params.owners.forEach((owner) => qs.append("owner", owner));
+  params.regions.forEach((region) => qs.append("region", region));
+  params.types.forEach((type) => qs.append("type", type));
+  params.accounts.forEach((account) => qs.append("account", account));
+  params.opportunities.forEach((opportunity) => qs.append("opportunity", opportunity));
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  if (params.q?.trim()) qs.set("q", params.q.trim());
+  return `${echoServiceUrls.calls}?${qs.toString()}`;
+}
 
 /**
  * The deal list URL with only the filters that are set.

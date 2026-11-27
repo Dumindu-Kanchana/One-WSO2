@@ -104,6 +104,8 @@ export interface MeetingsQueryParams {
   echoOnly: boolean;
   page: number;
   pageSize: number;
+  /** False while another source serves the list (the Echo scope from the Echo backend). */
+  enabled?: boolean;
 }
 
 /**
@@ -119,7 +121,7 @@ export interface MeetingsQueryParams {
  */
 export function useMeetings(params: MeetingsQueryParams) {
   const { getAccessToken, subState, retryIdentity, userSub, ready } = useSalesQueryBasis();
-  const { search, region, echoOnly, page, pageSize } = params;
+  const { search, region, echoOnly, page, pageSize, enabled = true } = params;
 
   const query = useQuery<MeetingList>({
     // Every scope lists only meetings that have already ended. The cutoff is "now", and
@@ -128,7 +130,7 @@ export function useMeetings(params: MeetingsQueryParams) {
     // would make every render a new key. Each fetch recomputes the cutoff below. There is
     // no polling: an open page refreshes on a filter, page or search change, or on remount.
     queryKey: ["sales-meetings", userSub, search, region, echoOnly, page, pageSize],
-    enabled: ready,
+    enabled: ready && enabled,
     queryFn: async () =>
       authedGet<MeetingList>(
         buildMeetingsUrl({

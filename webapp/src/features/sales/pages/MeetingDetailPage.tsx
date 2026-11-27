@@ -31,11 +31,7 @@ import {
   Typography,
 } from "@wso2/oxygen-ui";
 import { isSalesBackendConfigured, useMeeting, useTranscripts } from "../api/useSalesData";
-import {
-  meetingCustomer,
-  meetingTypeLabel,
-  parseOpportunityDetails,
-} from "../api/salesTypes";
+import { isLeadMeeting, meetingCustomer, meetingTypeLabel } from "../api/salesTypes";
 import SalesShell from "../components/SalesShell";
 import RecordingPlayer, { type RecordingPlayerHandle } from "../components/RecordingPlayer";
 import TranscriptPanel, { type TranscriptSection } from "../components/TranscriptPanel";
@@ -53,6 +49,8 @@ import { dealPath, MEETING_TABS, startSecondOf, type MeetingTab } from "../util/
 import { LETTER_KEYS } from "../meddpicc/util/meddpiccFormat";
 import type { LetterKey } from "../meddpicc/types";
 import { formatDateTime, splitParticipants } from "../util/salesTime";
+import { hasCallContext, useMeetingCallContext } from "../callContext/api/useCallContext";
+import CallContextCards from "../callContext/components/CallContextCards";
 
 /** Stands in for the recording of a meeting listed without recording parts. Never a real part id. */
 const DEFAULT_RECORDING = -1;
@@ -249,7 +247,10 @@ export default function MeetingDetailPage() {
   const externals = splitParticipants(meeting?.externalParticipants);
   const customer = meeting ? meetingCustomer(meeting) : null;
   const typeLabel = meetingTypeLabel(meeting?.meetingType);
-  const deal = parseOpportunityDetails(meeting?.opportunityDetails);
+  // The call's opportunity and account, live from the Echo backend; the cards fall back to
+  // the snapshot taken when the call was linked.
+  const callContext = useMeetingCallContext(meeting);
+  const linked = meeting ? hasCallContext(meeting, callContext) : false;
 
   return (
     <SalesShell
@@ -335,26 +336,21 @@ export default function MeetingDetailPage() {
                       third tab, which meant the reader had to go and get the context
                       before the summary meant anything. */}
                   <Stack spacing={2}>
-                    <Detail label="Account" value={customer} />
+                    {/* A linked call names its account in the Account card below; a lead's
+                        call, or one linked to nothing, keeps the name here. */}
+                    {!linked && (
+                      <Detail label={isLeadMeeting(meeting) ? "Lead" : "Account"} value={customer} />
+                    )}
                     <Detail label="Call type" value={typeLabel} />
-                    <Detail label="Account owner" value={meeting.host} />
+                    {/* The host, as such: the opportunity's owner (the AM) is in its card. */}
+                    <Detail label="Host" value={meeting.host} />
                     <Detail label="Started" value={formatDateTime(meeting.startTime)} />
                     <Detail label="Ended" value={formatDateTime(meeting.endTime)} />
 
-                    {deal && (
+                    {linked && (
                       <>
                         <Divider />
-                        <Typography variant="subtitle2">Opportunity</Typography>
-                        <Detail label="Stage" value={deal.stage ?? null} />
-                        <Detail
-                          label="Amount"
-                          value={
-                            deal.amount != null
-                              ? `${deal.currency ?? ""} ${deal.amount.toLocaleString()}`.trim()
-                              : null
-                          }
-                        />
-                        <Detail label="Close date" value={deal.closeDate ?? null} />
+                        <CallContextCards meeting={meeting} context={callContext} />
                       </>
                     )}
 

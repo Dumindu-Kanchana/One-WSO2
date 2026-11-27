@@ -30,14 +30,19 @@ import { SearchIcon, XIcon } from "@wso2/oxygen-ui-icons-react";
 import type { MeetingScope } from "../api/salesTypes";
 import ScopeSwitch from "./ScopeSwitch";
 
-const ALL_REGIONS = "__all__";
+const ALL_TEAMS = "__all__";
 
 /**
- * The three filters above the list: scope, region and title search.
+ * The three filters above the list: scope, host team and title search.
  *
  * Both scopes are past meetings only: Echo is what the calendar add-on recorded,
- * All adds every other way a meeting got in. Region is disabled under Echo —
- * add-on meetings carry no region yet, so any pick would empty the list.
+ * All adds every other way a meeting got in.
+ *
+ * The host team is the team of the person who hosted the call, from the Sales backend's
+ * list of HR teams. It is not a Salesforce region, so it is named for what it filters by;
+ * the Echo scope filters by Sales Region with its own filters. It is disabled under Echo
+ * when the Sales backend serves that list: add-on meetings carry no host team there, so
+ * any pick would empty the list.
  *
  * Search is a FORM rather than a text field with a keydown handler. Submitting
  * on Enter then comes for free and works the same as clicking the button.
@@ -52,27 +57,34 @@ const ALL_REGIONS = "__all__";
 export default function MeetingFilters({
   scope,
   onScopeChange,
-  region,
-  onRegionChange,
-  regions,
-  regionsLoading,
-  regionDisabled = false,
+  hostTeam,
+  onHostTeamChange,
+  hostTeams,
+  hostTeamsLoading,
+  hostTeamDisabled = false,
   search,
   onSearchChange,
   disabled,
+  showHostTeam = true,
+  searchPlaceholder = "Title, account, call type or owner",
 }: {
   scope: MeetingScope;
   onScopeChange: (scope: MeetingScope) => void;
-  region: string | null;
-  onRegionChange: (region: string | null) => void;
-  regions: string[];
-  regionsLoading: boolean;
-  /** Grey out the region filter (the page resets it to every region). */
-  regionDisabled?: boolean;
+  /** The host's team, or null for every team. */
+  hostTeam: string | null;
+  onHostTeamChange: (hostTeam: string | null) => void;
+  hostTeams: string[];
+  hostTeamsLoading: boolean;
+  /** Grey out the host team filter (the page resets it to every team). */
+  hostTeamDisabled?: boolean;
   /** The APPLIED search, not the draft. */
   search: string | null;
   onSearchChange: (search: string | null) => void;
   disabled?: boolean;
+  /** False when the list is filtered by its own filters instead (the Echo scope's). */
+  showHostTeam?: boolean;
+  /** What the search matches, which differs by the backend serving the list. */
+  searchPlaceholder?: string;
 }) {
   // Draft lives here; only submitting lifts it to the page.
   const [draft, setDraft] = useState(search ?? "");
@@ -128,39 +140,41 @@ export default function MeetingFilters({
           focus, so without it the tooltip explaining WHY it is disabled never appears.
           While disabled the span is focusable, and describeChild makes the tooltip its
           accessible description, so keyboard and screen-reader users get it too. */}
-      <Tooltip
-        title={regionDisabled ? "Region isn't available for Echo meetings yet" : ""}
-        describeChild
-        arrow
-      >
-        <Box component="span" sx={{ display: "inline-flex" }} tabIndex={regionDisabled ? 0 : undefined}>
-          <FormControl
-            size="small"
-            sx={{ minWidth: 180 }}
-            disabled={disabled || regionsLoading || regionDisabled}
-          >
-            <InputLabel id="sales-region-label">Region</InputLabel>
-            <Select
-              labelId="sales-region-label"
-              label="Region"
-              value={region ?? ALL_REGIONS}
-              onChange={(event) => {
-                const value = event.target.value as string;
-                onRegionChange(value === ALL_REGIONS ? null : value);
-              }}
+      {showHostTeam && (
+        <Tooltip
+          title={hostTeamDisabled ? "Host team isn't available for Echo meetings yet" : ""}
+          describeChild
+          arrow
+        >
+          <Box component="span" sx={{ display: "inline-flex" }} tabIndex={hostTeamDisabled ? 0 : undefined}>
+            <FormControl
+              size="small"
+              sx={{ minWidth: 180 }}
+              disabled={disabled || hostTeamsLoading || hostTeamDisabled}
             >
-              {/* "All" is a sentinel rather than an empty string: an empty value
-                  would render the Select as unset and float its label oddly. */}
-              <MenuItem value={ALL_REGIONS}>All regions</MenuItem>
-              {regions.map((name) => (
-                <MenuItem key={name} value={name}>
-                  {name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-      </Tooltip>
+              <InputLabel id="sales-host-team-label">Host team</InputLabel>
+              <Select
+                labelId="sales-host-team-label"
+                label="Host team"
+                value={hostTeam ?? ALL_TEAMS}
+                onChange={(event) => {
+                  const value = event.target.value as string;
+                  onHostTeamChange(value === ALL_TEAMS ? null : value);
+                }}
+              >
+                {/* "All" is a sentinel rather than an empty string: an empty value
+                    would render the Select as unset and float its label oddly. */}
+                <MenuItem value={ALL_TEAMS}>All host teams</MenuItem>
+                {hostTeams.map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </Tooltip>
+      )}
 
       <Box component="form" role="search" onSubmit={submit} sx={{ flex: 1, minWidth: 240 }}>
         <TextField
@@ -168,7 +182,7 @@ export default function MeetingFilters({
           size="small"
           type="search"
           label="Search"
-          placeholder="Title, account, call type or owner"
+          placeholder={searchPlaceholder}
           value={draft}
           disabled={disabled}
           onChange={(event) => setDraft(event.target.value)}

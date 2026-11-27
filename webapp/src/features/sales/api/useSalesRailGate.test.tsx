@@ -25,12 +25,14 @@ const state: {
   isLoading: boolean;
   isError: boolean;
   error: unknown;
+  privileges: number[];
 } = {
   configured: true,
   isPending: false,
   isLoading: false,
   isError: false,
   error: null,
+  privileges: [987],
 };
 const refetch = vi.fn();
 const enabledSeen: boolean[] = [];
@@ -40,6 +42,7 @@ vi.mock("./useSalesData", () => ({
   useSalesUserInfo: (enabled: boolean) => {
     enabledSeen.push(enabled);
     return {
+      data: state.isPending || state.isError ? undefined : { privileges: state.privileges },
       isPending: state.isPending,
       isLoading: state.isLoading,
       isError: state.isError,
@@ -65,6 +68,7 @@ beforeEach(() => {
   state.isLoading = false;
   state.isError = false;
   state.error = null;
+  state.privileges = [987];
   enabledSeen.length = 0;
   refetch.mockClear();
 });
@@ -118,6 +122,31 @@ describe("useSalesRailGate", () => {
   it("keeps it when no backend is configured", () => {
     state.configured = false;
     fail(403);
+    expect(gate().canSee("sales-meetings")).toBe(true);
+  });
+
+  // Echo stats is for admins only: the row is there for a Sales ADMIN (762) and for no one else.
+  it("shows the Stats row to a Sales admin only", () => {
+    expect(gate().canSee("sales-echo-stats")).toBe(false);
+    expect(gate().canSee("sales-meetings")).toBe(true);
+    state.privileges = [987, 762];
+    expect(gate().canSee("sales-echo-stats")).toBe(true);
+  });
+
+  it("holds the Stats row back while the answer is in flight, and hides it on a 403", () => {
+    state.privileges = [762];
+    state.isPending = true;
+    expect(gate().canSee("sales-echo-stats")).toBe(false);
+    state.isPending = false;
+    fail(403);
+    expect(gate().canSee("sales-echo-stats")).toBe(false);
+  });
+
+  // With no backend there is no one to say who is an admin, so the admin row stays hidden.
+  it("hides the Stats row when no backend is configured", () => {
+    state.configured = false;
+    state.privileges = [762];
+    expect(gate().canSee("sales-echo-stats")).toBe(false);
     expect(gate().canSee("sales-meetings")).toBe(true);
   });
 

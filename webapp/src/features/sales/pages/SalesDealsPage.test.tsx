@@ -86,6 +86,12 @@ describe("SalesDealsPage", { timeout: 20000 }, () => {
     expect(brightwater).not.toBeNull();
     const row = within(brightwater as HTMLElement);
     expect(row.getByText("Brightwater Pumps Limited")).toBeInTheDocument();
+    // The account leads the cell, bold; the opportunity's name follows, and is the way in.
+    const account = row.getByText("Brightwater Pumps Limited");
+    const opportunity = row.getByRole("button", { name: "Brightwater – API Manager first sale" });
+    expect(account.compareDocumentPosition(opportunity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(getComputedStyle(account).fontWeight).toBe("600");
+    expect(getComputedStyle(opportunity).fontWeight).not.toBe("600");
     expect(row.getByText("Qualify")).toBeInTheDocument();
     // Amount and close date ride under the name now, to give the timeline the width.
     expect(row.getByText("120,000 USD · closes 31/12/2026")).toBeInTheDocument();

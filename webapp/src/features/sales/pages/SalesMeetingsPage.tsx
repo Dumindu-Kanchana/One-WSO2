@@ -14,9 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useState } from "react";
-import { useNavigate } from "react-router";
-import { Alert, Box } from "@wso2/oxygen-ui";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
+import { Alert, Box, Button } from "@wso2/oxygen-ui";
 import SalesShell from "../components/SalesShell";
 import MeetingFilters from "../components/MeetingFilters";
 import MeetingsTable from "../components/MeetingsTable";
@@ -25,6 +25,18 @@ import type { Meeting, MeetingScope } from "../api/salesTypes";
 import { isSalesBackendConfigured, useSalesRegions, useMeetings } from "../api/useSalesData";
 import { describeError, isForbidden } from "../util/salesError";
 import { meetingPath } from "../util/salesPaths";
+import { isEchoBackendConfigured } from "@config/apiConfig";
+import { usePageCallContext } from "../callContext/api/useCallContext";
+import { storedContextView } from "../callContext/util/callContext";
+import { useEchoCalls } from "../echoCalls/api/useEchoCalls";
+import EchoCallFilters from "../echoCalls/components/EchoCallFilters";
+import {
+  NO_FILTERS,
+  filtersFromSearch,
+  filtersToSearch,
+  hasEchoFilters,
+  type CallFilters,
+} from "../echoCalls/util/callFilters";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -35,70 +47,137 @@ const DEFAULT_PAGE_SIZE = 10;
  * are deliberately not here: scheduling still happens in the calendar add-on,
  * and the analytics screen is not part of this one. Nothing of MEDDPICC either:
  * a call's analysis is on its own page, and a deal's is under Opportunities.
+ *
+ * TWO SOURCES. The Echo scope lists from the Echo backend (ONE_WSO2_ECHO_BACKEND_URL),
+ * which keeps each call's Salesforce context and so can filter every call by owner,
+ * region, account or opportunity, call type and date. The All scope lists from the Sales
+ * backend as it always has, with its host team filter and search, and fetches the live context
+ * of the page it shows. Without the Echo backend (not configured, or failing) the Echo
+ * scope falls back to the Sales backend's Echo list and says so.
+ *
+ * The filters live in the URL, so a filtered view is a link that can be shared.
  */
 export default function SalesMeetingsPage() {
   const configured = isSalesBackendConfigured();
+  const echoConfigured = isEchoBackendConfigured();
 
-  const [scope, setScope] = useState<MeetingScope>("echo");
-  const [region, setRegion] = useState<string | null>(null);
-  const [search, setSearch] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = useMemo(() => filtersFromSearch(searchParams), [searchParams]);
+  const filterKey = filtersToSearch(filters).toString();
+
+  // Any filter change invalidates the current page number — page 4 of the old result set
+  // is meaningless in the new one, and asking the server for it yields an empty table that
+  // looks like "no meetings" rather than "you are past the end".
+  //
+  // The page is held against the filters it was chosen under, rather than reset by the
+  // handlers: the filters arrive through the URL, so a Back, a pasted link or a handler all
+  // reset it the same way, and no render ever pairs new filters with an old page. Reset
+  // during render, as MeetingDetailPage resets the player clock, so going back to earlier
+  // filters starts at their first page too rather than restoring a page left long ago.
+  const [paging, setPaging] = useState({ key: filterKey, page: 0 });
+  if (paging.key !== filterKey) setPaging({ key: filterKey, page: 0 });
+  const page = paging.key === filterKey ? paging.page : 0;
+  const setPage = (next: number) => setPaging({ key: filterKey, page: next });
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const [attachmentsFor, setAttachmentsFor] = useState<Meeting | null>(null);
 
   const navigate = useNavigate();
 
-  const regionsQuery = useSalesRegions();
+  const update = (patch: Partial<CallFilters>) => {
+    // Replaced rather than pushed, so Back leaves the list instead of stepping through filters.
+    setSearchParams(filtersToSearch({ ...filters, ...patch }), { replace: true });
+  };
 
+  // The Sales backend's HR team list (`GET /regions`), for the All scope's host team filter.
+  const hostTeamsQuery = useSalesRegions();
+
+  // ---- The Echo scope, from the Echo backend ----------------------------------------
+  const echoWanted = filters.scope === "echo" && echoConfigured;
+  // The filters the Echo list failed under. For them the page stays on the Sales backend's
+  // list, paging included (a new page is a new query with no error of its own), until
+  // Retry or a change of filters asks the Echo backend again.
+  const [echoDownFor, setEchoDownFor] = useState<string | null>(null);
+  const echoDown = echoWanted && echoDownFor === filterKey;
+  const echoQuery = useEchoCalls(
+    {
+      page,
+      pageSize,
+      q: filters.q,
+      owners: filters.owners,
+      regions: filters.regions,
+      types: filters.types,
+      accounts: filters.accounts,
+      opportunities: filters.opportunities,
+      from: filters.from,
+      to: filters.to,
+    },
+    echoWanted && !echoDown,
+  );
+  if (echoWanted && !echoDown && echoQuery.isError && !echoQuery.isFetching) setEchoDownFor(filterKey);
+  const echoFailed = echoDown || (echoWanted && echoQuery.isError);
+  const fromEcho = echoWanted && !echoFailed;
+  const retryEcho = () => {
+    // The request starts before the fallback is lifted, so the lifted render already sees it
+    // in flight rather than the old error.
+    void echoQuery.refetch();
+    setEchoDownFor(null);
+  };
+
+  // ---- The All scope, and the Echo scope's fallback, from the Sales backend ----------
   // Both scopes list past meetings only; the "already ended" cutoff is computed per fetch
   // inside useMeetings, so any refetch picks up meetings that have ended since.
   const meetingsQuery = useMeetings({
-    search,
-    region,
-    echoOnly: scope === "echo",
+    search: filters.q,
+    // The host's team, which the Sales backend calls its region. Echo meetings carry none
+    // there, so the filter is disabled for the Echo scope.
+    region: filters.scope === "all" ? filters.hostTeam : null,
+    echoOnly: filters.scope === "echo",
     page,
     pageSize,
+    enabled: !fromEcho,
   });
 
-  // Any filter change invalidates the current page number — page 4 of the old
-  // result set is meaningless in the new one, and asking the server for it
-  // yields an empty table that looks like "no meetings" rather than "you are
-  // past the end".
-  //
-  // Done in the handlers rather than in an effect on [scope, region, search].
-  // An effect would render once with the new filter still paired with the old
-  // page, firing a request for a page that may not exist, and only then correct
-  // itself. React batches these two setters into a single render, so the
-  // out-of-range pairing never reaches a query.
-  const changeScope = (next: MeetingScope) => {
-    setScope(next);
-    // Echo meetings carry no region (the add-on never records the host's sub-team), so
-    // any region would empty the list. The filter is disabled for Echo and reset here; it
-    // stays on "All regions" when switching back rather than restoring an old pick.
-    if (next === "echo") setRegion(null);
-    setPage(0);
-  };
-  const changeRegion = (next: string | null) => {
-    setRegion(next);
-    setPage(0);
-  };
-  const changeSearch = (next: string | null) => {
-    setSearch(next);
-    setPage(0);
+  const calls = useMemo(() => (fromEcho ? (echoQuery.data?.calls ?? []) : []), [fromEcho, echoQuery.data]);
+  const meetings = fromEcho ? calls.map((call) => call.meeting) : (meetingsQuery.data?.meetings ?? []);
+  const totalCount = (fromEcho ? echoQuery.data?.count : meetingsQuery.data?.count) ?? 0;
+
+  // The calls' opportunity and account details. The Echo list brings its own; a Sales
+  // backend page asks the Echo backend for the live details of every call on it, in one
+  // request (see usePageCallContext). Neither blocks or breaks the list: until (or unless)
+  // they arrive, the rows show the meeting's own data.
+  const liveContext = usePageCallContext(fromEcho ? [] : meetings);
+  const context = useMemo(() => (fromEcho ? storedContextView(calls) : liveContext), [fromEcho, calls, liveContext]);
+
+  // Picked accounts and opportunities, named from the calls listed under them.
+  const knownNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    for (const { context: c } of calls) {
+      if (c.account) names[c.account.id] = c.account.name;
+      if (c.opportunity?.name) names[c.opportunity.id] = c.opportunity.name;
+      if (c.opportunity?.accountId && c.opportunity.accountName) names[c.opportunity.accountId] = c.opportunity.accountName;
+    }
+    return names;
+  }, [calls]);
+
+  const changeScope = (scope: MeetingScope) => {
+    // The two scopes filter by different things (Salesforce's Sales Regions and the rest in
+    // the Echo scope; the host's team in the All scope), so only the search text carries over.
+    update({ ...NO_FILTERS, scope, q: filters.q });
   };
   const changePageSize = (next: number) => {
     setPageSize(next);
     setPage(0);
   };
 
-  const meetings = meetingsQuery.data?.meetings ?? [];
-  const totalCount = meetingsQuery.data?.count ?? 0;
-
   // One 403 anywhere means the caller is in no authorised group — the backend
   // refuses every endpoint in that case — so the page says so once instead of
   // repeating it per panel.
-  const forbidden = isForbidden(meetingsQuery.error) || isForbidden(regionsQuery.error);
+  const forbidden = isForbidden(meetingsQuery.error) || isForbidden(hostTeamsQuery.error);
+  const listError = fromEcho ? echoQuery.error : meetingsQuery.error;
+  const loading = fromEcho
+    ? echoQuery.isLoading || echoQuery.isFetching
+    : meetingsQuery.isLoading || meetingsQuery.isFetching;
 
   return (
     <SalesShell
@@ -110,39 +189,68 @@ export default function SalesMeetingsPage() {
     >
       <Box>
         <MeetingFilters
-          scope={scope}
+          scope={filters.scope}
           onScopeChange={changeScope}
-          region={region}
-          onRegionChange={changeRegion}
-          regions={regionsQuery.data?.regions ?? []}
-          regionsLoading={regionsQuery.isLoading}
-          regionDisabled={scope === "echo"}
-          search={search}
-          onSearchChange={changeSearch}
+          // Applied in the All scope only, so shown there only: under Echo a team from the
+          // URL would sit in the disabled selector while the list ignores it.
+          hostTeam={filters.scope === "all" ? filters.hostTeam : null}
+          onHostTeamChange={(hostTeam) => update({ hostTeam })}
+          hostTeams={hostTeamsQuery.data?.regions ?? []}
+          hostTeamsLoading={hostTeamsQuery.isLoading}
+          hostTeamDisabled={filters.scope === "echo"}
+          // The Echo scope has its own filters, below, Region among them.
+          showHostTeam={!fromEcho}
+          search={filters.q}
+          onSearchChange={(q) => update({ q })}
+          searchPlaceholder={fromEcho ? "Title, account or opportunity" : undefined}
         />
+
+        {fromEcho && <EchoCallFilters filters={filters} onChange={update} knownNames={knownNames} />}
+
+        {/* The Echo scope without its backend: today's list, and a word on what is missing. */}
+        {filters.scope === "echo" && !echoConfigured && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Filtering by owner, region, account, call type and date isn't available: the Echo backend
+            (ONE_WSO2_ECHO_BACKEND_URL) isn't configured.
+          </Alert>
+        )}
+        {echoFailed && (
+          <Alert
+            severity="info"
+            sx={{ mb: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={retryEcho}>
+                Retry
+              </Button>
+            }
+          >
+            Filtering by owner, region, account, call type and date isn't available right now
+            {hasEchoFilters(filters) ? ", so those filters aren't applied" : ""}.
+          </Alert>
+        )}
 
         {/* A failed list is shown here rather than swapping out the filters:
             the user's next move is almost always to change a filter, so taking
             them away would remove the fix along with the problem. */}
-        {meetingsQuery.error && !forbidden && (
+        {listError && !forbidden && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {describeError(meetingsQuery.error)}
+            {describeError(listError)}
           </Alert>
         )}
 
         <MeetingsTable
           meetings={meetings}
           totalCount={totalCount}
-          loading={meetingsQuery.isLoading || meetingsQuery.isFetching}
+          loading={loading}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
           onPageSizeChange={changePageSize}
           onOpenAttachments={setAttachmentsFor}
           onOpenMeeting={(meeting) => void navigate(meetingPath(meeting.meetingId))}
+          context={context}
         />
       </Box>
-
 
       <AttachmentsDialog meeting={attachmentsFor} onClose={() => setAttachmentsFor(null)} />
     </SalesShell>

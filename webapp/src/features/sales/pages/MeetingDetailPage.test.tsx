@@ -20,11 +20,28 @@ import type { ReactNode } from "react";
 // Everything around the tabs is stubbed: these tests are about which pane opens, and
 // what the URL says about it.
 type Part = { id: number; startTime: string | null; endTime: string | null; state: "ATTACHED" };
-const state: { echoConfigured: boolean; recordings: Part[]; smartNotes: Part[] } = {
+const state: {
+  echoConfigured: boolean;
+  recordings: Part[];
+  smartNotes: Part[];
+  links: Record<string, string | null>;
+  callContext: unknown;
+} = {
   echoConfigured: true,
   recordings: [],
   smartNotes: [],
+  links: {},
+  callContext: null,
 };
+// The call's live opportunity and account, as the Echo backend answers them.
+const NO_LINKS = {
+  opportunity: { id: null, status: "unavailable", live: null },
+  account: { id: null, status: "unavailable", live: null },
+};
+vi.mock("../callContext/api/useCallContext", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../callContext/api/useCallContext")>()),
+  useMeetingCallContext: () => state.callContext,
+}));
 vi.mock("../components/SalesShell", () => ({
   default: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
@@ -37,6 +54,7 @@ vi.mock("../api/useSalesData", () => ({
       internalParticipants: "ravi@wso2.com", externalParticipants: null,
       meetingStatus: "ACTIVE", isRecurring: false,
       recordings: state.recordings, transcripts: [], smartNotes: state.smartNotes,
+      ...state.links,
     },
     isLoading: false,
     error: null,
@@ -90,7 +108,7 @@ vi.mock("../meddpicc/components/CallMeddpiccTab", () => ({
   ),
 }));
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import MeetingDetailPage from "./MeetingDetailPage";
@@ -114,6 +132,8 @@ beforeEach(() => {
   state.echoConfigured = true;
   state.recordings = [];
   state.smartNotes = [];
+  state.links = {};
+  state.callContext = NO_LINKS;
   caller.isAdmin = false;
   caller.workEmail = null;
   caller.isPending = false;
@@ -251,5 +271,109 @@ describe("MeetingDetailPage's Analyse again", () => {
     caller.isPending = true;
     at();
     expect(screen.getByRole("button", { name: "analysing" })).toBeInTheDocument();
+  });
+});
+
+// The call's opportunity and account: live from Salesforce, else the snapshot taken when it was linked.
+describe("MeetingDetailPage's opportunity and account", () => {
+  const OPP = "006AA000001aBcDEF1";
+  const ACC = "001AA000001aBcDEF1";
+  const liveOpportunity = {
+    id: OPP, name: "Harbourline – API platform", ownerName: "Nadia Perera", ownerEmail: "nadia@wso2.com",
+    salesRegion: "APAC", stage: "Qualify", recordType: "First Sale", amount: 120000, currency: "USD",
+    closeDate: "2026-12-15", isClosed: false, accountId: ACC, accountName: "Harbourline",
+  };
+  const liveAccount = {
+    id: ACC, name: "Harbourline", region: "Asia Pacific", salesRegion: "APAC",
+    ownerName: "Ola Berg", ownerEmail: "ola@wso2.com",
+    technicalOwnerName: "Tharindu Silva", technicalOwnerEmail: "tharindu@wso2.com",
+  };
+  const linkedToTheDeal = () => {
+    state.links = {
+      opportunityId: OPP,
+      opportunityDetails: JSON.stringify({
+        customerId: ACC, customerName: "Harbourline", stage: "Discovery", amount: 90000, currency: "USD",
+        closeDate: "2026-10-01",
+      }),
+    };
+  };
+  const card = (name: string) => screen.getByRole("region", { name });
+
+  it("shows the live opportunity and account", () => {
+    linkedToTheDeal();
+    state.callContext = {
+      opportunity: { id: OPP, status: "ready", live: liveOpportunity },
+      account: { id: ACC, status: "ready", live: liveAccount },
+    };
+    renderAt("/sales/meetings/7");
+
+    const opportunity = card("Opportunity");
+    expect(within(opportunity).getByRole("link", { name: "Harbourline – API platform" })).toHaveAttribute(
+      "href",
+      `/sales/deals/${OPP}`,
+    );
+    expect(opportunity).toHaveTextContent("Nadia Perera");
+    expect(opportunity).toHaveTextContent("nadia@wso2.com");
+    expect(opportunity).toHaveTextContent("APAC");
+    expect(opportunity).toHaveTextContent("Qualify");
+    expect(opportunity).toHaveTextContent("120,000 USD");
+    expect(opportunity).toHaveTextContent("15/12/2026");
+    expect(within(opportunity).queryByText("as linked")).not.toBeInTheDocument();
+
+    const account = card("Account");
+    expect(account).toHaveTextContent("Harbourline");
+    // The Sales Region, as the list shows it, not the broader Region.
+    expect(within(account).getByText("APAC")).toBeInTheDocument();
+    expect(account).not.toHaveTextContent("Asia Pacific");
+    expect(account).toHaveTextContent("Ola Berg");
+    expect(account).toHaveTextContent("Tharindu Silva");
+    expect(within(account).queryByText("as linked")).not.toBeInTheDocument();
+
+    // The host is labelled as the host now: the owner is the opportunity's.
+    expect(screen.getByText("Host")).toBeInTheDocument();
+    expect(within(account).getByText("Account owner")).toBeInTheDocument();
+  });
+
+  it("falls back to the snapshot taken when the call was linked, labelled as such", () => {
+    linkedToTheDeal();
+    state.callContext = {
+      opportunity: { id: OPP, status: "unavailable", live: null },
+      account: { id: ACC, status: "unavailable", live: null },
+    };
+    renderAt("/sales/meetings/7");
+
+    const opportunity = card("Opportunity");
+    expect(within(opportunity).getByText("as linked")).toBeInTheDocument();
+    expect(opportunity).toHaveTextContent("Discovery");
+    expect(opportunity).toHaveTextContent("90,000 USD");
+    expect(opportunity).toHaveTextContent("01/10/2026");
+    expect(within(opportunity).getByRole("link", { name: "Open deal" })).toHaveAttribute(
+      "href",
+      `/sales/deals/${OPP}`,
+    );
+
+    const account = card("Account");
+    expect(within(account).getByText("as linked")).toBeInTheDocument();
+    expect(account).toHaveTextContent("Harbourline");
+  });
+
+  it("shows skeletons, not the snapshot, while the live details load", () => {
+    linkedToTheDeal();
+    state.callContext = {
+      opportunity: { id: OPP, status: "loading", live: null },
+      account: { id: ACC, status: "loading", live: null },
+    };
+    renderAt("/sales/meetings/7");
+    expect(within(card("Opportunity")).queryByText("as linked")).not.toBeInTheDocument();
+    expect(card("Opportunity")).not.toHaveTextContent("Discovery");
+  });
+
+  it("names a lead's company, with no cards, for a call linked to a lead only", () => {
+    state.links = { leadId: "00QAA000001aBcDEF1", leadCompany: "Kestrel Labs" };
+    renderAt("/sales/meetings/7");
+    expect(screen.queryByRole("region", { name: "Opportunity" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Account" })).not.toBeInTheDocument();
+    expect(screen.getByText("Lead")).toBeInTheDocument();
+    expect(screen.getByText("Kestrel Labs")).toBeInTheDocument();
   });
 });

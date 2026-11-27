@@ -95,9 +95,9 @@ describe("the Sales perspective", () => {
     expect(findPerspectiveByKey("sales")?.sections?.map((section) => section.id)).toContain("sales-echo");
   });
 
-  // Opportunities is the first row, where Sales lands; Echo is a group of its one screen,
-  // Calls, like Sales Pitstop's.
-  it("puts Opportunities first, then Echo as a group with Calls inside it", async () => {
+  // Opportunities is the first row, where Sales lands; Echo is a group of Calls and, for
+  // admins, Stats.
+  it("puts Opportunities first, then Echo as a group with Calls and Stats inside it", async () => {
     const { findPerspectiveByKey } = await load();
     const sections = findPerspectiveByKey("sales")?.sections ?? [];
     expect(sections[0]).toMatchObject({ id: "sales-deals", label: "Opportunities", path: "/sales/deals" });
@@ -105,7 +105,10 @@ describe("the Sales perspective", () => {
     const echo = sections.find((s) => s.id === "sales-echo");
     expect(echo?.label).toBe("Echo");
     expect(echo?.alwaysGroup).toBe(true);
-    expect(echo?.children?.map((c) => [c.id, c.label, c.path])).toEqual([["sales-meetings", "Calls", "/sales/meetings"]]);
+    expect(echo?.children?.map((c) => [c.id, c.label, c.path])).toEqual([
+      ["sales-meetings", "Calls", "/sales/meetings"],
+      ["sales-echo-stats", "Stats", "/sales/echo-stats"],
+    ]);
   });
 });
 
@@ -146,6 +149,15 @@ describe("the Procurement perspective", () => {
   });
 });
 
+describe("Echo's Stats rail entry", () => {
+  // Admin-only is decided by useSalesRailGate, which only sees the ids the Sales adapter claims.
+  it("is decided by the Sales gate", async () => {
+    const { SALES_ITEM_IDS, SALES_ECHO_STATS_ITEM_ID } = await load({});
+    expect(SALES_ECHO_STATS_ITEM_ID).toBe("sales-echo-stats");
+    expect(SALES_ITEM_IDS.has(SALES_ECHO_STATS_ITEM_ID)).toBe(true);
+  });
+});
+
 describe("CadO2's rail entries", () => {
   const salesIdsIn = (perspectives: Perspectives) =>
     (perspectives.findPerspectiveByKey("sales")?.sections ?? [])
@@ -172,6 +184,7 @@ describe("CadO2's rail entries", () => {
         "sales-deals",
         "sales-echo",
         "sales-meetings",
+        "sales-echo-stats",
         "sales-pitstop",
         "sales-library",
       ]);
@@ -182,7 +195,7 @@ describe("CadO2's rail entries", () => {
     const { SALES_ITEM_IDS } = await load({ quickquote: true });
     // Opportunities and Echo are the Sales rows gated through ONE_WSO2_REVOPS_BACKEND_URL;
     // nothing of CadO2's joins them.
-    expect([...SALES_ITEM_IDS]).toEqual(["sales-deals", "sales-echo", "sales-meetings"]);
+    expect([...SALES_ITEM_IDS]).toEqual(["sales-deals", "sales-echo", "sales-meetings", "sales-echo-stats"]);
   });
 });
 
@@ -218,7 +231,7 @@ describe("the Ask Sales rail entry", () => {
   it("never joins the Echo gate's ids", async () => {
     const { SALES_ITEM_IDS } = await load({});
     // Opportunities and Echo are gated through ONE_WSO2_REVOPS_BACKEND_URL; the Library is decided by its own backend.
-    expect([...SALES_ITEM_IDS]).toEqual(["sales-deals", "sales-echo", "sales-meetings"]);
+    expect([...SALES_ITEM_IDS]).toEqual(["sales-deals", "sales-echo", "sales-meetings", "sales-echo-stats"]);
   });
 });
 

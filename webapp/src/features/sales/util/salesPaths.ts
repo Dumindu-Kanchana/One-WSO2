@@ -45,6 +45,9 @@ export function startSecondOf(params: URLSearchParams): number | null {
   return raw !== null && /^\d+$/.test(raw) ? Number(raw) : null;
 }
 
+/** Echo stats, for Sales admins. `?days=` picks the range (7, 30 or 90). */
+export const ECHO_STATS_PATH = "/sales/echo-stats";
+
 /** The deal page's tabs. */
 export type DealTab = "meddpicc" | "activity" | "ask";
 export const DEAL_TABS: readonly DealTab[] = ["meddpicc", "activity", "ask"];

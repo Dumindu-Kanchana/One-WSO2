@@ -27,6 +27,7 @@ import SalesMeetingsPage from "@features/sales/pages/SalesMeetingsPage";
 import MeetingDetailPage from "@features/sales/pages/MeetingDetailPage";
 import SalesDealsPage from "@features/sales/pages/SalesDealsPage";
 import DealPage from "@features/sales/pages/DealPage";
+import EchoStatsPage from "@features/sales/pages/EchoStatsPage";
 import PromotionHistoryPage from "@features/promotion/pages/PromotionHistoryPage";
 import PromotionRequiresEmployeeRoute from "@features/promotion/components/PromotionRequiresEmployeeRoute";
 import PromotionRequiresLeadRoute from "@features/promotion/components/PromotionRequiresLeadRoute";
@@ -1146,6 +1147,12 @@ export default function App() {
           {/* One deal, as a page rather than a drawer: it can be linked, refreshed and
               returned to with Back. ?letter= opens it filtered to one MEDDPICC Letter. */}
           <Route path="sales/deals/:opportunityId" element={<DealPage />} />
+          {/* Echo stats: an Adoption tab (usage, calls, deal progress, quiet deals) and a
+              Quality tab (AM decisions, analysis outcomes, Salesforce completeness), ?tab=.
+              Sales admins only. The rail shows it to Sales admins alone; anyone else who
+              opens the address is told it is for admins, and the ONE_WSO2_ECHO_BACKEND_URL
+              backend refuses them (403) on its own account. */}
+          <Route path="sales/echo-stats" element={<EchoStatsPage />} />
           {/* Sales → Library, Smart Search over Pitstop's content. Loaded lazily, so nothing of it is
               downloaded until the page is opened. */}
           <Route
