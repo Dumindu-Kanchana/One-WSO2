@@ -59,10 +59,11 @@ beforeEach(() => {
 });
 
 describe("ParLead360Evidence", () => {
-  it("below 3, shows nothing of the feedback: no responses, index or averages", () => {
+  it("below 3, shows the responses but not the index or averages", () => {
     render(<ParLead360Evidence parCycleId={2} employeeEmail="gina@example.com" threeSixtyDeadline={OPEN} />);
-    expect(screen.getByText("The 360° feedback shows after 3 or more submissions.")).toBeInTheDocument();
-    expect(screen.queryByText("Reviewer 1")).not.toBeInTheDocument();
+    expect(screen.getByText("The 360° index shows after 3 or more submissions.")).toBeInTheDocument();
+    expect(screen.getByText("Reviewer 1")).toBeInTheDocument();
+    expect(screen.getByText("Reviewer 2")).toBeInTheDocument();
     expect(screen.queryByText("360° index")).not.toBeInTheDocument();
   });
 
@@ -80,19 +81,21 @@ describe("ParLead360Evidence", () => {
     expect(screen.getByText("The 360° index shows after 3 or more submissions.")).toBeInTheDocument();
   });
 
-  it("once the 360° deadline has passed with fewer than 3, says there's none this cycle, not when it will show", () => {
+  it("once the 360° deadline has passed with fewer than 3, says there's no index this cycle, and keeps the responses", () => {
+    render(<ParLead360Evidence parCycleId={2} employeeEmail="gina@example.com" threeSixtyDeadline={PASSED} />);
+    expect(
+      screen.getByText("Fewer than 3 people submitted by the 360° deadline, so there's no 360° index this cycle."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/shows after 3/)).not.toBeInTheDocument();
+    expect(screen.getByText("Reviewer 1")).toBeInTheDocument();
+  });
+
+  it("says there's no 360° feedback when no one submitted by the 360° deadline", () => {
+    data = responses(0, false);
     render(<ParLead360Evidence parCycleId={2} employeeEmail="gina@example.com" threeSixtyDeadline={PASSED} />);
     expect(
       screen.getByText("Fewer than 3 people submitted by the 360° deadline, so there's no 360° feedback this cycle."),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/shows after 3/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Reviewer 1")).not.toBeInTheDocument();
-  });
-
-  it("says the same when no one submitted by the 360° deadline", () => {
-    data = responses(0, false);
-    render(<ParLead360Evidence parCycleId={2} employeeEmail="gina@example.com" threeSixtyDeadline={PASSED} />);
-    expect(screen.getByText(/^Fewer than 3 people submitted by the 360° deadline/)).toBeInTheDocument();
     expect(screen.queryByText("No one has submitted yet.")).not.toBeInTheDocument();
   });
 
