@@ -139,7 +139,7 @@ export default function ParGiveFeedbackTab() {
   }, [closedSurveyIds]);
 
   if (parts.isLoading) {
-    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   }
   if (!cycle || !workEmail) return null;
 
@@ -180,7 +180,7 @@ export default function ParGiveFeedbackTab() {
   const leadersFailed = parts.leadership && leaders.isError && !leaders.data;
 
   return (
-    <Stack spacing={2} sx={{ maxWidth: 1100, pt: 0.5 }}>
+    <Stack spacing={2} sx={{ pt: 0.5 }}>
       <Typography variant="body2" color="text.secondary">
         Share your feedback to help your colleagues recognise their strengths and find opportunities to grow.
       </Typography>

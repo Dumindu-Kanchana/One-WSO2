@@ -83,7 +83,7 @@ export default function ParEmployeeFeedbackTab() {
 
   let body: ReactNode;
   if (activeCycles.isLoading || profile.isLoading) {
-    body = <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    body = <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   } else if (profile.isError) {
     body = (
       <ErrorNotice error={profile.error} onRetry={() => profile.refetch()} retrying={profile.isFetching}>
@@ -99,7 +99,7 @@ export default function ParEmployeeFeedbackTab() {
   } else if (!cycle) {
     body = <Alert severity="info">There's no PAR cycle open for you right now.</Alert>;
   } else if (rating.isLoading) {
-    body = <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    body = <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   } else if (rating.isError) {
     body = (
       <ErrorNotice error={rating.error} onRetry={() => rating.refetch()} retrying={rating.isFetching}>
@@ -109,7 +109,7 @@ export default function ParEmployeeFeedbackTab() {
   } else if (!rating.data) {
     body = <Alert severity="info">Your record for this cycle isn't ready yet — check back shortly.</Alert>;
   } else if (selfReview.isLoading) {
-    body = <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    body = <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   } else if (selfReview.isError) {
     body = (
       <ErrorNotice error={selfReview.error} onRetry={() => selfReview.refetch()} retrying={selfReview.isFetching}>
@@ -283,7 +283,7 @@ function SelfReviewForm({
   }, [comment, finalized, deadlinePassed, showForm, confirming, isSaving]);
 
   return (
-    <Stack spacing={1.75} sx={{ maxWidth: 1100 }}>
+    <Stack spacing={1.75}>
       {!shared && (
         <Alert severity={deadlinePassed ? "error" : status === "DRAFT" ? "warning" : "info"}>
           {deadlinePassed

@@ -52,7 +52,7 @@ export default function ParRequestFeedbackTab() {
   const [adding, setAdding] = useState(false);
 
   if (profile.isLoading || activeCycles.isLoading) {
-    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 880 }} />;
+    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   }
   if (profile.isError) {
     return (
@@ -79,7 +79,7 @@ export default function ParRequestFeedbackTab() {
   const blocked = deadlinePassed || leadShared;
 
   return (
-    <Box sx={{ maxWidth: 880 }}>
+    <Box>
       {/* RequestFeedbackTab.tsx:74-84 — exact wording, always info severity
           regardless of deadline (unlike ProvideFeedbackTab's own alert). */}
       <Alert severity="info" sx={{ mb: 1.5 }}>

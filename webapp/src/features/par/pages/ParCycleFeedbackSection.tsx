@@ -31,7 +31,7 @@ export default function ParCycleFeedbackSection() {
   const cycle = activeCycles.data?.[0];
 
   if (profile.isLoading || activeCycles.isLoading) {
-    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   }
   if (activeCycles.isError) {
     return (
@@ -45,7 +45,7 @@ export default function ParCycleFeedbackSection() {
   }
   const leadership = isPreviewEnabled("leadership360");
   return (
-    <Stack spacing={2} sx={{ maxWidth: 1100 }}>
+    <Stack spacing={2}>
       <Par360AboutMe
         cycle={cycle}
         workEmail={workEmail}

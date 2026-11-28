@@ -71,7 +71,7 @@ export default function ParProvideFeedbackTab() {
   const [pickerResetKey, setPickerResetKey] = useState(0);
 
   if (profile.isLoading || activeCycles.isLoading) {
-    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 880 }} />;
+    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   }
   if (profile.isError) {
     return (
@@ -99,7 +99,7 @@ export default function ParProvideFeedbackTab() {
   const deadlinePassed = isDeadlinePassed(cycle.parThreeSixtyRatingDeadline);
 
   return (
-    <Box sx={{ maxWidth: 880 }}>
+    <Box>
       {/* ProvideFeedbackTab.tsx:217-227 — exact wording. */}
       <Alert severity={deadlinePassed ? "error" : "info"} sx={{ mb: 1.5 }}>
         {deadlinePassed

@@ -195,7 +195,7 @@ export default function ParSelfReviewForm({
   if (!shared && deadlinePassed) return null;
   if (shared) {
     return (
-      <Stack spacing={1.5} sx={{ maxWidth: 1100 }}>
+      <Stack spacing={1.5}>
         {/* Each section in a box of its own, with its hint and its answer. */}
         {definition.sections.map((section) => (
           <Box key={section.id} sx={{ border: 1, borderColor: "divider", borderRadius: "10px", px: 2, py: 1.75 }}>
@@ -272,7 +272,7 @@ export default function ParSelfReviewForm({
 
   if (!editable && status === "PENDING") {
     return (
-      <Card variant="outlined" sx={{ p: 4, textAlign: "center", maxWidth: 1100 }}>
+      <Card variant="outlined" sx={{ p: 4, textAlign: "center" }}>
         <Box
           sx={{
             color: "primary.main",
@@ -298,7 +298,7 @@ export default function ParSelfReviewForm({
   }
 
   return (
-    <Stack spacing={2} sx={{ maxWidth: 1100 }}>
+    <Stack spacing={2}>
       <Box
         sx={{
           display: "flex",

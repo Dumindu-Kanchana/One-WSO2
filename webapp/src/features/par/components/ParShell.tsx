@@ -25,6 +25,10 @@ import { isParBackendConfigured } from "../api/useParData";
 // heading, not a shared app-name banner: each portal already names itself,
 // so a generic "Performance Appraisal Review" label above that would say
 // the same thing twice.
+// Every PAR page is centred and capped, as other One App pages are, so it looks the same on a laptop and on a wide
+// external monitor; each tab fills it.
+const PAR_PAGE_MAX_WIDTH = 1440;
+
 export default function ParShell({
   title,
   subtitle,
@@ -39,7 +43,7 @@ export default function ParShell({
 }) {
   const configured = isParBackendConfigured();
   return (
-    <Box>
+    <Box sx={{ width: "100%", maxWidth: PAR_PAGE_MAX_WIDTH, mx: "auto" }}>
       <Typography component="h1" variant="h5" sx={{ mb: 0.5, fontWeight: 600 }}>
         {title}
       </Typography>

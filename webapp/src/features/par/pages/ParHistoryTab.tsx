@@ -134,7 +134,7 @@ export default function ParHistoryTab() {
           )}
         </Stack>
         {opened.kind === "real" ? (
-          <Box sx={{ maxWidth: 880 }}>
+          <Box>
             <RealCycleDetail cycle={opened.cycle} workEmail={workEmail} />
           </Box>
         ) : (

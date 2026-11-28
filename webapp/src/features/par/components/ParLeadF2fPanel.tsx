@@ -43,7 +43,7 @@ export default function ParLeadF2fPanel({ cycle, employeeEmail }: { cycle: ParCy
   const [dateTouched, setDateTouched] = useState(false);
 
   if (rating.isLoading) {
-    return <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    return <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5 }} />;
   }
   if (rating.isError) {
     return (
@@ -79,7 +79,7 @@ export default function ParLeadF2fPanel({ cycle, employeeEmail }: { cycle: ParCy
 
   return (
     <Box sx={{ pt: 0.5 }}>
-      <Stack spacing={1.75} sx={{ maxWidth: 1100 }}>
+      <Stack spacing={1.75}>
         {!deadlinePassed && status === "SCHEDULED" && <Alert severity="success">F2F meeting is scheduled</Alert>}
         {deadlinePassed && !completed && (
           <Alert severity="error">

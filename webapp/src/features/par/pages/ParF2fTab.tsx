@@ -54,7 +54,7 @@ export default function ParF2fTab({ activeCycle = false }: { activeCycle?: boole
   const [dateTouched, setDateTouched] = useState(false);
 
   if (activeCycles.isLoading || profile.isLoading) {
-    return <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    return <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5 }} />;
   }
   if (profile.isError) {
     return (
@@ -74,7 +74,7 @@ export default function ParF2fTab({ activeCycle = false }: { activeCycle?: boole
     return <Alert severity="info">There's no PAR cycle open for you right now.</Alert>;
   }
   if (rating.isLoading) {
-    return <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    return <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1.5 }} />;
   }
   if (rating.isError) {
     return (
@@ -124,7 +124,7 @@ export default function ParF2fTab({ activeCycle = false }: { activeCycle?: boole
 
   return (
     <Box sx={{ pt: 0.5 }}>
-      <Stack spacing={1.75} sx={{ maxWidth: 1100 }}>
+      <Stack spacing={1.75}>
         {/* Five alerts on independent conditions, not an if/else chain, so
             more than one can show at once (e.g. SCHEDULED and
             not-yet-lead-shared both render together). Not in Active cycle,

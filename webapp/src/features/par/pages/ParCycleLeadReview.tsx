@@ -51,7 +51,7 @@ export default function ParCycleLeadReview() {
   );
 
   if (profile.isLoading || activeCycles.isLoading || rating.isLoading) {
-    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
+    return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />;
   }
   if (profile.isError) {
     return (
@@ -143,7 +143,7 @@ function SharedReview({
   const specialRating =
     rating.parSpecialRating && rating.parSpecialRating !== "NOT_ASSIGNED" ? rating.parSpecialRating : undefined;
   return (
-    <Stack spacing={1.75} sx={{ maxWidth: 1100 }}>
+    <Stack spacing={1.75}>
       {(rating.parRating || specialRating) && (
         <Box
           sx={{
