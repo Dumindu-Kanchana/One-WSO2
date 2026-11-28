@@ -110,7 +110,7 @@ function show(initial = "/people-ops/performance/lead") {
         >
           <Route index element={<ParLeadGroupIndex />} />
           <Route path="direct-reports" element={<Tab name="Direct Reports" />} />
-          <Route path="employee-history" element={<Tab name="Employee History" />} />
+          <Route path="employee-history" element={<Tab name="History" />} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -173,15 +173,15 @@ describe("a lead with reports but no active cycle", () => {
     hasDirectReports(true);
   });
 
-  it("lands on Employee History, not the Employee Portal", async () => {
+  it("lands on History, not the Employee Portal", async () => {
     show();
     expect(await screen.findByTestId("url")).toHaveTextContent(
       "/people-ops/performance/lead/employee-history",
     );
-    expect(await screen.findByTestId("tab-body")).toHaveTextContent("Employee History");
+    expect(await screen.findByTestId("tab-body")).toHaveTextContent("History");
   });
 
-  it("sees only the Employee History tab", async () => {
+  it("sees only the History tab", async () => {
     show();
     await screen.findByTestId("tab-body");
     expect(screen.queryByRole("tab", { name: "Direct Reports" })).not.toBeInTheDocument();
@@ -189,7 +189,7 @@ describe("a lead with reports but no active cycle", () => {
     expect(screen.queryByRole("button", { name: "View Quotas" })).not.toBeInTheDocument();
   });
 
-  it("is redirected to Employee History when deep-linking straight to a cycle-scoped tab", async () => {
+  it("is redirected to History when deep-linking straight to a cycle-scoped tab", async () => {
     show("/people-ops/performance/lead/direct-reports");
     expect(await screen.findByTestId("url")).toHaveTextContent(
       "/people-ops/performance/lead/employee-history",

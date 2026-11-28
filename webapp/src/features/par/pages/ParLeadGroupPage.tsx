@@ -36,13 +36,13 @@ const TABS: RoutedTabDef[] = [
   { segment: "direct-reports", label: "Direct Reports" },
   { segment: "additional-reports", label: "Additional Reports" },
   { segment: "report-chain", label: "Report Chain" },
-  { segment: "employee-history", label: "Employee History" },
+  { segment: "employee-history", label: "History" },
 ];
 
-// No active cycle: every tab but Employee History acts on cycle data that
+// No active cycle: every tab but History acts on cycle data that
 // doesn't exist without one (isTeamLead is itself scoped to the active
 // cycle — see ParEmployeeInfo).
-const HISTORY_ONLY_TABS: RoutedTabDef[] = [{ segment: "employee-history", label: "Employee History" }];
+const HISTORY_ONLY_TABS: RoutedTabDef[] = [{ segment: "employee-history", label: "History" }];
 
 // One page frame for everything a lead does for their reports — the
 // employee-facing counterpart, ParGroupPage.tsx, now lives under the Me
@@ -74,7 +74,7 @@ export default function ParLeadGroupPage() {
     <ParShell
       title="Lead View"
       subtitle="Review and rate your reports' PAR, manage their 360° feedback and F2F and see their record from past cycles."
-      // Only in an active cycle, like every tab but Employee History: isTeamLead is false without one (see
+      // Only in an active cycle, like every tab but History: isTeamLead is false without one (see
       // ParEmployeeInfo).
       actions={employeeInfo.isTeamLead && <ParLeadQuotasButton />}
     >
@@ -93,7 +93,7 @@ export default function ParLeadGroupPage() {
 }
 
 /** The index route of the group: sends an active-cycle lead to Direct
- * Reports, and everyone else to Employee History (their only tab). */
+ * Reports, and everyone else to History (their only tab). */
 export function ParLeadGroupIndex() {
   const profile = useMeProfile();
   const employeeInfo = useParIsTeamLead(profile.data?.userInfo.workEmail);
@@ -102,7 +102,7 @@ export function ParLeadGroupIndex() {
 
 /** Guards the whole /people-ops/performance/lead subtree — par-app's own
  * Role.TEAM_LEAD gate on /lead-portal (route.ts), OR'd with the org-chart
- * signal (GET /employees?leadEmail=, the same lookup Employee History
+ * signal (GET /employees?leadEmail=, the same lookup History
  * itself uses) so a real lead keeps access once their cycle closes and
  * isTeamLead goes false. Hiding the nav item is not access control; the
  * route is what actually enforces it, same reasoning as ParRequiresLeadRoute.

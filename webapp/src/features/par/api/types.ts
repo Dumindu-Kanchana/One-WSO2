@@ -343,7 +343,7 @@ export interface ParTeamDetails extends ParTeamSummary {
 // GET /employees?leadEmail= — mirrors backend's BasicEmployeeInfo. Pure
 // org-chart data (managerEmail match), not tied to any PAR cycle or rating
 // record — direct reports only, unlike the PAR-cycle-scoped "reports"/
-// "report-levels" endpoints above. Backs the Employee History tab's
+// "report-levels" endpoints above. Backs the History tab's
 // employee picker (EmployeeReportView.tsx's fetchEntityEmployees).
 export interface ParEmployee {
   employeeName: string;
