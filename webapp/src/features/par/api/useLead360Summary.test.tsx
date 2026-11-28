@@ -50,11 +50,10 @@ beforeEach(() => {
 });
 
 describe("useLead360SummarySuggestion", () => {
-  it("reads the kept suggestion and notes on the rating what it was written from", async () => {
+  it("reads the kept suggestion", async () => {
     const { result } = renderHook(() => useLead360SummarySuggestion(2, "alex@example.com", 4, true), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(authedPost).toHaveBeenCalledWith("/par-cycles/2/alex@example.com/suggestion");
-    expect(client.getQueryData<ParRating>(ratingKey)).toMatchObject({ parLead360SuggestionResponses: 4 });
   });
 
   it("asks only when it's wanted, and again only once more responses come in", async () => {

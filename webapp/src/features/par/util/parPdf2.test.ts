@@ -201,3 +201,14 @@ describe("downloadParPdf", () => {
     expect(text).toContain("Colleagues see real ownership.");
   });
 });
+
+describe("downloadParPdf, the admin comment", () => {
+  it("writes the admin comment in a PAR admin's download only", () => {
+    const rating = { parEmployeeEmail: "e@x.com", parRating: "Successful" } as ParRating;
+    downloadParPdf(rating, "", "<p>Great cycle.</p>", [], "<p>Checked with the lead.</p>");
+    expect(JSON.stringify(tables.at(-1))).toContain("Checked with the lead.");
+    downloadParPdf(rating, "", "<p>Great cycle.</p>", []);
+    expect(JSON.stringify(tables.at(-1))).not.toContain("Admin Comment");
+  });
+});
+

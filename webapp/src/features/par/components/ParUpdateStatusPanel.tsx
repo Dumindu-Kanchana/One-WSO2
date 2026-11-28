@@ -45,14 +45,23 @@ export default function ParUpdateStatusPanel({ cycle, employeeEmail }: { cycle: 
   // doesn't touch this field would overwrite a SCHEDULED record with PENDING.
   const [f2fStatus, setF2fStatus] = useState<ParF2fStatus>("PENDING");
   const [f2fDate, setF2fDate] = useState("");
-  const [seededForId, setSeededForId] = useState<number | undefined>(undefined);
+  const [seededFrom, setSeededFrom] = useState<string | null | undefined>(undefined);
 
   const parRatingData = rating.data;
 
-  // Seed once per record so a background refetch doesn't overwrite an
-  // in-progress edit.
-  if (parRatingData && parRatingData.parRatingId !== seededForId) {
-    setSeededForId(parRatingData.parRatingId);
+  // Seeded from what's saved, and again whenever that changes (after a save, or another tab's), so the fields always
+  // start from the stored statuses. A refetch that brings nothing new leaves an edit in progress alone.
+  const saved =
+    parRatingData &&
+    [
+      parRatingData.parRatingId,
+      parRatingData.parEmployeeStatus,
+      parRatingData.parLeadStatus,
+      parRatingData.parF2fStatus,
+      parRatingData.parF2fDate ?? "",
+    ].join("|");
+  if (parRatingData && saved !== seededFrom) {
+    setSeededFrom(saved);
     setEmployeeStatus(parRatingData.parEmployeeStatus);
     setLeadStatus(parRatingData.parLeadStatus);
     setF2fStatus(parRatingData.parF2fStatus);
@@ -90,11 +99,16 @@ export default function ParUpdateStatusPanel({ cycle, employeeEmail }: { cycle: 
       {
         employeeEmail,
         parRatingId: parRatingData.parRatingId,
+        // Only what changed, so a field left as it was is never sent back over a newer value.
         payload: {
-          parEmployeeStatus: employeeStatus,
-          parLeadStatus: leadStatus,
-          parF2fStatus: f2fStatus,
-          ...(f2fStatus === "COMPLETED" && f2fDate ? { parF2fDate: f2fDate } : {}),
+          ...(employeeStatus !== parRatingData.parEmployeeStatus ? { parEmployeeStatus: employeeStatus } : {}),
+          ...(leadStatus !== parRatingData.parLeadStatus ? { parLeadStatus: leadStatus } : {}),
+          ...(f2fStatus !== parRatingData.parF2fStatus ? { parF2fStatus: f2fStatus } : {}),
+          ...(f2fStatus === "COMPLETED" &&
+          f2fDate &&
+          (f2fStatus !== parRatingData.parF2fStatus || f2fDate !== (parRatingData.parF2fDate ?? ""))
+            ? { parF2fDate: f2fDate }
+            : {}),
         },
       },
       {

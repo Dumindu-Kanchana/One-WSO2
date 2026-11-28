@@ -44,7 +44,14 @@ type PdfRow = (string | { content: string; colSpan?: number; styles: Record<stri
 // shared it, optionally followed by a "360° Reviews" section — one row per
 // reviewer, unfiltered by review status (the on-screen 360 list filters to
 // SHARED-only; the PDF export never did).
-export function downloadParPdf(rating: ParRating, selfComment: string, leadComment: string, reviews?: Par360Review[]): void {
+export function downloadParPdf(
+  rating: ParRating,
+  selfComment: string,
+  leadComment: string,
+  reviews?: Par360Review[],
+  // A PAR admin's download only.
+  adminComment?: string,
+): void {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
 
   const rows: PdfRow[] = [];
@@ -68,6 +75,14 @@ export function downloadParPdf(rating: ParRating, selfComment: string, leadComme
       "360° Summary",
       "",
       { content: htmlToPdfText(lead360Summary), styles: { textColor: [50, 50, 50], cellPadding: 6 } },
+    ]);
+  }
+
+  if (adminComment && !isEmptyHtml(adminComment)) {
+    rows.push([
+      "Admin Comment",
+      "",
+      { content: htmlToPdfText(adminComment), styles: { textColor: [50, 50, 50], cellPadding: 6 } },
     ]);
   }
 

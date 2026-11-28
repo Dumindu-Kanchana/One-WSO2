@@ -14,12 +14,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useEffect, useImperativeHandle, type ReactNode, type Ref } from "react";
+import { useImperativeHandle, type ReactNode, type Ref } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ParCycle, ParRating } from "../api/types";
 import { encodeParComment } from "../util/parComment";
-import { formatShortDateTime } from "../util/parDate";
 import type { ParRichTextFieldHandle } from "./ParRichTextField";
 
 let rating: ParRating;
@@ -53,12 +52,6 @@ vi.mock("../api/useReview360", () => ({
 vi.mock("../api/useLead360Summary", () => ({
   useLead360SummarySuggestion: (_cycle: number, _email: string, _count: number, enabled: boolean) => {
     suggestionAskedFor = enabled;
-    // As the hook does once it has read one, the rating then says what the
-    // suggestion was written from (seen on the next render).
-    const written = (suggestion.data as { responseCount?: number } | undefined)?.responseCount;
-    useEffect(() => {
-      if (enabled && written !== undefined) rating = { ...rating, parLead360SuggestionResponses: written };
-    }, [enabled, written]);
     return enabled ? suggestion : {};
   },
   useSaveLead360Summary: () => ({ mutate: save, mutateAsync: save, isPending: summarySavePending }),
@@ -216,6 +209,12 @@ describe("ParLeadReviewPanel: the employee's self-review", () => {
 
 describe("ParLeadReviewPanel: 360° summary", () => {
   const INSERTED = "<p>Colleagues see real ownership.</p><p>They'd like earlier updates.</p>";
+  const HINT = "A suggested summary is available after the 360° deadline if 3 or more people respond.";
+
+  // Once all 360° feedback is in, unless a test says otherwise.
+  beforeEach(() => {
+    cycle.parThreeSixtyRatingDeadline = PASSED_360;
+  });
 
   it("shows the suggestion in grey while the summary is empty, and a click on it inserts it as paragraphs", () => {
     show();
@@ -241,59 +240,69 @@ describe("ParLeadReviewPanel: 360° summary", () => {
     expect(screen.queryByText("Colleagues see real ownership.")).not.toBeInTheDocument();
   });
 
-  it("needs 3 submitted responses before there's a summary to write, or a suggestion", () => {
+  it("lets the lead draft the summary before the 360° deadline, at any number of responses, with no suggestion", () => {
+    cycle.parThreeSixtyRatingDeadline = "2999-12-01";
+    for (const count of [0, 2, 3]) {
+      responseCount = count;
+      const view = show();
+      expect(suggestionAskedFor).toBe(false);
+      expect(screen.getByLabelText(FIELD)).toHaveValue("");
+      expect(screen.queryByText(/Suggested from/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Available after 3/)).not.toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  it("says beside the heading when a suggestion comes, while the lead can write the summary", () => {
+    cycle.parThreeSixtyRatingDeadline = "2999-12-01";
+    show();
+    expect(screen.getByRole("img", { name: HINT })).toBeInTheDocument();
+  });
+
+  it("keeps the summary to write, with no suggestion, after the 360° deadline with fewer than 3", () => {
     responseCount = 2;
     show();
     expect(suggestionAskedFor).toBe(false);
-    expect(screen.queryByLabelText(FIELD)).not.toBeInTheDocument();
-    expect(screen.getByText("Available after 3 or more submissions (2 so far).")).toBeInTheDocument();
+    expect(screen.getByLabelText(FIELD)).toBeInTheDocument();
+    expect(screen.queryByText(/suggested summary from the 360° feedback/)).not.toBeInTheDocument();
   });
 
-  it("says when the 360° responses couldn't be loaded, with Retry, rather than how many there are", () => {
+  it("says when the 360° responses couldn't be loaded after the deadline, with Retry, under the summary", () => {
     responsesFail = true;
-    show();
+    const view = show();
+    expect(screen.getByLabelText(FIELD)).toBeInTheDocument();
     expect(screen.getByText(/Couldn't load the 360° responses/)).toBeInTheDocument();
-    expect(screen.queryByText(/Available after 3/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(FIELD)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(retryResponses).toHaveBeenCalled();
-  });
+    view.unmount();
 
-  it("has no summary row once the 360° deadline has passed everywhere with fewer than 3", () => {
-    responseCount = 2;
-    cycle.parThreeSixtyRatingDeadline = "2020-01-01";
+    // Before the deadline the count doesn't matter yet.
+    cycle.parThreeSixtyRatingDeadline = "2999-12-01";
     show();
-    expect(screen.queryByText("360° summary")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Available after 3/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(FIELD)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't load the 360° responses/)).not.toBeInTheDocument();
   });
 
-  it("leaves the lead's own words alone when no responses came in since the last suggestion", () => {
+  it("offers the suggestion under the lead's own words without writing one until it's asked for", () => {
     show({ parLead360Summary: encodeParComment("<p>My own words.</p>"), parLead360SuggestionResponses: 3 });
     expect(screen.getByLabelText(FIELD)).toHaveValue("<p>My own words.</p>");
     expect(suggestionAskedFor).toBe(false);
-    expect(screen.queryByRole("button", { name: /suggestion/ })).not.toBeInTheDocument();
+    expect(screen.getByText("There's a suggested summary from the 360° feedback.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show updated suggestion" })).not.toBeInTheDocument();
   });
 
-  it("offers the updated suggestion again only when more responses come in, once it's dismissed", () => {
-    responseCount = 5;
-    suggestion = { data: { ...SUGGESTED, responseCount: 5 } };
+  it("offers it again once it's dismissed", () => {
     show({ parLead360Summary: encodeParComment("<p>My own words.</p>"), parLead360SuggestionResponses: 3 });
-    fireEvent.click(screen.getByRole("button", { name: "Show updated suggestion" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show suggestion" }));
+    expect(screen.getByText("Suggested from 3 360° responses")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText("Suggested from 5 360° responses")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /suggestion/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggested from 3 360° responses")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show suggestion" })).toBeInTheDocument();
     expect(screen.getByLabelText(FIELD)).toHaveValue("<p>My own words.</p>");
   });
 
-  it("offers the suggestion from newer responses, and replaces the lead's words only on Replace", () => {
-    responseCount = 5;
-    suggestion = { data: { ...SUGGESTED, responseCount: 5 } };
-    show({ parLead360Summary: encodeParComment("<p>My own words.</p>"), parLead360SuggestionResponses: 3 });
-    expect(screen.getByText("2 new 360° responses since the last suggestion.")).toBeInTheDocument();
-    expect(suggestionAskedFor).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Show updated suggestion" }));
-    expect(screen.getByText("Suggested from 5 360° responses")).toBeInTheDocument();
+  it("replaces the lead's words with the suggestion only on Replace", () => {
+    show({ parLead360Summary: encodeParComment("<p>My own words.</p>") });
+    fireEvent.click(screen.getByRole("button", { name: "Show suggestion" }));
     // Its text doesn't replace them on a click.
     fireEvent.click(screen.getByText("Colleagues see real ownership."));
     expect(screen.getByLabelText(FIELD)).toHaveValue("<p>My own words.</p>");
@@ -302,16 +311,10 @@ describe("ParLeadReviewPanel: 360° summary", () => {
     expect(screen.getByLabelText(FIELD)).toHaveValue(INSERTED);
   });
 
-  it("offers one when the lead wrote their own before any suggestion", () => {
-    show({ parLead360Summary: encodeParComment("<p>My own words.</p>") });
-    fireEvent.click(screen.getByRole("button", { name: "Show suggestion" }));
-    expect(screen.getByText("Suggested from 3 360° responses")).toBeInTheDocument();
-  });
-
   it("says so quietly when a suggestion can't be written", () => {
     suggestion = { isError: true, error: new Error("HTTP 503") };
     show();
-    expect(screen.getByText(/Couldn't write a suggestion just now/)).toBeInTheDocument();
+    expect(screen.getByText("Couldn't write a suggestion just now. It's tried again after an hour.")).toBeInTheDocument();
     expect(screen.getByLabelText(FIELD)).toBeInTheDocument();
   });
 
@@ -379,6 +382,7 @@ describe("ParLeadReviewPanel: 360° summary", () => {
     expect(screen.getByText("Colleagues see real ownership.")).toBeInTheDocument();
     expect(suggestionAskedFor).toBe(false);
     expect(screen.queryByText("Suggested from 3 360° responses")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /suggested summary/ })).not.toBeInTheDocument();
   });
 });
 
@@ -538,16 +542,13 @@ describe("ParLeadReviewPanel: a PAR not shared by its deadline", () => {
     expect(screen.queryByLabelText("Rating auto-assigned and locked")).not.toBeInTheDocument();
   });
 
-  it("tells the lead, before the deadline, the rating the PAR gets if it isn't shared, with PAR 2.0", () => {
+  it("tells the lead, before the deadline, that they can share once the self-review is shared, with PAR 2.0", () => {
     window.config = { ...(originalConfig ?? {}), ONE_WSO2_PREVIEW_FEATURES: { par2: true } } as Window["config"];
     rating = missed;
     const openCycle = { ...missedCycle, parEmployeeDeadline: "2999-12-01" } as unknown as ParCycle;
     render(<ParLeadReviewPanel cycle={openCycle} employeeEmail="alex@example.com" />);
-    expect(
-      screen.getByText(/You can share once Alex shares their self-review\. If they don't by .+, their rating will be Needs Improvements\./),
-    ).toBeInTheDocument();
-    // The moment the deadline has passed everywhere: the start of the next day at UTC-12.
-    expect(screen.getByText(new RegExp(`by ${formatShortDateTime(new Date("2999-12-02T12:00:00Z"))},`))).toBeInTheDocument();
+    expect(screen.getByText("You can share once Alex shares their self-review.")).toBeInTheDocument();
+    expect(screen.queryByText(/their rating will be/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
   });
 });
@@ -880,5 +881,61 @@ describe("ParLeadReviewPanel: saving without a comment", () => {
     expect(savedPayload()).toMatchObject({ parRating: "Successful" });
     expect(savedPayload()).not.toHaveProperty("parLeadComment");
     expect(savedPayload()).not.toHaveProperty("parAdminComment");
+  });
+});
+
+describe("ParLeadReviewPanel: Admin View saves", () => {
+  const savedPayload = () => ratingMutate.mock.calls.at(-1)![0].payload;
+  const COMMENT = "Enter your comment here";
+  // The admin comment's field, as opposed to the lead's comment once editing is unlocked.
+  const adminField = () => screen.getAllByLabelText(COMMENT).find((e) => e.closest(".MuiAccordion-root"))!;
+  const leadField = () => screen.getAllByLabelText(COMMENT).find((e) => !e.closest(".MuiAccordion-root"))!;
+  const showAsAdmin = (overrides: Partial<ParRating> = {}, forCycle: ParCycle = cycle) => {
+    rating = {
+      parRatingId: 7,
+      parCycleId: 2,
+      parEmployeeEmail: "alex@example.com",
+      parEmployeeStatus: "SHARED",
+      parLeadStatus: "DRAFT",
+      parIsLeadershipEmployee: false,
+      ...overrides,
+    } as ParRating;
+    return render(<ParLeadReviewPanel cycle={forCycle} employeeEmail="alex@example.com" isAdminView />);
+  };
+
+  it("saves the admin comment on its own, sending nothing else and needing no unlocking", () => {
+    showAsAdmin({ parLeadStatus: "SHARED", parRating: "Successful", parLeadComment: encodeParComment("<p>Lead</p>") });
+    fireEvent.click(screen.getByRole("button", { name: "Admin Comment" }));
+    expect(screen.getByRole("button", { name: "Save comment" })).toBeDisabled();
+    fireEvent.change(adminField(), { target: { value: "<p>Checked with the lead.</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save comment" }));
+    expect(savedPayload()).toEqual({ parAdminComment: encodeParComment("<p>Checked with the lead.</p>") });
+  });
+
+  it("clears the admin comment with an empty one", () => {
+    showAsAdmin({ parAdminComment: encodeParComment("<p>Old note</p>") });
+    fireEvent.change(adminField(), { target: { value: "<p><br></p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save comment" }));
+    expect(savedPayload()).toEqual({ parAdminComment: "" });
+  });
+
+  it("keeps a shared PAR shared on Save draft, sending only what the admin changed", async () => {
+    showAsAdmin({ parLeadStatus: "SHARED", parRating: "Successful", parLeadComment: encodeParComment("<p>Lead</p>") });
+    fireEvent.click(screen.getByRole("button", { name: "edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await screen.findByRole("combobox", { name: "Rating" });
+    expect(screen.getByText("Lead's feedback is shared with the employee")).toBeInTheDocument();
+    expect(screen.queryByText(/Please share/)).not.toBeInTheDocument();
+    fireEvent.change(leadField(), { target: { value: "<p>Lead, corrected.</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toEqual({ parLeadComment: encodeParComment("<p>Lead, corrected.</p>") });
+  });
+
+  it("can't be edited once the cycle is closed, even before its end date", () => {
+    showAsAdmin({}, { ...cycle, parCycleStatus: "CLOSED" } as ParCycle);
+    expect(screen.queryByRole("button", { name: "edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save comment" })).not.toBeInTheDocument();
+    expect(screen.getByText("Admin comment unavailable")).toBeInTheDocument();
   });
 });

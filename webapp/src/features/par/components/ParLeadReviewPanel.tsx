@@ -46,6 +46,7 @@ import {
 import {
   ChevronDownIcon,
   CircleAlertIcon,
+  CircleHelpIcon,
   ExternalLinkIcon,
   FileDownIcon,
   Google,
@@ -62,7 +63,7 @@ import { useParEmployeeReviews } from "../api/useLeadHistory";
 import { useGoogleDrivePicker } from "../hooks/useGoogleDrivePicker";
 import { decodeParComment, encodeParComment, isEmptyHtml, paragraphsToHtml } from "../util/parComment";
 import { isPreviewEnabled } from "@config/previewFeatures";
-import { deadlinePassedEverywhereAt, hasEndedEverywhere, isDeadlinePassed } from "../util/parDeadline";
+import { deadlinePassedEverywhereAt, isDeadlinePassed } from "../util/parDeadline";
 import { formatShortDate, formatShortDateTime } from "../util/parDate";
 import { downloadParPdf } from "../util/parPdf";
 import { isOpenableUrl, parseSavedUrls, type DriveFile } from "../util/parDriveFile";
@@ -95,6 +96,9 @@ const toSpecialRatingUi = (value: string | undefined): SpecialRatingUi =>
 
 const SPECIAL_RATING_LABELS: Record<SpecialRatingUi, string> = { NONE: "N/A", TOP5P: "Top 5%", TOP20P: "Top 20%" };
 
+/** Beside the 360° summary's heading, while the lead can write it. */
+const SUGGESTION_HINT = "A suggested summary is available after the 360° deadline if 3 or more people respond.";
+
 // Ports LeadReviewPanel.tsx's lead-only path, plus (via `isAdminView`) its
 // isAdminAuditViewOn branch used from the Admin Portal's Employee View/Team
 // View "Review" action. Not ported even in admin mode: editing the
@@ -126,13 +130,13 @@ export default function ParLeadReviewPanel({
   const { top5p20pEnabledRating, evidenceEnabledRating } = ratingRules;
 
   const [leadComment, setLeadComment] = useState("");
-  // The lead's 360° summary (PAR 2.0, not the leadership team): shared with
-  // the comment, saved on its own. While it's empty, an AI suggestion shows in
-  // grey for the lead to insert.
+  // The lead's 360° summary (PAR 2.0, not the leadership team): a draft like
+  // the comment, shared with it and saved on its own, at any number of
+  // responses. Once all 360° feedback is in, an AI suggestion shows in grey
+  // while it's empty, for the lead to insert.
   const [lead360Summary, setLead360Summary] = useState("");
-  // The suggestion written from newer responses, shown under the lead's own
-  // words when they ask for it.
-  const [showingUpdatedSuggestion, setShowingUpdatedSuggestion] = useState(false);
+  // The suggestion, shown under the lead's own words when they ask for it.
+  const [showingSuggestion, setShowingSuggestion] = useState(false);
   const summaryField = useRef<ParRichTextFieldHandle>(null);
   const [summaryAutoSaved, setSummaryAutoSaved] = useState(false);
   const [adminComment, setAdminComment] = useState("");
@@ -232,7 +236,7 @@ export default function ParLeadReviewPanel({
   // at the cycle's end date.
   const hardDeadline = showsPar2 ? cycle.parLeadHardDeadline : undefined;
   const hardDeadlinePassed = !isAdminView && hardDeadline !== undefined && isDeadlinePassed(hardDeadline);
-  const editingClosed = isAdminView ? deadlinePassed : cycle.parCycleStatus === "CLOSED" || hardDeadlinePassed;
+  const editingClosed = cycle.parCycleStatus === "CLOSED" || (isAdminView ? deadlinePassed : hardDeadlinePassed);
   const leadLate = !isAdminView && !shared && deadlinePassed && !hardDeadlinePassed;
   const specialRatingClosed =
     !isAdminView && Boolean(cycle.parSpecialRatingDeadline) && isDeadlinePassed(cycle.parSpecialRatingDeadline!);
@@ -251,37 +255,40 @@ export default function ParLeadReviewPanel({
   const saveSummaryIfChanged = () =>
     summaryDirty ? saveSummary.mutateAsync(summaryToSave ? encodeParComment(summaryToSave) : "") : Promise.resolve();
 
-  // The suggestion: in grey while the summary is empty, or under the lead's
-  // own words once they ask for the one written from newer responses. The
-  // backend keeps it, so it's written again only when more responses come in.
-  // Not for a shared PAR, whose summary can't change.
+  // The suggestion is written once all the 360° feedback is in: after the 360°
+  // deadline has passed everywhere, as for sharing, from 3 or more responses.
+  // The backend keeps it, so it's written once. It shows in grey while the
+  // summary is empty, or under the lead's own words when they ask for it. Not
+  // for a shared PAR, whose summary can't change. The panel redraws when the
+  // deadline passes.
+  const allFeedbackInAtMs = deadlinePassedEverywhereAt(cycle.parThreeSixtyRatingDeadline).getTime();
+  const allFeedbackIn = Date.now() >= allFeedbackInAtMs;
+  useRedrawAt(allFeedbackInAtMs, summaryShown && !readOnly && !allFeedbackIn);
   const responseCount = responses.data?.responseCount ?? 0;
   const summaryEmpty = isEmptyHtml(lead360Summary);
   const suggestionPossible =
-    summaryShown && !readOnly && !shared && !selfReviewMissed && responseCount >= MIN_360_RESPONSES;
+    summaryShown &&
+    !readOnly &&
+    !shared &&
+    !selfReviewMissed &&
+    allFeedbackIn &&
+    responseCount >= MIN_360_RESPONSES;
   const suggestion = useLead360SummarySuggestion(
     cycle.parCycleId,
     employeeEmail,
     responseCount,
-    suggestionPossible && (summaryEmpty || showingUpdatedSuggestion),
+    suggestionPossible && (summaryEmpty || showingSuggestion),
   );
   const suggestionFailed = suggestion.isError;
-  const suggestedFrom = parRatingData?.parLead360SuggestionResponses;
-  // Offered under the lead's own words: more responses have come in since the
-  // last suggestion, or none was written yet. Once seen and dismissed, it's
-  // offered again only when more come in.
-  const updateOffered =
-    suggestionPossible &&
-    !summaryEmpty &&
-    !showingUpdatedSuggestion &&
-    (suggestedFrom === undefined || responseCount > suggestedFrom);
-  const newResponses = responseCount - (suggestedFrom ?? 0);
+  // Offered under the lead's own words whenever it isn't open, so one that was
+  // dismissed can be looked at again: it's kept, so nothing new is written.
+  const suggestionOffered = suggestionPossible && !summaryEmpty && !showingSuggestion;
   // Into the field as one step the field's Undo takes back, so it needs no
   // confirming, even when it replaces the lead's own words.
   const takeSuggestion = () => {
     if (!suggestion.data) return;
     summaryField.current?.replaceContents(paragraphsToHtml(suggestion.data.summary));
-    setShowingUpdatedSuggestion(false);
+    setShowingSuggestion(false);
   };
   const greySuggestionShown = summaryEmpty && Boolean(suggestion.data || suggestion.isLoading);
 
@@ -310,15 +317,21 @@ export default function ParLeadReviewPanel({
     opts?: { silent?: boolean; onSuccess?: () => void; commentOnly?: boolean },
   ) => {
     if (!parRatingData) return;
+    // A PAR admin's save sends only what they changed, so it never overwrites the lead's newer words or rating, and
+    // their Save draft keeps the lead status as it is: a shared PAR stays shared, and a PAR the lead hasn't started
+    // isn't turned into the lead's draft.
+    const adminChanged = (changed: boolean) => !isAdminView || changed;
     ratingUpdate.mutate(
       {
         employeeEmail,
         parRatingId: parRatingData.parRatingId,
         payload: {
-          parLeadStatus: status,
+          ...(isAdminView && status === "DRAFT" ? {} : { parLeadStatus: status }),
           // A comment never written is left out: the backend refuses an empty one. (A comment the lead
           // clears still holds the editor's empty paragraph, so it's sent and saved empty.)
-          ...(leadComment ? { parLeadComment: encodeParComment(leadComment) } : {}),
+          ...(leadComment && adminChanged(leadComment.trim() !== savedLeadComment.trim())
+            ? { parLeadComment: encodeParComment(leadComment) }
+            : {}),
           // The autosave fires purely off comment typing and must not also
           // commit whatever the rating dropdowns currently hold — sending
           // parSpecialRating with it would clobber a saved Top 5%/20%
@@ -326,7 +339,9 @@ export default function ParLeadReviewPanel({
           ...(opts?.commentOnly
             ? {}
             : {
-                ...(parRatingValue && !ratingLocked ? { parRating: parRatingValue } : {}),
+                ...(parRatingValue && !ratingLocked && adminChanged(parRatingValue !== (parRatingData.parRating ?? ""))
+                  ? { parRating: parRatingValue }
+                  : {}),
                 // The backend's wire vocabulary is TOP5P/TOP20P/NOT_ASSIGNED;
                 // "NONE" is only this component's UI sentinel and 400s if sent.
                 // Sent only when changed: after the Top 5%/20% deadline the backend refuses any
@@ -338,9 +353,6 @@ export default function ParLeadReviewPanel({
                 // which takes the saved ones away.
                 ...(evidenceLinks !== savedEvidenceLinks ? { parPerformanceNoticeAck: evidenceLinks } : {}),
               }),
-          // Only an admin caller may set this field — the backend rejects a
-          // non-empty value from anyone else.
-          ...(isAdminView && adminComment ? { parAdminComment: encodeParComment(adminComment) } : {}),
         },
       },
       {
@@ -351,6 +363,25 @@ export default function ParLeadReviewPanel({
         onError: (err) => {
           if (!opts?.silent) showError(describeError(err));
         },
+      },
+    );
+  };
+
+  // The admin comment is the PAR admin's own note: it saves on its own, sending nothing else, and an emptied one
+  // clears it. It needs no unlocking, since it doesn't change the lead's review.
+  const adminCommentToSave = isEmptyHtml(adminComment) ? "" : adminComment;
+  const adminCommentDirty = isAdminView && adminCommentToSave.trim() !== savedAdminComment.trim();
+  const saveAdminComment = () => {
+    if (!parRatingData) return;
+    ratingUpdate.mutate(
+      {
+        employeeEmail,
+        parRatingId: parRatingData.parRatingId,
+        payload: { parAdminComment: adminCommentToSave ? encodeParComment(adminCommentToSave) : "" },
+      },
+      {
+        onSuccess: () => showSuccess(adminCommentToSave ? "Admin comment saved" : "Admin comment cleared"),
+        onError: (err) => showError(describeError(err)),
       },
     );
   };
@@ -428,12 +459,11 @@ export default function ParLeadReviewPanel({
   const dirty =
     summaryDirty ||
     leadComment.trim() !== savedLeadComment.trim() ||
-    (isAdminView && adminComment.trim() !== savedAdminComment.trim()) ||
     (parRatingValue !== (parRatingData.parRating ?? "") && parRatingValue !== "") ||
     specialRating !== toSpecialRatingUi(parRatingData.parSpecialRating) ||
     evidenceLinks !== savedEvidenceLinks;
 
-  const statusAlert = readOnly ? (
+  const statusAlert = readOnly || shared ? (
     <Alert severity={shared ? "success" : "info"}>
       {shared ? "Lead's feedback is shared with the employee" : "Lead's feedback is not shared with the employee"}
     </Alert>
@@ -534,7 +564,7 @@ export default function ParLeadReviewPanel({
               </Alert>
             )}
           </Box>
-          {isAdminView && readOnly && (
+          {isAdminView && readOnly && !editingClosed && (
             <Tooltip title="Edit PAR details">
               <IconButton aria-label="edit" onClick={() => setAdminEditConfirmOpen(true)}>
                 <PencilIcon size={18} />
@@ -546,7 +576,15 @@ export default function ParLeadReviewPanel({
               <IconButton
                 aria-label="download"
                 disabled={!reviews.isSuccess}
-                onClick={() => downloadParPdf(parRatingData, employeeComment, savedLeadComment, reviews.data)}
+                onClick={() =>
+                  downloadParPdf(
+                    parRatingData,
+                    employeeComment,
+                    savedLeadComment,
+                    reviews.data,
+                    isAdminView ? savedAdminComment : undefined,
+                  )
+                }
               >
                 <FileDownIcon size={18} />
               </IconButton>
@@ -610,29 +648,22 @@ export default function ParLeadReviewPanel({
                       <ParCommentView html={savedLead360Summary} />
                     </Box>
                   )
-                ) : responses.isLoading ? null : responses.isError && !responses.data ? (
-                  // Without the count, nothing says whether there's a summary to write.
-                  <ErrorNotice error={responses.error} onRetry={() => responses.refetch()} retrying={responses.isFetching}>
-                    Couldn't load the 360° responses.
-                  </ErrorNotice>
-                ) : responseCount < MIN_360_RESPONSES && !savedLead360Summary ? (
-                  // A summary, like the index, only from enough responses: the employee sees it. Once the
-                  // 360° deadline has passed everywhere no more can come in, so there's no row at all.
-                  hasEndedEverywhere(cycle.parThreeSixtyRatingDeadline) ? null : (
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-                        360° summary
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Available after {MIN_360_RESPONSES} or more submissions ({responseCount} so far).
-                      </Typography>
-                    </Box>
-                  )
                 ) : (
                   <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      360° summary
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1 }}>
+                      <Typography variant="subtitle2">360° summary</Typography>
+                      <Tooltip title={SUGGESTION_HINT} arrow enterTouchDelay={0}>
+                        <Box
+                          component="span"
+                          role="img"
+                          tabIndex={0}
+                          aria-label={SUGGESTION_HINT}
+                          sx={{ display: "flex", color: "text.secondary", cursor: "help" }}
+                        >
+                          <CircleHelpIcon size={15} />
+                        </Box>
+                      </Tooltip>
+                    </Box>
                     <ParRichTextField
                       ref={summaryField}
                       value={lead360Summary}
@@ -647,25 +678,31 @@ export default function ParLeadReviewPanel({
                       }
                       onAcceptSuggestion={summaryEmpty && suggestion.data ? takeSuggestion : undefined}
                     />
-                    {updateOffered && (
+                    {allFeedbackIn && responses.isError && !responses.data && (
+                      // Without the count, nothing says whether there's a suggestion.
+                      <Box sx={{ mt: 1 }}>
+                        <ErrorNotice error={responses.error} onRetry={() => responses.refetch()} retrying={responses.isFetching}>
+                          Couldn't load the 360° responses.
+                        </ErrorNotice>
+                      </Box>
+                    )}
+                    {suggestionOffered && (
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}>
                         <Typography variant="caption" color="text.secondary">
-                          {suggestedFrom === undefined
-                            ? "There's a suggested summary from the 360° feedback."
-                            : `${newResponses} new 360° ${newResponses === 1 ? "response" : "responses"} since the last suggestion.`}
+                          There's a suggested summary from the 360° feedback.
                         </Typography>
-                        <Button size="small" onClick={() => setShowingUpdatedSuggestion(true)}>
-                          {suggestedFrom === undefined ? "Show suggestion" : "Show updated suggestion"}
+                        <Button size="small" onClick={() => setShowingSuggestion(true)}>
+                          Show suggestion
                         </Button>
                       </Box>
                     )}
-                    {showingUpdatedSuggestion && !summaryEmpty && (suggestion.data || suggestion.isLoading) && (
+                    {showingSuggestion && !summaryEmpty && (suggestion.data || suggestion.isLoading) && (
                       <Box sx={{ mt: 1, p: 1.5, border: 1, borderColor: "divider", borderStyle: "dashed", borderRadius: 1 }}>
                         <ParLead360Suggestion
                           suggestion={suggestion.data}
                           actions={
                             <>
-                              <Button size="small" onClick={() => setShowingUpdatedSuggestion(false)}>
+                              <Button size="small" onClick={() => setShowingSuggestion(false)}>
                                 Dismiss
                               </Button>
                               <Button size="small" variant="outlined" onClick={takeSuggestion}>
@@ -680,7 +717,7 @@ export default function ParLeadReviewPanel({
                       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
                         {summaryAutoSaved
                           ? "Draft Saved"
-                          : "Couldn't write a suggestion just now. It's tried again when another response comes in, or after a day."}
+                          : "Couldn't write a suggestion just now. It's tried again after an hour."}
                       </Typography>
                     )}
                   </Box>
@@ -917,9 +954,7 @@ export default function ParLeadReviewPanel({
                     <Alert severity="info" sx={{ py: 0.25 }}>
                       You can share once {parRatingData.parEmployeeName?.split(" ")[0] ?? "the employee"} shares their{" "}
                       {showsPar2 ? "self-review" : "PAR"}
-                      {missedDeadlineRating
-                        ? `. If they don't by ${formatShortDateTime(selfReviewClosesAt)}, their rating will be ${missedDeadlineRating}.`
-                        : `, or from ${formatShortDateTime(selfReviewClosesAt)} if they don't.`}
+                      {missedDeadlineRating ? "." : `, or from ${formatShortDateTime(selfReviewClosesAt)} if they don't.`}
                     </Alert>
                   )}
                   {employeeReady && shareWaits && (
@@ -983,19 +1018,30 @@ export default function ParLeadReviewPanel({
 
       {isAdminView && (
         <Grid size={12} sx={showsPar2 ? { order: 3 } : undefined}>
-          <Accordion variant="outlined" defaultExpanded={Boolean(savedAdminComment)}>
+          <Accordion variant="outlined" defaultExpanded={!isEmptyHtml(savedAdminComment)}>
             <AccordionSummary expandIcon={<ChevronDownIcon size={18} />}>
               <Typography variant="h6">Admin Comment</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              {readOnly ? (
-                savedAdminComment ? (
+              {editingClosed ? (
+                !isEmptyHtml(savedAdminComment) ? (
                   <ParCommentView html={savedAdminComment} />
                 ) : (
                   <ParEmptyState text="Admin comment unavailable" />
                 )
               ) : (
-                <ParRichTextField value={adminComment} onChange={setAdminComment} placeholder="Enter your comment here" />
+                <Stack spacing={1.5}>
+                  <ParRichTextField value={adminComment} onChange={setAdminComment} placeholder="Enter your comment here" />
+                  <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Button
+                      variant="outlined"
+                      disabled={!adminCommentDirty || ratingUpdate.isPending}
+                      onClick={saveAdminComment}
+                    >
+                      Save comment
+                    </Button>
+                  </Box>
+                </Stack>
               )}
             </AccordionDetails>
           </Accordion>
