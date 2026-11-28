@@ -28,9 +28,13 @@ let rating: Partial<ParRating>;
 let reviewers: Partial<Par360Reviewer>[];
 let countFails = false;
 let countLoading = false;
+let ratingLoading = false;
 const retryCount = vi.fn();
 
-vi.mock("../api/useParData", () => ({ useParRating: () => query(rating) }));
+vi.mock("../api/useParData", () => ({
+  useParRating: () =>
+    ratingLoading ? { data: undefined, isLoading: true, isError: false, refetch: vi.fn() } : query(rating),
+}));
 vi.mock("../api/usePar360", () => ({ useReviewers: () => query(reviewers) }));
 vi.mock("../api/useReview360", () => ({
   useReviewCount: () =>
@@ -82,6 +86,7 @@ beforeEach(() => {
   reviewers = [];
   countFails = false;
   countLoading = false;
+  ratingLoading = false;
   retryCount.mockReset();
 });
 
@@ -141,18 +146,44 @@ describe("ParCycleTracker", () => {
     countFails = true;
     show();
     expect(screen.getByText(/Couldn't load your PAR cycle's progress/)).toBeInTheDocument();
-    expect(screen.getByText("The step's page")).toBeInTheDocument();
+    expect(screen.getByText("The step's page")).toBeVisible();
     expect(screen.queryByText("360° feedback")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(retryCount).toHaveBeenCalled();
   });
 
-  it("shows the step's page, but no steps or heading, until how many responded is in", () => {
+  it("loads the step's page out of sight until the PAR record and how many responded are in", () => {
+    for (const loading of ["rating", "count"]) {
+      ratingLoading = loading === "rating";
+      countLoading = loading === "count";
+      const view = render(
+        <MemoryRouter initialEntries={["/me/performance/cycle/self-review"]}>
+          <ParCycleTracker cycle={cycle} workEmail="me@example.com" selected="self-review">
+            <div>The step's page</div>
+          </ParCycleTracker>
+        </MemoryRouter>,
+      );
+      expect(screen.getByText("The step's page")).not.toBeVisible();
+      expect(screen.queryByText("360° feedback")).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  it("shows the steps and the step's page together once both are in", () => {
     countLoading = true;
-    show();
-    expect(screen.getByText("The step's page")).toBeInTheDocument();
-    expect(screen.queryByText("360° feedback")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    const tree = () => (
+      <MemoryRouter initialEntries={["/me/performance/cycle/self-review"]}>
+        <ParCycleTracker cycle={cycle} workEmail="me@example.com" selected="self-review">
+          <div>The step's page</div>
+        </ParCycleTracker>
+      </MemoryRouter>
+    );
+    const view = render(tree());
+    countLoading = false;
+    view.rerender(tree());
+    expect(screen.getByText("360° feedback")).toBeInTheDocument();
+    expect(screen.getByText("The step's page")).toBeVisible();
   });
 
   it("keeps what was picked on the step's page when the count loads after a retry", async () => {

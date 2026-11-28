@@ -89,19 +89,20 @@ export default function ParCycleTracker({
   const navigate = useNavigate();
   const { input, isLoading, failed } = useHomeInput(cycle, workEmail);
 
-  if (!input && isLoading) return <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5, maxWidth: 1100 }} />;
   // Without the PAR record there's nothing to track; the page says why.
-  if (!input) return <>{children}</>;
+  if (!input && !isLoading) return <>{children}</>;
 
-  // The steps wait for how many responded: until it's in, the rail and heading are placeholders, and if it
-  // couldn't be loaded, the rail says so. The step's page stays in the same place throughout, so what's picked or
-  // typed in it survives the count arriving or a retry.
-  const ready = !isLoading && !failed;
+  // The steps wait for the PAR record and how many responded: until both are in, the rail is a placeholder, and if
+  // the count couldn't be loaded, the rail says so. The step's page loads meanwhile but shows only with the steps, or
+  // with why they're missing, so the two appear together. It stays in the same place throughout, so what's picked
+  // or typed in it survives a retry.
+  const ready = input !== undefined && !isLoading && !failed;
   const steps = ready ? homeSteps(input) : [];
-  const open = selected ?? landingStep(input);
+  const open = selected ?? (input && landingStep(input));
+  const pageShown = ready || Boolean(failed);
 
   return (
-    <Card variant="outlined" sx={{ maxWidth: 1100 }}>
+    <Card variant="outlined">
       <Box sx={(theme) => ({ bgcolor: railBg(theme), px: 1.5, pt: 1.5, pb: ready ? 0 : 1.5, containerType: "inline-size" })}>
         <Chip label={cycle.parCycleName} size="small" color="primary" variant="outlined" sx={{ mb: 1.5, fontWeight: 600 }} />
         {failed ? (
@@ -141,8 +142,9 @@ export default function ParCycleTracker({
           colour even where the theme's surfaces are see-through. */}
       <Box sx={(theme) => ({ bgcolor: railBg(theme), borderTop: 1, borderColor: line(theme) })}>
         <Box sx={{ bgcolor: "background.paper", px: { xs: 2, sm: 3 }, pt: { xs: 2, sm: 2.5 }, pb: 3 }}>
-          {ready && <PanelHeader header={stepHeader(input, open)} />}
-          {children}
+          {ready && open && <PanelHeader header={stepHeader(input, open)} />}
+          {!pageShown && <Skeleton variant="rectangular" height={260} sx={{ borderRadius: 1.5 }} />}
+          <Box hidden={!pageShown}>{children}</Box>
         </Box>
       </Box>
     </Card>

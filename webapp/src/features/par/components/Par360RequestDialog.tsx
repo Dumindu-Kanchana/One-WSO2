@@ -26,6 +26,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  Skeleton,
   TextField,
   Typography,
 } from "@wso2/oxygen-ui";
@@ -50,13 +51,17 @@ import { describeError } from "@api/errors";
 // the same list Give feedback offers, rather than the whole org directory. A
 // PAR 2.0 cycle also suggests people from the employee's calendar, above the
 // field, 8 at a time with Suggest more for the rest; adding one adds them like
-// any other pick. Without `onCancel` it has no Cancel and doesn't take focus:
-// the 360° tab shows it all the time. `activeCycle` is Active cycle's look: the
+// any other pick. While they load, grey chips hold their place, so the field
+// doesn't jump down when they arrive. Without `onCancel` it has no Cancel and
+// doesn't take focus: the 360° tab shows it all the time. `activeCycle` is Active cycle's look: the
 // suggestions in the main colour, a "Search people" field without a From:
 // label, and Request under it on the left.
 
 /** Calendar suggestions shown at first, and added by each Suggest more. */
 const SUGGESTIONS_PER_ROUND = 8;
+
+/** The widths of the grey chips shown while the calendar suggestions load. */
+const LOADING_CHIP_WIDTHS = [112, 136, 96, 124];
 
 /** What separates addresses in pasted text: spaces, commas, semicolons, and the brackets and quotes of "Name
  * <address>" as an email's To line copies it. Each whole piece with an @ in it is one address. */
@@ -181,35 +186,43 @@ export function Par360RequestPicker({
 
   return (
     <>
-      {(suggested.length > 0 || moreSuggested) && (
+      {(suggestions.isLoading || suggested.length > 0 || moreSuggested) && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             {/* A lead's view passes "them" when the name isn't known. */}
             Suggested from {subjectName === undefined ? "your" : subjectName === "them" ? "their" : `${subjectName}'s`}{" "}
             calendar:
           </Typography>
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-            {suggested.map((s) => (
-              <Chip
-                key={s.workEmail}
-                variant="outlined"
-                icon={<PlusIcon size={14} />}
-                label={s.employeeName}
-                aria-label={`Add ${s.employeeName}`}
-                onClick={() => setSelected((prev) => [...prev, s.workEmail])}
-                sx={
-                  activeCycle
-                    ? { borderStyle: "dashed", borderColor: "primary.main", color: "primary.main", "& .MuiChip-icon": { color: "primary.main" } }
-                    : undefined
-                }
-              />
-            ))}
-            {moreSuggested && (
-              <Button size="small" onClick={() => setSuggestionsShown((n) => n + SUGGESTIONS_PER_ROUND)}>
-                Suggest more
-              </Button>
-            )}
-          </Box>
+          {suggestions.isLoading ? (
+            <Box role="status" aria-label="Loading suggestions" sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {LOADING_CHIP_WIDTHS.map((width) => (
+                <Skeleton key={width} variant="rounded" width={width} height={32} sx={{ borderRadius: 4 }} />
+              ))}
+            </Box>
+          ) : (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {suggested.map((s) => (
+                <Chip
+                  key={s.workEmail}
+                  variant="outlined"
+                  icon={<PlusIcon size={14} />}
+                  label={s.employeeName}
+                  aria-label={`Add ${s.employeeName}`}
+                  onClick={() => setSelected((prev) => [...prev, s.workEmail])}
+                  sx={
+                    activeCycle
+                      ? { borderStyle: "dashed", borderColor: "primary.main", color: "primary.main", "& .MuiChip-icon": { color: "primary.main" } }
+                      : undefined
+                  }
+                />
+              ))}
+              {moreSuggested && (
+                <Button size="small" onClick={() => setSuggestionsShown((n) => n + SUGGESTIONS_PER_ROUND)}>
+                  Suggest more
+                </Button>
+              )}
+            </Box>
+          )}
         </Box>
       )}
       {!activeCycle && <Typography sx={{ pb: 2 }}>From:</Typography>}

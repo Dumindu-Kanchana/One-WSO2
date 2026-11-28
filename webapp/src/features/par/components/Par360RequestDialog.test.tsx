@@ -34,7 +34,10 @@ vi.mock("../api/usePar360", () => ({
   }),
 }));
 let suggestions: unknown = undefined;
-vi.mock("../api/useReviewerSuggestions", () => ({ useReviewerSuggestions: () => ({ data: suggestions }) }));
+let suggestionsLoading = false;
+vi.mock("../api/useReviewerSuggestions", () => ({
+  useReviewerSuggestions: () => ({ data: suggestions, isLoading: suggestionsLoading }),
+}));
 
 const { Par360RequestPicker } = await import("./Par360RequestDialog");
 
@@ -60,6 +63,7 @@ function renderPicker(
 
 beforeEach(() => {
   suggestions = undefined;
+  suggestionsLoading = false;
 });
 
 // Typing an address and a comma adds it, as picking it from the list does.
@@ -169,6 +173,32 @@ describe("Par360RequestPicker", () => {
     expect(screen.queryByRole("button", { name: "Add Maya Fernando" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Request" }));
     expect(onSubmit).toHaveBeenCalledWith(["maya@example.com"]);
+  });
+
+  it("holds the suggestions' place above the field while they load, and leaves none when there are none", () => {
+    suggestionsLoading = true;
+    const view = renderPicker(vi.fn());
+    expect(screen.getByText("Suggested from your calendar:")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading suggestions" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Add / })).not.toBeInTheDocument();
+
+    suggestionsLoading = false;
+    suggestions = { meetingsSince: "2026-08-13", suggestions: [] };
+    view.rerender(
+      <Par360RequestPicker
+        open
+        selfEmail="ravi@example.com"
+        leadEmail="hannah@example.com"
+        existingEmails={[]}
+        onSubmit={vi.fn()}
+        onCancel={() => {}}
+        isSubmitting={false}
+        error={undefined}
+        parCycleId={2}
+      />,
+    );
+    expect(screen.queryByText("Suggested from your calendar:")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Loading suggestions" })).not.toBeInTheDocument();
   });
 
   it("says whose calendar for a lead", () => {
