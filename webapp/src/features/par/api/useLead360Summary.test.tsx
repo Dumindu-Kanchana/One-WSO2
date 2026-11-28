@@ -17,7 +17,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
 import type { ParRating } from "./types";
 
 const authedPost = vi.fn<(url: string) => Promise<unknown>>();
@@ -50,6 +50,22 @@ beforeEach(() => {
 });
 
 describe("useLead360SummarySuggestion", () => {
+  it("asks again an hour after a failure even while the tab is hidden", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      authedPost.mockRejectedValueOnce(new Error("HTTP 503"));
+      const { result } = renderHook(() => useLead360SummarySuggestion(2, "alex@example.com", 4, true), { wrapper });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      focusManager.setFocused(false);
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(authedPost).toHaveBeenCalledTimes(2);
+    } finally {
+      focusManager.setFocused(undefined);
+      vi.useRealTimers();
+    }
+  });
+
   it("reads the kept suggestion", async () => {
     const { result } = renderHook(() => useLead360SummarySuggestion(2, "alex@example.com", 4, true), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

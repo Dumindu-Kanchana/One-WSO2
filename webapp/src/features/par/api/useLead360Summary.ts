@@ -67,6 +67,9 @@ export function useLead360SummarySuggestion(
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchInterval: (query) => (query.state.status === "error" ? SUGGESTION_RETRY_AFTER_MS : false),
+    // Also while the tab is hidden: coming back to it doesn't ask again (focus refetching is off), so a retry skipped
+    // then would wait another hour.
+    refetchIntervalInBackground: true,
   });
 }
 
