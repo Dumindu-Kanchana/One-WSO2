@@ -147,6 +147,9 @@ export default function ParLeadReviewPanel({
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   const [evidenceConfirmed, setEvidenceConfirmed] = useState(false);
   const [seededForId, setSeededForId] = useState<number | undefined>(undefined);
+  // What the PAR admin has changed themselves since the record loaded or they last saved. Their save sends the lead's
+  // comment and rating only when they did, so a newer value the lead saved meanwhile (seen in a refetch) stays.
+  const [adminEdited, setAdminEdited] = useState({ leadComment: false, rating: false });
   const [autoSaved, setAutoSaved] = useState(false);
   const [confirming, setConfirming] = useState(false);
   // An admin lands on this panel read-only by default — even for a
@@ -184,6 +187,7 @@ export default function ParLeadReviewPanel({
   // Seed once per record, so a background refetch doesn't overwrite mid-typing.
   if (parRatingData && parRatingData.parRatingId !== seededForId) {
     setSeededForId(parRatingData.parRatingId);
+    setAdminEdited({ leadComment: false, rating: false });
     setLeadComment(decodeParComment(parRatingData.parLeadComment));
     setLead360Summary(decodeParComment(parRatingData.parLead360Summary));
     setAdminComment(decodeParComment(parRatingData.parAdminComment));
@@ -320,7 +324,7 @@ export default function ParLeadReviewPanel({
     // A PAR admin's save sends only what they changed, so it never overwrites the lead's newer words or rating, and
     // their Save draft keeps the lead status as it is: a shared PAR stays shared, and a PAR the lead hasn't started
     // isn't turned into the lead's draft.
-    const adminChanged = (changed: boolean) => !isAdminView || changed;
+    const adminChanged = (edited: boolean) => !isAdminView || edited;
     ratingUpdate.mutate(
       {
         employeeEmail,
@@ -329,7 +333,7 @@ export default function ParLeadReviewPanel({
           ...(isAdminView && status === "DRAFT" ? {} : { parLeadStatus: status }),
           // A comment never written is left out: the backend refuses an empty one. (A comment the lead
           // clears still holds the editor's empty paragraph, so it's sent and saved empty.)
-          ...(leadComment && adminChanged(leadComment.trim() !== savedLeadComment.trim())
+          ...(leadComment && adminChanged(adminEdited.leadComment)
             ? { parLeadComment: encodeParComment(leadComment) }
             : {}),
           // The autosave fires purely off comment typing and must not also
@@ -339,7 +343,7 @@ export default function ParLeadReviewPanel({
           ...(opts?.commentOnly
             ? {}
             : {
-                ...(parRatingValue && !ratingLocked && adminChanged(parRatingValue !== (parRatingData.parRating ?? ""))
+                ...(parRatingValue && !ratingLocked && adminChanged(adminEdited.rating)
                   ? { parRating: parRatingValue }
                   : {}),
                 // The backend's wire vocabulary is TOP5P/TOP20P/NOT_ASSIGNED;
@@ -357,6 +361,7 @@ export default function ParLeadReviewPanel({
       },
       {
         onSuccess: () => {
+          if (isAdminView) setAdminEdited({ leadComment: false, rating: false });
           if (!opts?.silent) showSuccess(status === "SHARED" ? "Successfully shared" : "Draft saved");
           opts?.onSuccess?.();
         },
@@ -625,7 +630,11 @@ export default function ParLeadReviewPanel({
                 ) : (
                   <ParRichTextField
                     value={leadComment}
-                    onChange={setLeadComment}
+                    onChange={(value) => {
+                      // An editor that only tidies the value it was given hasn't been edited.
+                      if (value.trim() !== leadComment.trim()) setAdminEdited((e) => ({ ...e, leadComment: true }));
+                      setLeadComment(value);
+                    }}
                     placeholder="Enter your comment here"
                     disabled={selfReviewMissed}
                   />
@@ -770,7 +779,10 @@ export default function ParLeadReviewPanel({
                     <ComplexSelect
                       fullWidth
                       value={shownRating}
-                      onChange={(e) => setParRatingValue(e.target.value as string)}
+                      onChange={(e) => {
+                        setAdminEdited((edited) => ({ ...edited, rating: true }));
+                        setParRatingValue(e.target.value as string);
+                      }}
                       disabled={ratingUpdate.isPending || ratingLocked}
                       // MUI names the combobox from labelId; aria-labelledby alone didn't reach it.
                       labelId="lead-review-rating-label"

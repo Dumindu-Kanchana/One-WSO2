@@ -932,6 +932,20 @@ describe("ParLeadReviewPanel: Admin View saves", () => {
     expect(savedPayload()).toEqual({ parLeadComment: encodeParComment("<p>Lead, corrected.</p>") });
   });
 
+  it("leaves a rating the lead saved meanwhile alone when the admin changed only the comment", async () => {
+    const view = showAsAdmin({ parRating: "Successful", parLeadComment: encodeParComment("<p>Lead</p>") });
+    fireEvent.click(screen.getByRole("button", { name: "edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await screen.findByRole("combobox", { name: "Rating" });
+    // The lead saves another rating meanwhile, and a refetch brings it in.
+    rating = { ...rating, parRating: "Needs Improvements" };
+    view.rerender(<ParLeadReviewPanel cycle={cycle} employeeEmail="alex@example.com" isAdminView />);
+    fireEvent.change(leadField(), { target: { value: "<p>Lead, corrected.</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toEqual({ parLeadComment: encodeParComment("<p>Lead, corrected.</p>") });
+  });
+
   it("can't be edited once the cycle is closed, even before its end date", () => {
     showAsAdmin({}, { ...cycle, parCycleStatus: "CLOSED" } as ParCycle);
     expect(screen.queryByRole("button", { name: "edit" })).not.toBeInTheDocument();

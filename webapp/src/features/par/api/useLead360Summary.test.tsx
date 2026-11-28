@@ -71,10 +71,19 @@ describe("useLead360SummarySuggestion", () => {
     await waitFor(() => expect(authedPost).toHaveBeenCalledTimes(2));
   });
 
-  it("doesn't retry after a failure: the backend decides when to try again", async () => {
-    authedPost.mockRejectedValue(new Error("HTTP 503"));
-    const { result } = renderHook(() => useLead360SummarySuggestion(2, "alex@example.com", 4, true), { wrapper });
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(authedPost).toHaveBeenCalledTimes(1);
+  it("asks again an hour after a failure, not before: the backend tries a failed one again only then", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      authedPost.mockRejectedValueOnce(new Error("HTTP 503"));
+      const { result } = renderHook(() => useLead360SummarySuggestion(2, "alex@example.com", 4, true), { wrapper });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      await vi.advanceTimersByTimeAsync(59 * 60 * 1000);
+      expect(authedPost).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(60 * 1000);
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(authedPost).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

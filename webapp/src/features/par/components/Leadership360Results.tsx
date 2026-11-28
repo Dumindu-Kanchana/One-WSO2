@@ -93,7 +93,10 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
   const averages = new Map(summary.questionAverages.map((a) => [a.questionId, a]));
   const questions = allQuestions(definition);
   const max = Math.max(...Object.values(definition.scales).map((s) => s.max), 5);
-  const choiceLabels = new Map(questions.flatMap((q) => (q.options ?? []).map((o) => [o.value, o.label] as const)));
+  // The relationship breakdown counts the answers to the aggregate-only questions, so its labels come from those.
+  const choiceLabels = new Map(
+    questions.filter((q) => q.aggregateOnly).flatMap((q) => (q.options ?? []).map((o) => [o.value, o.label] as const)),
+  );
   const heading = (text: string) => (
     <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
       {text}
@@ -205,7 +208,7 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
                 {!response.latest && " · earlier response"}
               </AccordionSummary>
               <AccordionDetails>
-                <Answers answers={response.answers} questions={questions} choiceLabels={choiceLabels} />
+                <Answers answers={response.answers} questions={questions} />
               </AccordionDetails>
             </Accordion>
           ))}
@@ -213,7 +216,7 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
             <Accordion key={`anonymous-${i}`} disableGutters>
               <AccordionSummary>Anonymous</AccordionSummary>
               <AccordionDetails>
-                <Answers answers={response.answers} questions={questions} choiceLabels={choiceLabels} />
+                <Answers answers={response.answers} questions={questions} />
               </AccordionDetails>
             </Accordion>
           ))}
@@ -223,16 +226,9 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
   );
 }
 
-// One response's answers, every one, in the form's order, a choice by its label.
-function Answers({
-  answers,
-  questions,
-  choiceLabels,
-}: {
-  answers: FormAnswers;
-  questions: FormQuestion[];
-  choiceLabels: Map<string, string>;
-}) {
+// One response's answers, every one, in the form's order, a choice by its label (from its own question, since two
+// questions may use the same value for different labels).
+function Answers({ answers, questions }: { answers: FormAnswers; questions: FormQuestion[] }) {
   const answered = questions.filter((q) => {
     const answer = answers[q.id];
     return answer !== undefined && answer !== null && answer !== "";
@@ -243,7 +239,8 @@ function Answers({
         const answer = String(answers[q.id]);
         return (
           <Typography key={q.id} variant="body2">
-            <strong>{q.text}:</strong> {q.type === "CHOICE" ? (choiceLabels.get(answer) ?? answer) : answer}
+            <strong>{q.text}:</strong>{" "}
+            {q.type === "CHOICE" ? (q.options?.find((o) => o.value === answer)?.label ?? answer) : answer}
           </Typography>
         );
       })}

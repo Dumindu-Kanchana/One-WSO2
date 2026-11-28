@@ -14,7 +14,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authedPatch } from "@api/http";
 import { useAccessToken } from "@hooks/useAccessToken";
 import { parServiceUrls } from "@config/apiConfig";
@@ -30,13 +30,28 @@ import type { ParRatingModify } from "./types";
 // "Share" button) is not a real bulk endpoint — it's a client-side loop of
 // this same per-record PATCH, one call per selected row. Ported the same
 // way: call this mutation once per employee, not a batch request.
+// What a rating update makes stale: the employee's PAR, the team rosters and the teams' completion counts.
+function refreshAfterRatingUpdates(qc: QueryClient, parCycleId: number | undefined, employeeEmails: string[]) {
+  return Promise.all([
+    ...employeeEmails.map((employeeEmail) =>
+      qc.invalidateQueries({ queryKey: ["par-rating", parCycleId, employeeEmail] }),
+    ),
+    qc.invalidateQueries({ queryKey: ["par-team-details"] }),
+    // A lead status / special-rating change also moves ParTeamSummary's
+    // own completion counts, shown back on the team-picker page.
+    qc.invalidateQueries({ queryKey: ["par-teams"] }),
+  ]);
+}
+
+// `refreshLater` leaves the refresh to the caller, for a run of updates (bulk Share) that refreshes once at the end
+// with useRefreshAfterRatingUpdates, instead of reloading every team's roster after each one.
 export function useLeadRatingUpdate(parCycleId: number | undefined) {
   const getAccessToken = useAccessToken();
   const qc = useQueryClient();
   return useMutation<
     void,
     Error,
-    { employeeEmail: string; parRatingId: number; payload: ParRatingModify }
+    { employeeEmail: string; parRatingId: number; payload: ParRatingModify; refreshLater?: boolean }
   >({
     mutationFn: async ({ employeeEmail, parRatingId, payload }) => {
       if (!parCycleId) throw new Error("Missing cycle");
@@ -48,14 +63,14 @@ export function useLeadRatingUpdate(parCycleId: number | undefined) {
         digiopsHeaders(),
       );
     },
-    onSuccess: async (_data, { employeeEmail }) => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["par-rating", parCycleId, employeeEmail] }),
-        qc.invalidateQueries({ queryKey: ["par-team-details"] }),
-        // A lead status / special-rating change also moves ParTeamSummary's
-        // own completion counts, shown back on the team-picker page.
-        qc.invalidateQueries({ queryKey: ["par-teams"] }),
-      ]);
+    onSuccess: async (_data, { employeeEmail, refreshLater }) => {
+      if (!refreshLater) await refreshAfterRatingUpdates(qc, parCycleId, [employeeEmail]);
     },
   });
+}
+
+// The refresh a run of `refreshLater` updates does once, for the employees it updated.
+export function useRefreshAfterRatingUpdates(parCycleId: number | undefined) {
+  const qc = useQueryClient();
+  return (employeeEmails: string[]) => refreshAfterRatingUpdates(qc, parCycleId, employeeEmails);
 }

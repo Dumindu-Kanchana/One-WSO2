@@ -51,6 +51,14 @@ const definition = {
       title: "Feedback",
       questions: [{ id: "other-feedback", type: "TEXT", text: "Anything else" }],
     },
+    {
+      id: "context",
+      title: "Context",
+      // The same option value as the relationship question's, with another label.
+      questions: [
+        { id: "seniority", type: "CHOICE", text: "Their role", options: [{ value: "TEAM_LEAD", label: "Leads a team" }] },
+      ],
+    },
   ],
 } as unknown as FormDefinition;
 
@@ -110,6 +118,16 @@ describe("Leadership360Results", () => {
       "How do you work with this leader?: Another lead in my team" +
         "Shows integrity: 2" +
         "Anything else: Share more context",
+    );
+  });
+
+  it("labels each choice from its own question, when two questions share a value", () => {
+    summary = { ...results(1), anonymousResponses: [{ answers: { relationship: "TEAM_LEAD", seniority: "TEAM_LEAD" } }] };
+    render(<Leadership360Results surveyId={5} view="REPORTS" leaderEmail="ada@example.com" />);
+    const anonymous = screen.getByRole("button", { name: "Anonymous" });
+    fireEvent.click(anonymous);
+    expect(anonymous.closest(".MuiAccordion-root")!).toHaveTextContent(
+      "How do you work with this leader?: Another lead in my team" + "Their role: Leads a team",
     );
   });
 

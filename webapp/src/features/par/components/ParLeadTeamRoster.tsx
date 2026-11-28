@@ -45,7 +45,7 @@ import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { useMeProfile } from "@features/my/api/useMeProfile";
 import { useParTeamsDetails } from "../api/useLeadTeams";
 import { useSend360Reminder } from "../api/useLeadReminders";
-import { useLeadRatingUpdate } from "../api/useLeadRatingUpdate";
+import { useLeadRatingUpdate, useRefreshAfterRatingUpdates } from "../api/useLeadRatingUpdate";
 import { useParShowsPar2, useReviewIndexes } from "../api/useReview360";
 import { cycleSurvey, useLeadership360Results, useLeadership360Surveys } from "../api/useLeadership360";
 import { formatIndex } from "../util/review360Form";
@@ -127,6 +127,7 @@ export default function ParLeadTeamRoster({
   const single = teams.length === 1 ? teams[0] : undefined;
   const send360Reminder = useSend360Reminder();
   const ratingUpdate = useLeadRatingUpdate(cycle.parCycleId);
+  const refreshAfterRatingUpdates = useRefreshAfterRatingUpdates(cycle.parCycleId);
   const { showSuccess, showError } = useNotifications();
   const leadEmail = useMeProfile().data?.userInfo.workEmail;
   // A PAR 2.0 cycle adds each member's 360° index and the team's headline counts.
@@ -251,19 +252,24 @@ export default function ParLeadTeamRoster({
     let passedCount = 0;
     let failedCount = 0;
     const reasons: string[] = [];
+    const shared: string[] = [];
+    // The rosters reload once, after the last share, rather than every team's after each one.
     for (const member of selectedMembers) {
       try {
         await ratingUpdate.mutateAsync({
           employeeEmail: member.parEmployeeEmail,
           parRatingId: member.parRatingId,
           payload: { parLeadStatus: "SHARED" },
+          refreshLater: true,
         });
         passedCount++;
+        shared.push(member.parEmployeeEmail);
       } catch (err) {
         failedCount++;
         reasons.push(describeError(err));
       }
     }
+    if (shared.length > 0) await refreshAfterRatingUpdates(shared);
     setSharing(false);
     setSelectedIds([]);
     if (passedCount === 0) {

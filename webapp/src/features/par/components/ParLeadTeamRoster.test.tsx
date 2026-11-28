@@ -15,7 +15,7 @@
 // under the License.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ParCycle, ParRatingMinimal, ParTeamSummary } from "../api/types";
 
 let rosters: { details: Partial<ParRatingMinimal>[] }[];
@@ -23,7 +23,12 @@ vi.mock("../api/useLeadTeams", () => ({
   useParTeamsDetails: () => ({ isLoading: false, isError: false, data: rosters }),
 }));
 vi.mock("../api/useLeadReminders", () => ({ useSend360Reminder: () => ({ mutate: vi.fn(), isPending: false }) }));
-vi.mock("../api/useLeadRatingUpdate", () => ({ useLeadRatingUpdate: () => ({ mutateAsync: vi.fn() }) }));
+const ratingMutateAsync = vi.fn();
+const refreshAfterRatingUpdates = vi.fn();
+vi.mock("../api/useLeadRatingUpdate", () => ({
+  useLeadRatingUpdate: () => ({ mutateAsync: ratingMutateAsync }),
+  useRefreshAfterRatingUpdates: () => refreshAfterRatingUpdates,
+}));
 vi.mock("../api/useReview360", () => ({
   useParShowsPar2: () => ({ showsPar2: true }),
   useReviewIndexes: () => ({ data: undefined }),
@@ -111,6 +116,26 @@ describe("ParLeadTeamRoster", () => {
     expect(screen.getByRole("button", { name: "Share" })).toBeEnabled();
     pickRow("Leo Tanaka");
     expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+  });
+
+  it("shares the picked PARs one by one, then reloads the rosters once", async () => {
+    rosters = [
+      { details: [member(11, "Maya Fernando", "maya@example.com"), member(13, "Sam Perera", "sam@example.com")] },
+      { details: [member(12, "Leo Tanaka", "leo@example.com")] },
+    ];
+    ratingMutateAsync.mockReset().mockResolvedValue(undefined);
+    refreshAfterRatingUpdates.mockReset().mockResolvedValue(undefined);
+    render(<ParLeadTeamRoster cycle={cycle} teams={[PLATFORM, FIELD_OPS]} onOpenReview={() => {}} />);
+    pickRow("Maya Fernando");
+    pickRow("Sam Perera");
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(refreshAfterRatingUpdates).toHaveBeenCalledTimes(1));
+    expect(ratingMutateAsync.mock.calls.map(([v]) => [v.employeeEmail, v.refreshLater])).toEqual([
+      ["maya@example.com", true],
+      ["sam@example.com", true],
+    ]);
+    expect(refreshAfterRatingUpdates).toHaveBeenCalledWith(["maya@example.com", "sam@example.com"]);
   });
 
   it("names the team and has no Team column for a lead with one team", () => {

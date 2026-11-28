@@ -50,6 +50,19 @@ describe("ParUpdateStatusPanel", () => {
     expect(mutate.mock.calls[0][0].payload).toEqual({ parLeadStatus: "DRAFT" });
   });
 
+  it("keeps an edit in progress when something else changes what's saved", () => {
+    rating = { ...rating, parEmployeeStatus: "DRAFT" };
+    const view = render(panel());
+    pick("Lead's Feedback Status", "Draft");
+    // The employee shares meanwhile, and a refetch brings it in.
+    rating = { ...rating, parEmployeeStatus: "SHARED" };
+    view.rerender(panel());
+    expect(screen.getByRole("combobox", { name: "Lead's Feedback Status" })).toHaveTextContent("Draft");
+    expect(screen.getByRole("combobox", { name: "Employee PAR Status" })).toHaveTextContent("Shared");
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
+    expect(mutate.mock.calls[0][0].payload).toEqual({ parLeadStatus: "DRAFT" });
+  });
+
   it("shows what's saved after a save changes more than was picked", () => {
     const view = render(panel());
     pick("Lead's Feedback Status", "Draft");

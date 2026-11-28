@@ -34,8 +34,12 @@ export interface Lead360SummarySuggestion {
 // The backend writes it once all the 360° feedback is in (after the 360°
 // deadline has passed everywhere) and keeps it, so it's written once; the key
 // carries the response count all the same. A POST, since asking may write one.
-// Never retried, not even when the panel mounts again after a failure: the
-// backend tries a failed one again only after an hour.
+// Not retried at once, not even when the panel mounts again after a failure:
+// the backend tries a failed one again only after an hour, so after a failure
+// it's asked for again an hour later, as the panel tells the lead.
+// How long after a failed suggestion it's asked for again: when the backend tries a failed one again.
+const SUGGESTION_RETRY_AFTER_MS = 60 * 60 * 1000;
+
 export function useLead360SummarySuggestion(
   parCycleId: number,
   employeeEmail: string,
@@ -62,6 +66,7 @@ export function useLead360SummarySuggestion(
     retryOnMount: false,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => (query.state.status === "error" ? SUGGESTION_RETRY_AFTER_MS : false),
   });
 }
 
