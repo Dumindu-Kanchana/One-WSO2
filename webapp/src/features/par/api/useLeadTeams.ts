@@ -78,6 +78,25 @@ export function useParTeamDetails(parCycleId: number | undefined, parTeamId: num
   return useQuery(teamDetailsQuery(parCycleId, parTeamId, getAccessToken, isSignedIn));
 }
 
+// GET the rosters of several teams at once: a lead's direct reports across all their teams, as one list. `data` is
+// each team's roster in the order asked, once every one has loaded.
+export function useParTeamsDetails(parCycleId: number | undefined, parTeamIds: number[]) {
+  const { isSignedIn } = useAsgardeo();
+  const getAccessToken = useAccessToken();
+  const rosters = useQueries({
+    queries: parTeamIds.map((id) => teamDetailsQuery(parCycleId, id, getAccessToken, isSignedIn)),
+  });
+  const failed = rosters.find((r) => r.isError);
+  return {
+    data: rosters.every((r) => r.data) ? rosters.map((r) => r.data!) : undefined,
+    isLoading: rosters.some((r) => r.isLoading),
+    isError: Boolean(failed),
+    error: failed?.error ?? null,
+    isFetching: rosters.some((r) => r.isFetching),
+    refetch: () => rosters.filter((r) => r.isError).forEach((r) => void r.refetch()),
+  };
+}
+
 // Who a lead can't offer 360° feedback to, by lowercased email, as the backend
 // decides it: the members of their teams in the cycle, or, with feedback held
 // for the next cycle, their direct reports in the org chart. Their feedback

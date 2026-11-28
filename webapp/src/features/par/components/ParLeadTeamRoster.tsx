@@ -30,21 +30,20 @@ import {
   Grid,
   IconButton,
   InputAdornment,
-  Link,
   Skeleton,
   Stack,
   TextField,
   Tooltip,
   Typography,
 } from "@wso2/oxygen-ui";
-import { ArrowLeftIcon, CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
+import { CalendarIcon, CopyIcon, EyeIcon, PencilIcon, SearchIcon } from "@wso2/oxygen-ui-icons-react";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { isPreviewEnabled } from "@config/previewFeatures";
 import { describeError } from "@api/errors";
 import { useNotifications } from "@context/notifications/NotificationsContext";
 import { useLeaveEmployees } from "@features/leave/api/useLeaveData";
 import { useMeProfile } from "@features/my/api/useMeProfile";
-import { useParTeamDetails } from "../api/useLeadTeams";
+import { useParTeamsDetails } from "../api/useLeadTeams";
 import { useSend360Reminder } from "../api/useLeadReminders";
 import { useLeadRatingUpdate } from "../api/useLeadRatingUpdate";
 import { useParShowsPar2, useReviewIndexes } from "../api/useReview360";
@@ -106,21 +105,26 @@ function StageProgress({ row }: { row: ParRatingMinimal }) {
   );
 }
 
-// Ports TeamSummary.tsx: one team's completion cards + member roster.
+/** A member with the team they're in. */
+type Member = ParRatingMinimal & { team: ParTeamSummary };
+
+/** A team by its department, team and sub-team: what tells a lead's teams apart. */
+const teamName = (team: ParTeamSummary) =>
+  [team.parDepartment, team.parTeam, team.parSubTeam].filter(Boolean).join(" / ");
+
+// A lead's direct reports, across all their teams, in one list (a Team column tells them apart when there are
+// several): the completion cards, the members, and the tools that act on them.
 export default function ParLeadTeamRoster({
   cycle,
-  team,
-  showBack,
-  onBack,
+  teams,
   onOpenReview,
 }: {
   cycle: ParCycle;
-  team: ParTeamSummary;
-  showBack: boolean;
-  onBack: () => void;
+  teams: ParTeamSummary[];
   onOpenReview: (employeeEmail: string) => void;
 }) {
-  const details = useParTeamDetails(cycle.parCycleId, team.parTeamId);
+  const details = useParTeamsDetails(cycle.parCycleId, teams.map((t) => t.parTeamId));
+  const single = teams.length === 1 ? teams[0] : undefined;
   const send360Reminder = useSend360Reminder();
   const ratingUpdate = useLeadRatingUpdate(cycle.parCycleId);
   const { showSuccess, showError } = useNotifications();
@@ -128,14 +132,23 @@ export default function ParLeadTeamRoster({
   // A PAR 2.0 cycle adds each member's 360° index and the team's headline counts.
   const { showsPar2 } = useParShowsPar2(cycle.parCycleId);
   const indexes = useReviewIndexes(cycle.parCycleId, leadEmail, showsPar2);
-  // In a PAR 2.0 cycle the team's PARs are shared once all their 360° feedback is in: once the 360° deadline (or the
-  // team's later self-review deadline) has passed everywhere (the backend's checkShareOpen).
-  const shareOpens = shareOpensAfter(cycle, team.parDepartment);
-  const shareOpensAt = deadlinePassedEverywhereAt(shareOpens.date);
-  const shareOpensAtMs = shareOpensAt.getTime();
-  const shareWaits = showsPar2 && new Date() < shareOpensAt;
-  // The roster redraws when Share opens, as the review panel does.
-  useRedrawAt(shareOpensAtMs, shareWaits);
+  // In a PAR 2.0 cycle a team's PARs are shared once all their 360° feedback is in: once the 360° deadline (or the
+  // team's later self-review deadline) has passed everywhere (the backend's checkShareOpen). Teams in different
+  // departments can open at different times.
+  const opensByTeam = new Map(
+    teams.map((t) => {
+      const opens = shareOpensAfter(cycle, t.parDepartment);
+      return [t.parTeamId, { after: opens.after, at: deadlinePassedEverywhereAt(opens.date) }] as const;
+    }),
+  );
+  const now = new Date().getTime();
+  const nextOpeningMs = Math.min(
+    ...[...opensByTeam.values()].map((o) => o.at.getTime()).filter((ms) => ms > now),
+    Number.POSITIVE_INFINITY,
+  );
+  const waits = (team: ParTeamSummary) => showsPar2 && now < (opensByTeam.get(team.parTeamId)?.at.getTime() ?? 0);
+  // The roster redraws when Share opens for a team, as the review panel does.
+  useRedrawAt(nextOpeningMs, showsPar2 && Number.isFinite(nextOpeningMs));
   const indexByEmail = useMemo(
     () => new Map((indexes.data?.members ?? []).map((m) => [m.employeeEmail.toLowerCase(), m.index])),
     [indexes.data],
@@ -173,23 +186,35 @@ export default function ParLeadTeamRoster({
   if (details.isError) {
     return (
       <ErrorNotice error={details.error} onRetry={() => details.refetch()} retrying={details.isFetching}>
-        Couldn't load this team's roster.
+        {single ? "Couldn't load this team's roster." : "Couldn't load your teams' rosters."}
       </ErrorNotice>
     );
   }
 
-  const members = details.data?.details ?? [];
+  const members: Member[] = (details.data ?? []).flatMap((roster, i) =>
+    (roster.details ?? []).map((m) => ({ ...m, team: teams[i] })),
+  );
   // The 360° responses tile counts PAR 360° only; leaders' feedback is Leadership 360°.
   const parMembers = members.filter((m) => !leaderResponsesByEmail.has(m.parEmployeeEmail.toLowerCase()));
   const filteredMembers = members
     .filter((member) =>
-      `${member.parEmployeeName.toLowerCase()}${member.parEmployeeEmail.toLowerCase()}`.includes(
-        searchTerm.toLowerCase(),
-      ),
+      [member.parEmployeeName, member.parEmployeeEmail, single ? "" : teamName(member.team)]
+        .join(" ")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()),
     )
     .sort((a, b) => a.parEmployeeName.localeCompare(b.parEmployeeName));
 
+  const teamSize = teams.reduce((n, t) => n + t.numberOfTeamMembers, 0);
   const selectedMembers = members.filter((m) => selectedIds.includes(m.parRatingId));
+  // Share waits while any picked PAR's team does, or, with none picked, while every team does. The time shown is the
+  // latest among them.
+  const waitingFor = (selectedMembers.length > 0 ? selectedMembers : members).filter((m) => waits(m.team));
+  const shareWaits =
+    selectedMembers.length > 0 ? waitingFor.length > 0 : members.length > 0 && waitingFor.length === members.length;
+  const lastToOpen = waitingFor
+    .map((m) => opensByTeam.get(m.team.parTeamId)!)
+    .reduce<{ after: string; at: Date } | undefined>((last, o) => (!last || o.at > last.at ? o : last), undefined);
 
   const handleCopyEmails = async () => {
     try {
@@ -250,7 +275,7 @@ export default function ParLeadTeamRoster({
     }
   };
 
-  const columns: DataGrid.GridColDef<ParRatingMinimal>[] = [
+  const columns: DataGrid.GridColDef<Member>[] = [
     {
       field: "parEmployeeName",
       headerName: "Team Member",
@@ -328,6 +353,17 @@ export default function ParLeadTeamRoster({
         </Box>
       ),
     },
+    // Only with more than one team; its column menu filters by it.
+    ...(single
+      ? []
+      : [
+          {
+            field: "team",
+            headerName: "Team",
+            flex: 1.2,
+            valueGetter: (_v, row) => teamName(row.team),
+          } satisfies DataGrid.GridColDef<Member>,
+        ]),
     {
       field: "parEmployeeStatus",
       headerName: showsPar2 ? "Self-review" : "Employee PAR",
@@ -446,23 +482,21 @@ export default function ParLeadTeamRoster({
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
-        <Box sx={{ minWidth: 0, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          {showBack && (
+        <Box sx={{ minWidth: 0, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+          {single ? (
+            <Typography component="span" variant="body1" sx={{ fontWeight: 600 }}>
+              {[single.parBusinessUnit, single.parDepartment, single.parTeam, single.parSubTeam]
+                .filter(Boolean)
+                .join(" / ")}
+            </Typography>
+          ) : (
             <>
-              <IconButton aria-label="Back to all teams" color="primary" onClick={onBack} sx={{ mr: 0.5 }}>
-                <ArrowLeftIcon size={18} />
-              </IconButton>
-              <Link component="button" underline="hover" onClick={onBack} sx={{ mr: 0.5 }}>
-                All Teams
-              </Link>
-              <Typography component="span" sx={{ mx: 0.5 }}>
-                /
+              <Chip label={cycle.parCycleName} size="small" color="primary" variant="outlined" />
+              <Typography component="span" variant="caption" color="text.secondary">
+                ({formatShortDate(cycle.parCycleStartDate)} - {formatShortDate(cycle.parCycleEndDate)})
               </Typography>
             </>
           )}
-          <Typography component="span" variant="body1" sx={{ fontWeight: 600 }}>
-            {[team.parBusinessUnit, team.parDepartment, team.parTeam, team.parSubTeam].filter(Boolean).join(" / ")}
-          </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
           <Tooltip title="Open Cycle Dates" arrow>
@@ -483,8 +517,8 @@ export default function ParLeadTeamRoster({
         <Grid size={{ xs: 12, sm: showsPar2 ? 3 : 4 }}>
           <ParCompletionKpiTile
             label={showsPar2 ? "Self-reviews shared" : "Employee PAR"}
-            completed={team.summary.employeeParCompletedCount}
-            total={team.numberOfTeamMembers}
+            completed={teams.reduce((n, t) => n + t.summary.employeeParCompletedCount, 0)}
+            total={teamSize}
           />
         </Grid>
         {showsPar2 && (
@@ -499,15 +533,15 @@ export default function ParLeadTeamRoster({
         <Grid size={{ xs: 12, sm: showsPar2 ? 3 : 4 }}>
           <ParCompletionKpiTile
             label={showsPar2 ? "Lead reviews done" : "Lead's PAR"}
-            completed={team.summary.leadsReviewCompletedCount}
-            total={team.numberOfTeamMembers}
+            completed={teams.reduce((n, t) => n + t.summary.leadsReviewCompletedCount, 0)}
+            total={teamSize}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: showsPar2 ? 3 : 4 }}>
           <ParCompletionKpiTile
             label="F2F"
-            completed={team.summary.f2fCompletedCount}
-            total={team.numberOfTeamMembers}
+            completed={teams.reduce((n, t) => n + t.summary.f2fCompletedCount, 0)}
+            total={teamSize}
           />
         </Grid>
       </Grid>
@@ -521,8 +555,14 @@ export default function ParLeadTeamRoster({
             </Button>
             <Tooltip
               title={
-                shareWaits
-                  ? `Reviews can be shared from ${formatShortDateTime(shareOpensAt)}, when ${shareOpens.after === "360" ? "the 360° deadline" : "this team's self-review deadline"} has passed everywhere.`
+                shareWaits && lastToOpen
+                  ? `Reviews can be shared from ${formatShortDateTime(lastToOpen.at)}, when ${
+                      lastToOpen.after === "360"
+                        ? "the 360° deadline"
+                        : single
+                          ? "this team's self-review deadline"
+                          : "their team's self-review deadline"
+                    } has passed everywhere.`
                   : ""
               }
             >
