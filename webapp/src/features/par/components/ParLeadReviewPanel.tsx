@@ -147,9 +147,10 @@ export default function ParLeadReviewPanel({
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   const [evidenceConfirmed, setEvidenceConfirmed] = useState(false);
   const [seededForId, setSeededForId] = useState<number | undefined>(undefined);
-  // What the PAR admin has changed themselves since the record loaded or they last saved. Their save sends the lead's
-  // comment and rating only when they did, so a newer value the lead saved meanwhile (seen in a refetch) stays.
-  const [adminEdited, setAdminEdited] = useState({ leadComment: false, rating: false });
+  // How many edits the PAR admin has made to each since the record loaded or a save took them. Their save sends the
+  // lead's comment and rating only when they did, so a newer value the lead saved meanwhile (seen in a refetch) stays.
+  // A save clears only the edits it carried: one made while it was on its way is still sent next time.
+  const [adminEdited, setAdminEdited] = useState({ leadComment: 0, rating: 0 });
   const [autoSaved, setAutoSaved] = useState(false);
   const [confirming, setConfirming] = useState(false);
   // An admin lands on this panel read-only by default — even for a
@@ -187,7 +188,7 @@ export default function ParLeadReviewPanel({
   // Seed once per record, so a background refetch doesn't overwrite mid-typing.
   if (parRatingData && parRatingData.parRatingId !== seededForId) {
     setSeededForId(parRatingData.parRatingId);
-    setAdminEdited({ leadComment: false, rating: false });
+    setAdminEdited({ leadComment: 0, rating: 0 });
     setLeadComment(decodeParComment(parRatingData.parLeadComment));
     setLead360Summary(decodeParComment(parRatingData.parLead360Summary));
     setAdminComment(decodeParComment(parRatingData.parAdminComment));
@@ -277,12 +278,17 @@ export default function ParLeadReviewPanel({
     !selfReviewMissed &&
     allFeedbackIn &&
     responseCount >= MIN_360_RESPONSES;
+  // Whether the last try at a suggestion failed. Until one succeeds it stays asked for, so it's tried again an hour
+  // later as the panel says, even once the lead has started writing.
+  const [suggestionFailedBefore, setSuggestionFailedBefore] = useState(false);
   const suggestion = useLead360SummarySuggestion(
     cycle.parCycleId,
     employeeEmail,
     responseCount,
-    suggestionPossible && (summaryEmpty || showingSuggestion),
+    suggestionPossible && (summaryEmpty || showingSuggestion || suggestionFailedBefore),
   );
+  const suggestionLastFailed = suggestion.isError ? true : suggestion.isSuccess ? false : suggestionFailedBefore;
+  if (suggestionLastFailed !== suggestionFailedBefore) setSuggestionFailedBefore(suggestionLastFailed);
   const suggestionFailed = suggestion.isError;
   // Offered under the lead's own words whenever it isn't open, so one that was
   // dismissed can be looked at again: it's kept, so nothing new is written.
@@ -324,7 +330,8 @@ export default function ParLeadReviewPanel({
     // A PAR admin's save sends only what they changed, so it never overwrites the lead's newer words or rating, and
     // their Save draft keeps the lead status as it is: a shared PAR stays shared, and a PAR the lead hasn't started
     // isn't turned into the lead's draft.
-    const adminChanged = (edited: boolean) => !isAdminView || edited;
+    const adminChanged = (edits: number) => !isAdminView || edits > 0;
+    const sentEdits = adminEdited;
     ratingUpdate.mutate(
       {
         employeeEmail,
@@ -361,7 +368,12 @@ export default function ParLeadReviewPanel({
       },
       {
         onSuccess: () => {
-          if (isAdminView) setAdminEdited({ leadComment: false, rating: false });
+          if (isAdminView) {
+            setAdminEdited((now) => ({
+              leadComment: now.leadComment === sentEdits.leadComment ? 0 : now.leadComment,
+              rating: now.rating === sentEdits.rating ? 0 : now.rating,
+            }));
+          }
           if (!opts?.silent) showSuccess(status === "SHARED" ? "Successfully shared" : "Draft saved");
           opts?.onSuccess?.();
         },
@@ -632,7 +644,9 @@ export default function ParLeadReviewPanel({
                     value={leadComment}
                     onChange={(value) => {
                       // An editor that only tidies the value it was given hasn't been edited.
-                      if (value.trim() !== leadComment.trim()) setAdminEdited((e) => ({ ...e, leadComment: true }));
+                      if (value.trim() !== leadComment.trim()) {
+                        setAdminEdited((e) => ({ ...e, leadComment: e.leadComment + 1 }));
+                      }
                       setLeadComment(value);
                     }}
                     placeholder="Enter your comment here"
@@ -780,7 +794,7 @@ export default function ParLeadReviewPanel({
                       fullWidth
                       value={shownRating}
                       onChange={(e) => {
-                        setAdminEdited((edited) => ({ ...edited, rating: true }));
+                        setAdminEdited((edited) => ({ ...edited, rating: edited.rating + 1 }));
                         setParRatingValue(e.target.value as string);
                       }}
                       disabled={ratingUpdate.isPending || ratingLocked}

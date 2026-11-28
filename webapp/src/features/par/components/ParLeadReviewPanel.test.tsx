@@ -318,6 +318,15 @@ describe("ParLeadReviewPanel: 360° summary", () => {
     expect(screen.getByLabelText(FIELD)).toBeInTheDocument();
   });
 
+  it("keeps asking for a suggestion after a failure, even once the lead starts writing", () => {
+    suggestion = { isError: true, error: new Error("HTTP 503") };
+    show();
+    fireEvent.change(screen.getByLabelText(FIELD), { target: { value: "<p>My own start.</p>" } });
+    // Still asked for, so the hourly retry the message promises carries on.
+    expect(suggestionAskedFor).toBe(true);
+    expect(screen.getByText("Couldn't write a suggestion just now. It's tried again after an hour.")).toBeInTheDocument();
+  });
+
   it("says on sharing that a suggestion not inserted isn't shared", () => {
     cycle.parEmployeeDeadline = PASSED_SELF_REVIEW;
     cycle.parThreeSixtyRatingDeadline = PASSED_360;
@@ -944,6 +953,23 @@ describe("ParLeadReviewPanel: Admin View saves", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
     await act(async () => {});
     expect(savedPayload()).toEqual({ parLeadComment: encodeParComment("<p>Lead, corrected.</p>") });
+  });
+
+  it("still sends a comment edited while the previous save was on its way", async () => {
+    showAsAdmin({ parRating: "Successful", parLeadComment: encodeParComment("<p>Lead</p>") });
+    fireEvent.click(screen.getByRole("button", { name: "edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await screen.findByRole("combobox", { name: "Rating" });
+    fireEvent.change(leadField(), { target: { value: "<p>First fix.</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    const firstSave = ratingMutate.mock.calls.at(-1)!;
+    // Edited again before the first save comes back.
+    fireEvent.change(leadField(), { target: { value: "<p>Second fix.</p>" } });
+    act(() => firstSave[1].onSuccess());
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await act(async () => {});
+    expect(savedPayload()).toEqual({ parLeadComment: encodeParComment("<p>Second fix.</p>") });
   });
 
   it("can't be edited once the cycle is closed, even before its end date", () => {

@@ -15,7 +15,7 @@
 // under the License.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ParCycle, ParRating } from "../api/types";
 
 let rating: Partial<ParRating>;
@@ -61,6 +61,18 @@ describe("ParUpdateStatusPanel", () => {
     expect(screen.getByRole("combobox", { name: "Employee PAR Status" })).toHaveTextContent("Shared");
     fireEvent.click(screen.getByRole("button", { name: "Update" }));
     expect(mutate.mock.calls[0][0].payload).toEqual({ parLeadStatus: "DRAFT" });
+  });
+
+  it("keeps an edit through a refresh that comes while saving, when the save fails", () => {
+    rating = { ...rating, parEmployeeStatus: "DRAFT" };
+    const view = render(panel());
+    pick("Lead's Feedback Status", "Draft");
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
+    // The employee shares while the save is on its way, then the save fails.
+    rating = { ...rating, parEmployeeStatus: "SHARED" };
+    view.rerender(panel());
+    act(() => mutate.mock.calls[0][1].onError(new Error("HTTP 500")));
+    expect(screen.getByRole("combobox", { name: "Lead's Feedback Status" })).toHaveTextContent("Draft");
   });
 
   it("shows what's saved after a save changes more than was picked", () => {

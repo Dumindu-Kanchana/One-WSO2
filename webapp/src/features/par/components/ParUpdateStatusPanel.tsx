@@ -63,7 +63,8 @@ export default function ParUpdateStatusPanel({ cycle, employeeEmail }: { cycle: 
   const [f2fStatus, setF2fStatus] = useState<ParF2fStatus>("PENDING");
   const [f2fDate, setF2fDate] = useState("");
   const [seededFrom, setSeededFrom] = useState<SavedStatuses | undefined>(undefined);
-  // Set by the PAR admin's own save, so what it stored replaces every field.
+  // Set once the PAR admin's own save has succeeded (and the record has been read again), so what it stored replaces
+  // every field. Not before: a refresh that arrives while the save is on its way keeps the edits, in case it fails.
   const [reseedAll, setReseedAll] = useState(false);
 
   const parRatingData = rating.data;
@@ -80,7 +81,7 @@ export default function ParUpdateStatusPanel({ cycle, employeeEmail }: { cycle: 
         f2fDate: parRatingData.parF2fDate ?? "",
       }
     : undefined;
-  if (saved && !sameStatuses(saved, seededFrom)) {
+  if (saved && (reseedAll || !sameStatuses(saved, seededFrom))) {
     const before = !reseedAll && seededFrom?.parRatingId === saved.parRatingId ? seededFrom : undefined;
     const follow = <T,>(local: T, was: T | undefined, now: T) => (before && local !== was ? local : now);
     setEmployeeStatus(follow(employeeStatus, before?.employeeStatus, saved.employeeStatus));
@@ -118,7 +119,6 @@ export default function ParUpdateStatusPanel({ cycle, employeeEmail }: { cycle: 
     f2fDate !== (parRatingData.parF2fDate ?? "");
 
   const handleSave = () => {
-    setReseedAll(true);
     ratingUpdate.mutate(
       {
         employeeEmail,
@@ -136,11 +136,11 @@ export default function ParUpdateStatusPanel({ cycle, employeeEmail }: { cycle: 
         },
       },
       {
-        onSuccess: () => showSuccess("Status updated"),
-        onError: (err) => {
-          setReseedAll(false);
-          showError(describeError(err));
+        onSuccess: () => {
+          setReseedAll(true);
+          showSuccess("Status updated");
         },
+        onError: (err) => showError(describeError(err)),
       },
     );
   };
