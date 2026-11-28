@@ -15,7 +15,7 @@
 // under the License.
 
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { FormDefinition, Leadership360Summary } from "../api/leadership360Types";
 
 const query = <T,>(data: T) => ({ data, isLoading: false, isError: false, refetch: vi.fn() });
@@ -28,9 +28,28 @@ const definition = {
   scales: { agreement: { min: 1, max: 5, minLabel: "Strongly disagree", maxLabel: "Strongly agree" } },
   sections: [
     {
+      id: "relationship",
+      title: "How you work with them",
+      questions: [
+        {
+          id: "relationship",
+          type: "CHOICE",
+          text: "How do you work with this leader?",
+          required: true,
+          aggregateOnly: true,
+          options: [{ value: "TEAM_LEAD", label: "Another lead in my team" }],
+        },
+      ],
+    },
+    {
       id: "traits",
       title: "Personal traits",
       questions: [{ id: "integrity", type: "RATING", text: "Shows integrity", scale: "agreement", required: true }],
+    },
+    {
+      id: "feedback",
+      title: "Feedback",
+      questions: [{ id: "other-feedback", type: "TEXT", text: "Anything else" }],
     },
   ],
 } as unknown as FormDefinition;
@@ -54,12 +73,50 @@ const results = (responseCount: number): Leadership360Summary => ({
 });
 
 describe("Leadership360Results", () => {
-  it("below 3, shows a leader's lead the comments but not the averages", () => {
-    summary = results(1);
+  it("below 3, shows a leader's lead only the responses: no averages or comments", () => {
+    summary = { ...results(1), comments: [], anonymousResponses: [{ answers: { integrity: 2 } }] };
     render(<Leadership360Results surveyId={5} view="REPORTS" leaderEmail="ada@example.com" />);
-    expect(screen.getByText("The averages show after 3 or more responses.")).toBeInTheDocument();
+    expect(screen.getByText("The averages and comments show after 3 or more responses.")).toBeInTheDocument();
     expect(screen.queryByText("Overall")).not.toBeInTheDocument();
-    expect(screen.queryByText("Shows integrity")).not.toBeInTheDocument();
+    expect(screen.queryByText("Comments")).not.toBeInTheDocument();
+    expect(screen.queryByText("No written comments.")).not.toBeInTheDocument();
+    expect(screen.getByText("Responses (1)")).toBeInTheDocument();
+  });
+
+  it("shows a leader's lead every response in full, anonymous ones without a name or date", () => {
+    summary = {
+      ...results(3),
+      namedResponses: [
+        {
+          respondentEmail: "bob@example.com",
+          respondentName: "Bob Silva",
+          submittedOn: "2026-11-20",
+          latest: true,
+          answers: { integrity: 5 },
+        },
+      ],
+      anonymousResponses: [
+        { answers: { "other-feedback": "Share more context", integrity: 2, relationship: "TEAM_LEAD" } },
+      ],
+    };
+    render(<Leadership360Results surveyId={5} view="REPORTS" leaderEmail="ada@example.com" />);
+    expect(screen.getByText("Responses (2)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Bob Silva · / })).toBeInTheDocument();
+    const anonymous = screen.getByRole("button", { name: "Anonymous" });
+    fireEvent.click(anonymous);
+    const details = anonymous.closest(".MuiAccordion-root")!;
+    // Every answer, in the form's order, a choice by its label.
+    expect(details).toHaveTextContent(
+      "How do you work with this leader?: Another lead in my team" +
+        "Shows integrity: 2" +
+        "Anything else: Share more context",
+    );
+  });
+
+  it("shows the leader no whole responses", () => {
+    summary = { ...results(3), namedResponses: undefined };
+    render(<Leadership360Results surveyId={5} view="SELF" leaderEmail="ada@example.com" />);
+    expect(screen.queryByText(/^Responses \(/)).not.toBeInTheDocument();
     expect(screen.getByText("Share more context")).toBeInTheDocument();
   });
 

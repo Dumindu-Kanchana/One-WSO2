@@ -108,7 +108,7 @@ describe("Leadership360ResultsCard", () => {
     ];
     render(<Leadership360ResultsCard view="ALL" leaderEmail="Bea@example.com" parCycleId={9} />);
     expect(screen.getByText("Leadership 360° results")).toBeInTheDocument();
-    expect(screen.getByText(/As People Ops you also see named responses in full/)).toBeInTheDocument();
+    expect(screen.getByText(/As People Ops you also see every response in full/)).toBeInTheDocument();
     expect(screen.getByText("Results of survey 5 (ALL)")).toBeInTheDocument();
     expect(asked.every((a) => a.view === "ALL")).toBe(true);
   });

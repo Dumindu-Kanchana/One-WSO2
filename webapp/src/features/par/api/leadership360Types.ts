@@ -145,6 +145,12 @@ export interface Leadership360NamedResponse {
   answers: FormAnswers;
 }
 
+// An anonymous response in full, for the leader's leads and PAR admins: no
+// name, date or id, and without how the respondent works with the leader.
+export interface Leadership360AnonymousResponse {
+  answers: FormAnswers;
+}
+
 export interface Leadership360NamedComment {
   respondentEmail: string;
   respondentName: string | null;
@@ -168,6 +174,9 @@ export interface Leadership360Summary {
   relationshipCounts?: Record<string, number>;
   // PAR admins and the leader's leads only.
   namedResponses?: Leadership360NamedResponse[];
+  // PAR admins and the leader's leads only, in an order that says nothing
+  // about when they were written.
+  anonymousResponses?: Leadership360AnonymousResponse[];
 }
 
 export interface Leadership360ResultsEntry {

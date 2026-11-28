@@ -27,7 +27,13 @@ import {
 } from "@wso2/oxygen-ui";
 import ErrorNotice from "@components/error-notice/ErrorNotice";
 import { useLeadership360Summary, useLeadership360SurveyWithTemplate } from "../api/useLeadership360";
-import type { FormDefinition, Leadership360Summary, Leadership360View } from "../api/leadership360Types";
+import type {
+  FormAnswers,
+  FormDefinition,
+  FormQuestion,
+  Leadership360Summary,
+  Leadership360View,
+} from "../api/leadership360Types";
 import { allQuestions, stepSections } from "../util/leadership360Form";
 import { formatShortDate } from "../util/parDate";
 import { formatIndex } from "../util/review360Form";
@@ -37,9 +43,10 @@ import { SummaryMetric } from "./Par360SummaryView";
 // One leader's results in one survey. What they contain depends on the view
 // they're read from — the backend decides: the leader (SELF) gets averages and
 // comments, with names on named comments, from 3 responses; their leads
-// (REPORTS) and PAR admins (ALL) get them from the first, with named responses
-// in full, and the averages from 3; admins also get the relationship breakdown.
-// Laid out like a PAR 360° summary.
+// (REPORTS) and PAR admins (ALL) get every response in full from the first,
+// every answer included (anonymous ones without a name or date), and the
+// summary from 3: averages, comments and, for admins, the relationship
+// breakdown. Laid out like a PAR 360° summary.
 export function Leadership360Results({
   surveyId,
   view,
@@ -84,19 +91,17 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
   }
 
   const averages = new Map(summary.questionAverages.map((a) => [a.questionId, a]));
-  const questionText = new Map(allQuestions(definition).map((q) => [q.id, q.text]));
+  const questions = allQuestions(definition);
   const max = Math.max(...Object.values(definition.scales).map((s) => s.max), 5);
-  const choiceLabels = new Map(
-    allQuestions(definition).flatMap((q) => (q.options ?? []).map((o) => [o.value, o.label] as const)),
-  );
+  const choiceLabels = new Map(questions.flatMap((q) => (q.options ?? []).map((o) => [o.value, o.label] as const)));
   const heading = (text: string) => (
     <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
       {text}
     </Typography>
   );
 
-  // Like PAR 360°'s index, the averages show only from 3 responses: one anonymous response's scores would be
-  // readable from them.
+  // Like PAR 360°'s index, the summary (averages and comments) shows only from 3 responses. Below that, a leader's
+  // leads and PAR admins read the responses themselves.
   const averagesShown = summary.responseCount >= MIN_360_RESPONSES;
 
   return (
@@ -110,7 +115,7 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
 
       {!averagesShown && (
         <Typography variant="body2" color="text.secondary">
-          The averages show after {MIN_360_RESPONSES} or more responses.
+          The averages and comments show after {MIN_360_RESPONSES} or more responses.
         </Typography>
       )}
 
@@ -153,23 +158,25 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
             </Box>
           ))}
 
-      <Box>
-        {heading("Comments")}
-        {summary.comments.length === 0 && summary.namedComments.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            No written comments.
-          </Typography>
-        ) : (
-          <Stack spacing={0.75}>
-            {summary.namedComments.map((c, i) => (
-              <Comment key={`named-${i}`} text={c.comment} by={c.respondentName ?? c.respondentEmail} />
-            ))}
-            {summary.comments.map((comment, i) => (
-              <Comment key={`anonymous-${i}`} text={comment} by="Anonymous" />
-            ))}
-          </Stack>
-        )}
-      </Box>
+      {averagesShown && (
+        <Box>
+          {heading("Comments")}
+          {summary.comments.length === 0 && summary.namedComments.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No written comments.
+            </Typography>
+          ) : (
+            <Stack spacing={0.75}>
+              {summary.namedComments.map((c, i) => (
+                <Comment key={`named-${i}`} text={c.comment} by={c.respondentName ?? c.respondentEmail} />
+              ))}
+              {summary.comments.map((comment, i) => (
+                <Comment key={`anonymous-${i}`} text={comment} by="Anonymous" />
+              ))}
+            </Stack>
+          )}
+        </Box>
+      )}
 
       {summary.relationshipCounts && (
         <Box>
@@ -182,14 +189,15 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
         </Box>
       )}
 
-      {summary.namedResponses && (
+      {(summary.namedResponses || summary.anonymousResponses) && (
         <Box>
-          {heading(`Named responses (${summary.namedResponses.length})`)}
+          {heading(`Responses (${(summary.namedResponses?.length ?? 0) + (summary.anonymousResponses?.length ?? 0)})`)}
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Only respondents who chose to submit with their name. The leader sees their comments with their name, not
-            the whole response. When someone responded more than once, only their latest scores count.
+            Each response in full. Anonymous ones show no name or date, and aren't in the order they came in. The
+            leader sees the averages and comments, not whole responses. When someone responded more than once, only
+            their latest scores count.
           </Typography>
-          {summary.namedResponses.map((response, i) => (
+          {summary.namedResponses?.map((response, i) => (
             <Accordion key={`${response.respondentEmail}-${i}`} disableGutters>
               <AccordionSummary>
                 {response.respondentName ?? response.respondentEmail}
@@ -197,18 +205,48 @@ function SummaryContent({ summary, definition }: { summary: Leadership360Summary
                 {!response.latest && " · earlier response"}
               </AccordionSummary>
               <AccordionDetails>
-                <Stack spacing={0.5}>
-                  {Object.entries(response.answers).map(([questionId, answer]) => (
-                    <Typography key={questionId} variant="body2">
-                      <strong>{questionText.get(questionId) ?? questionId}:</strong> {String(answer)}
-                    </Typography>
-                  ))}
-                </Stack>
+                <Answers answers={response.answers} questions={questions} choiceLabels={choiceLabels} />
+              </AccordionDetails>
+            </Accordion>
+          ))}
+          {summary.anonymousResponses?.map((response, i) => (
+            <Accordion key={`anonymous-${i}`} disableGutters>
+              <AccordionSummary>Anonymous</AccordionSummary>
+              <AccordionDetails>
+                <Answers answers={response.answers} questions={questions} choiceLabels={choiceLabels} />
               </AccordionDetails>
             </Accordion>
           ))}
         </Box>
       )}
+    </Stack>
+  );
+}
+
+// One response's answers, every one, in the form's order, a choice by its label.
+function Answers({
+  answers,
+  questions,
+  choiceLabels,
+}: {
+  answers: FormAnswers;
+  questions: FormQuestion[];
+  choiceLabels: Map<string, string>;
+}) {
+  const answered = questions.filter((q) => {
+    const answer = answers[q.id];
+    return answer !== undefined && answer !== null && answer !== "";
+  });
+  return (
+    <Stack spacing={0.5}>
+      {answered.map((q) => {
+        const answer = String(answers[q.id]);
+        return (
+          <Typography key={q.id} variant="body2">
+            <strong>{q.text}:</strong> {q.type === "CHOICE" ? (choiceLabels.get(answer) ?? answer) : answer}
+          </Typography>
+        );
+      })}
     </Stack>
   );
 }
